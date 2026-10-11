@@ -1,6 +1,7 @@
 import struct,glob,json,base64,numpy as np,sys
 import os
-src=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'kicker_export') + '/'
+# the Fusion export folder: the first argument, else kicker_export/ at the repo root
+src=os.path.join(sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'kicker_export'), '')
 keys={'calf':'Calf_Component','housing':'Assembled_Actuator_v54_1_Body2','ring':'Ring_Gear','endcap':'End_Cap','carriage':'v57_1_Carriage','topcarriage':'Top_Carriage','sun':'Sun_Gear','motor':'Tarot','rack':'Rack_v10_1_Body2','rail':'Extrusion_1_Extrusion','railcap':'v23_2_Cap','shoe':'Shoe_Cup',
  'planet1':'Stage_1_v16_1','planet2':'Stage_1_v16_2','planet3':'Stage_1_v16_3','planet4':'Stage_1_v16_4',
  'spacer1':'Spacer_1_Body1','spacer2':'Spacer_1_Body2','spacer3':'Spacer_1_Body3','spacer4':'Spacer_1_Body4'}

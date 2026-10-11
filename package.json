@@ -1,0 +1,17 @@
+{
+  "name": "gabrielprice-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "dev": "node scripts/build.mjs && wrangler dev",
+    "deploy": "node scripts/build.mjs && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.146.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
