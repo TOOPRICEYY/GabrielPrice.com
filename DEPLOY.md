@@ -22,10 +22,13 @@ You need four things: Cloudflare in charge of the domain, a deploy key for GitHu
 
 ### 2. Let GitHub Actions deploy
 
+If you have already connected the repo to Cloudflare's **Workers Builds** (Workers & Pages → gabrielprice-com → Settings → Build), Cloudflare deploys `main` and posts a preview on every pull request by itself. In that case, skip this section and leave the GitHub secrets unset: GitHub Actions then only builds and tests, and you avoid two deploys of the same commit. `wrangler.jsonc` runs the build itself, so Workers Builds needs no build command. Its deploy command stays `npx wrangler deploy`.
+
+
 1. In Cloudflare, go to **My Profile → API Tokens → Create Token** and pick the template **Edit Cloudflare Workers**. Under Account Resources, select your account. Under Zone Resources, select `gabrielprice.com`. Also add the permission **Zone → DNS → Edit**, so the first deploy can attach the domain. Create the token and copy it.
 2. Copy your **Account ID**. It's on the right side of the account's Workers & Pages overview page.
 3. In the GitHub repo, go to **Settings → Secrets and variables → Actions** and add two repository secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-4. Go to **Actions → Deploy → Run workflow** on `main`. Until these secrets exist, the workflow only builds and tests. The first deploy creates the Worker `gabrielprice` and puts it on gabrielprice.com and www.
+4. Go to **Actions → Deploy → Run workflow** on `main`. Until these secrets exist, the workflow only builds and tests. The first deploy creates the Worker `gabrielprice-com` and puts it on gabrielprice.com and www.
 
 ### 3. Put a lock on /admin (Cloudflare Access)
 
@@ -39,7 +42,7 @@ You need four things: Cloudflare in charge of the domain, a deploy key for GitHu
    - Repository access: **Only select repositories**, then pick `TOOPRICEYY/GabrielPrice.com`.
    - Permissions: **Contents**, **Issues** and **Pull requests**, each set to Read and write.
    - Pick an expiry and set yourself a reminder to renew it. When it expires, the editor shows "Not saved".
-2. In Cloudflare, go to **Workers & Pages → gabrielprice → Settings → Variables and Secrets** and add four values, each with type **Secret**:
+2. In Cloudflare, go to **Workers & Pages → gabrielprice-com → Settings → Variables and Secrets** and add four values, each with type **Secret**:
 
 | Name | Value |
 |---|---|

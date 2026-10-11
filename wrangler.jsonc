@@ -1,8 +1,10 @@
 // Cloudflare Worker for gabrielprice.com: the built site from dist/ plus the owner's editor under /admin (worker/index.js).
-// `npm run build` must run before any wrangler command; the deploy workflow does both.
+// wrangler runs the build itself (build.command), so `npx wrangler deploy` works from GitHub Actions and from Cloudflare's
+// Workers Builds alike. The name must match the Worker that Workers Builds is connected to.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gabrielprice",
+  "name": "gabrielprice-com",
+  "build": { "command": "node scripts/build.mjs" },
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
   "assets": {
