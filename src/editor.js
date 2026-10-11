@@ -25,19 +25,22 @@ const ID_OK = /^[\w.:@+~-]{1,200}$/;
 const COLOR_OK = /^(#[0-9a-f]{3,8}|var\(--[a-z0-9-]+\))$/i;
 
 // ---------- the editable elements, indexed before any edit touches them ----------
-const TEXT_SEL = ['h1', 'h2', 'p', '.eyebrow', '.scrollhint', '.spec dt', '.spec dd', '.formula', 'figcaption', '.chain span', '.alsolist li', '.links span']
+const TEXT_SEL = ['h1', 'h2', 'p', '.eyebrow', '.scrollhint', '.spec dt', '.spec dd', '.formula', 'figcaption', '.chain span', '.alsolist li', '.links span', '.gal-tag', '.gal-meta h3']
   .map((s) => 'main ' + s).join(',');
-const BLOCK_SEL = ['.card', '.hero-wrap', '.media', '.media figure', '.strip', '.strip li', '.spec', '.chain', '.ctl', '.btnrow', '#gait', '.bom', '.modtable', '.alsolist', '.links']
+const BLOCK_SEL = ['.card', '.hero-wrap', '.media', '.media figure', '.strip', '.strip li', '.spec', '.chain', '.ctl', '.btnrow', '#gait', '.bom', '.modtable', '.alsolist', '.links', '.gal-item']
   .map((s) => 'main ' + s).join(',') + ',.titleblock';
-const NAMES = [['h1', 'Title'], ['h2', 'Heading'], ['.eyebrow', 'Eyebrow'], ['.note', 'Small print'], ['.more', 'Extra paragraph'], ['p', 'Paragraph'],
+const NAMES = [['h1', 'Title'], ['h2', 'Heading'], ['h3', 'Card title'], ['.gal-tag', 'Tag'], ['.gal-item', 'Gallery card'], ['.eyebrow', 'Eyebrow'], ['.note', 'Small print'], ['.more', 'Extra paragraph'], ['p', 'Paragraph'],
   ['.scrollhint', 'Scroll hint'], ['dt', 'Spec label'], ['dd', 'Spec value'], ['.formula', 'Formula'], ['figcaption', 'Caption'], ['.chain span', 'Chain step'],
   ['.alsolist li', 'List item'], ['.links span', 'Link'], ['.card', 'Card'], ['.hero-wrap', 'Hero block'], ['.titleblock', 'Title block'], ['.media figure', 'Photo'],
   ['.media', 'Media'], ['.strip li', 'Photo'], ['.strip', 'Photo strip'], ['.spec', 'Spec table'], ['.chain', 'Drive chain'], ['.ctl', 'Sliders'],
   ['.btnrow', 'Buttons'], ['#gait', 'Gait plot'], ['.bom', 'Parts list'], ['.modtable', 'Module table'], ['.alsolist', 'List'], ['.links', 'Links']];
 const nameOf = (el) => (NAMES.find(([s]) => el.matches(s)) || [0, el.tagName.toLowerCase()])[1];
+// the scroll sections (data-s), plus the gallery after them, which has no scroll position and is keyed by its id
+const SEC_SEL = 'section[data-s], section#gallery';
+const secId = (sec) => sec.dataset.s != null ? +sec.dataset.s : sec.id;
 const items = new Map();          // key → item
 const byEl = new WeakMap();       // element → item
-// key: section number, then tag + index among same-tag siblings down to the element, e.g. s7.div1.p2 (section data-s=7, first div, second p)
+// key: section number (or the gallery's id), then tag + index among same-tag siblings down to the element, e.g. s7.div1.p2 (section data-s=7, first div, second p)
 function keyFor(el, sec) {
   if (el.matches('.titleblock')) return 'page.titleblock';
   const parts = [];
@@ -46,16 +49,16 @@ function keyFor(el, sec) {
     for (let s = n.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === n.tagName) i++;
     parts.unshift(n.tagName.toLowerCase() + i);
   }
-  return 's' + sec.dataset.s + '.' + parts.join('.');
+  return (sec.dataset.s != null ? 's' + sec.dataset.s : sec.id) + '.' + parts.join('.');
 }
 function indexAll() {
   const add = (el, kind) => {
     if (byEl.has(el)) return;
-    const sec = el.closest('section[data-s]');
+    const sec = el.closest(SEC_SEL);
     if (!sec && !el.matches('.titleblock')) return;
     const it = {
-      el, kind, key: keyFor(el, sec), sec: sec ? +sec.dataset.s : null, name: nameOf(el),
-      section: sec ? norm(sec.querySelector('.eyebrow')?.textContent) || 'Section ' + sec.dataset.s : 'Fixed overlay',
+      el, kind, key: keyFor(el, sec), sec: sec ? secId(sec) : null, name: nameOf(el),
+      section: sec ? norm(sec.querySelector('.eyebrow')?.textContent) || 'Section ' + secId(sec) : 'Fixed overlay',
       fp: norm(el.textContent).slice(0, 160), orig: el.innerHTML,
     };
     items.set(it.key, it); byEl.set(el, it);
@@ -64,6 +67,9 @@ function indexAll() {
   document.querySelectorAll(BLOCK_SEL).forEach((el) => add(el, el.matches('.card, .hero-wrap, .titleblock') ? 'card' : 'block'));
 }
 indexAll();
+// gallery.js fills the gallery grid later (it is a module, so it runs after this script): index its cards when they arrive
+const galgrid = document.getElementById('galgrid');
+if (galgrid) new MutationObserver(() => { const n = items.size; indexAll(); if (items.size !== n) applyAll(); }).observe(galgrid, { childList: true });
 
 const edits = new Map();   // doc id → edit doc
 const where = new Map();   // edit id → the item it resolved to this load
@@ -150,7 +156,7 @@ function applyAll() {
 }
 
 // the UI part reads these; render checks read items and edits
-const E = window.__siteEditor = { items, byEl, edits, where, norm, num, phoneMQ, layoutNow, ID_OK, resolve, sanitize, applyAll, editingEl: null, afterApply: null };
+const E = window.__siteEditor = { items, byEl, edits, where, norm, num, phoneMQ, layoutNow, ID_OK, SEC_SEL, secId, resolve, sanitize, applyAll, editingEl: null, afterApply: null };
 
 // ---------- the hosted site: baked edits, and the hidden door to the editor ----------
 const seed = document.getElementById('site-edits');
@@ -192,7 +198,7 @@ if (seed) {
 const E = window.__siteEditor;
 if (!E || E.ui) return;
 E.ui = true;
-const { items, byEl, edits, where, norm, num, phoneMQ, layoutNow, ID_OK, sanitize, applyAll } = E;
+const { items, byEl, edits, where, norm, num, phoneMQ, layoutNow, ID_OK, SEC_SEL, secId, sanitize, applyAll } = E;
 const clone = (o) => o == null ? null : JSON.parse(JSON.stringify(o));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const rnd = (v, k = 100) => Math.round(v * k) / k;
@@ -932,10 +938,10 @@ function onPointerUp(e) {
 function draftAt(x, y, target, wasFree) {
   const it = target && target.id !== 'stage' ? pick(target, false) : null;
   const s = sNow(), secs = sectionsNow();
-  const sec = (it && it.el.closest('section[data-s]')) || secs[Math.max(0, Math.min(secs.length - 1, Math.round(s)))];
+  const sec = (it && it.el.closest(SEC_SEL)) || secs[Math.max(0, Math.min(secs.length - 1, Math.round(s)))];
   const n = {
     n: 0, text: '', status: 'open', reply: '',
-    s: rnd(s, 1000), section: { index: sec ? +sec.dataset.s : Math.round(s), eyebrow: sec ? norm(sec.querySelector('.eyebrow')?.textContent) : '', title: sec ? norm(sec.querySelector('h1, h2')?.textContent) : '' },
+    s: rnd(s, 1000), section: { index: sec ? secId(sec) : Math.round(s), eyebrow: sec ? norm(sec.querySelector('.eyebrow')?.textContent) : '', title: sec ? norm(sec.querySelector('h1, h2')?.textContent) : '' },
     layout: layoutNow(), viewport: { w: innerWidth, h: innerHeight }, scrollY: Math.round(scrollY),
     screen: { x: Math.round(x), y: Math.round(y), fx: rnd(x / innerWidth, 1000), fy: rnd(y / innerHeight, 1000) },
   };
