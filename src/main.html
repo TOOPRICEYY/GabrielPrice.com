@@ -429,11 +429,22 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="links"><span>gabrielprice.com</span><span>GitHub · TOOPRICEYY</span></div>
     </div>
   </section>
+
+  <section class="gallery" id="gallery" aria-labelledby="gallery-h">
+    <div class="gal-wrap">
+      <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
+      <h2 id="gallery-h">More from the bench.</h2>
+      <p>Open one to turn it over, pull it apart and see how it goes together.</p>
+      <div class="gal-grid" id="galgrid"></div>
+    </div>
+  </section>
 </main>
+<script>/*EDITOR*/</script>
 
 <script>/*KICKER_DATA*/</script>
 <script>/*FIGURE_DATA*/</script>
 <script>/*WORKSHOP_DATA*/</script>
+<script>/*GALLERY_DATA*/</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -1197,9 +1208,10 @@ function frame() {
 resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
   buildKicker(); rigBuild();
-  window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; } }; // debug hook for render checks
+  window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; },
+    scene, renderer, controls, free, get s() { return sNow; } }; // debug hook for render checks; the site editor (editor.js) reads scene, camera and s from it
   requestAnimationFrame(frame);
 })
   .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
 </script>
-
+<script type="module">/*GALLERY*/</script>

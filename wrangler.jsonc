@@ -1,0 +1,31 @@
+// Cloudflare Worker for gabrielprice.com: the built site from dist/ plus the owner's editor under /admin (worker/index.js).
+// `npm run build` must run before any wrangler command; the deploy workflow does both.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gabrielprice",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/admin", "/admin/*"]
+  },
+  // the live domain; both need gabrielprice.com's nameservers moved to Cloudflare first
+  "routes": [
+    { "pattern": "gabrielprice.com", "custom_domain": true },
+    { "pattern": "www.gabrielprice.com", "custom_domain": true }
+  ],
+  // every pull request gets a preview link at a workers.dev address; the editor stays locked there (no Access login)
+  "workers_dev": true,
+  "preview_urls": true,
+  "vars": {
+    "GITHUB_REPO": "TOOPRICEYY/GabrielPrice.com"
+  },
+  // Secrets, set once in the Cloudflare dashboard (Workers → gabrielprice → Settings → Variables and Secrets) or with
+  // `npx wrangler secret put NAME`. They are never in this repo:
+  //   GITHUB_TOKEN        fine-grained token for this one repo: Contents, Issues and Pull requests read/write
+  //   ALLOWED_EMAILS      who may edit, comma-separated
+  //   ACCESS_TEAM_DOMAIN  e.g. https://yourteam.cloudflareaccess.com
+  //   ACCESS_AUD          the Application Audience (AUD) tag of the Access application for gabrielprice.com/admin
+  "observability": { "enabled": true }
+}
