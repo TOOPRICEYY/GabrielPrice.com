@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Dependencies and tool caches
+node_modules/
+.wrangler/
+
+# Secrets for local runs (wrangler dev reads .dev.vars). Real secrets live in GitHub and Cloudflare settings.
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+
+# Build output: the deploy workflow rebuilds these from src/ on every push
+dist/
+/index.html
+/artifact.html
+worker/editor-ui.gen.js
+
+# Raw Fusion 360 exports and their archives: inputs to src/pack*.py, kept on this Mac, not needed to build the site.
+# Delete a line here if you want that folder versioned too.
+fusion_exports/
+kicker_export/
+kicker_export_v20/
+*.tgz
+
+# Render-check screenshots
+*_check.png
+/figure_dummy_before_after.png

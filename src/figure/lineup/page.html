@@ -1,0 +1,225 @@
+<title>Mannequin Lineup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef1f4; --panel:#e2e8ed; --grid:rgba(8,160,180,.16); --fg:#1b2027; --muted:#5a6470; --line:#cdd5dd;
+  --accent:#07879a; --chip:#ffffff; --chip-on:#1b2027; --chip-on-fg:#ffffff;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171c; --panel:#1b2128; --grid:rgba(70,210,226,.12); --fg:#e6eaee; --muted:#96a1ac; --line:#2b333c;
+  --accent:#4fd2e2; --chip:#1b2128; --chip-on:#e6eaee; --chip-on-fg:#13171c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171c; --panel:#1b2128; --grid:rgba(70,210,226,.12); --fg:#e6eaee; --muted:#96a1ac; --line:#2b333c;
+  --accent:#4fd2e2; --chip:#1b2128; --chip-on:#e6eaee; --chip-on-fg:#13171c; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 "Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 72px;display:flex;flex-direction:column;gap:40px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px}
+header .t{display:flex;flex-direction:column;gap:6px;min-width:0;max-width:62ch}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.1;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.lede{margin:0;color:var(--muted)}
+.ctl{display:flex;gap:8px;flex-wrap:wrap}
+.ctl button{font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;border-radius:999px;
+  border:1px solid var(--line);background:var(--chip);color:var(--fg);cursor:pointer}
+.ctl button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-fg);border-color:var(--chip-on)}
+section{display:flex;flex-direction:column;gap:14px}
+.sh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;border-top:1px solid var(--line);padding-top:14px}
+.sh h2{margin:0;font-size:19px;font-weight:600}
+.sh .range{font-size:12px;letter-spacing:.08em;color:var(--accent)}
+.sh p{margin:0;color:var(--muted);flex-basis:100%;max-width:70ch}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(var(--cols),minmax(0,1fr))}
+.g4{--cols:4}.g5{--cols:5}
+@media (max-width:980px){.g5{--cols:3}}
+@media (max-width:720px){.g4,.g5{--cols:2}}
+.card{display:flex;flex-direction:column;gap:9px;min-width:0}
+.view{aspect-ratio:3/4;max-width:100%;border-radius:10px;cursor:grab;touch-action:pan-y;
+  background-color:var(--panel);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:22px 22px;background-position:center bottom}
+.view:active{cursor:grabbing}
+.cap{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cap .row{display:flex;align-items:baseline;gap:8px}
+.cap .num{font-size:12px;color:var(--accent);letter-spacing:.04em}
+.cap .name{font-weight:600;font-size:16px}
+.cap .desc{margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}
+.cap .meta{font-size:11.5px;color:var(--muted);letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.foot{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px;max-width:80ch}
+#gl{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="t">
+      <h1>Mannequin lineup</h1>
+      <p class="lede">Nine body styles for the site figure, each built on the same skeleton as the current one. Arms are lowered here for display only. Drag a figure to turn it, and reply in the thread with the number you want.</p>
+    </div>
+    <div class="ctl">
+      <button id="spin" aria-pressed="true">Turntable</button>
+      <button id="edges" aria-pressed="false">Facet edges</button>
+    </div>
+  </header>
+
+  <section>
+    <div class="sh"><span class="range mono">01&ndash;04</span><h2>Faceted</h2>
+      <p>Flat-shaded low-poly, like the reference you sent. The same body cut to different triangle counts, in two builds: the soft doll and a chiseled V-taper.</p></div>
+    <div class="grid g4">
+      <div class="card" data-key="chiseled" data-flat="1"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">01</span><span class="name">Chiseled</span></div>
+        <p class="desc">Broad chest block, shoulder caps, narrow waist, calf and forearm swell. Closest to your reference.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="faceted" data-flat="1"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">02</span><span class="name">Faceted doll</span></div>
+        <p class="desc">The softer doll proportions, with straight sides and a rounder chest, cut into planes.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="crystal" data-flat="1"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">03</span><span class="name">Crystal</span></div>
+        <p class="desc">The chiseled body cut down hard. Big planes, very graphic, reads like a game proxy.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="fine" data-flat="1"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">04</span><span class="name">Fine facet</span></div>
+        <p class="desc">The chiseled body with small facets. Smooth from a distance, faceted in close-ups.</p>
+        <span class="meta mono"></span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="range mono">05&ndash;09</span><h2>Other directions</h2>
+      <p>Smooth-shaded technical styles from the first round of ideas, kept for comparison.</p></div>
+    <div class="grid g5">
+      <div class="card" data-key="vinyl"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">05</span><span class="name">Vinyl doll</span></div>
+        <p class="desc">Blended capsules and an egg head, like a sculpting app's default base mesh.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="wooden"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">06</span><span class="name">Drawing manikin</span></div>
+        <p class="desc">Separate pieces on ball joints, like an artist's wooden manikin. Segmented, like the Xbot you passed on.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="crash"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">07</span><span class="name">Crash-test dummy</span></div>
+        <p class="desc">Seam rings at every joint, a waist and neck break, and quadrant calibration targets.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="boxy"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">08</span><span class="name">Box proxy</span></div>
+        <p class="desc">Rounded boxes for every segment, like a blocking-out rig before modelling.</p>
+        <span class="meta mono"></span></div></div>
+      <div class="card" data-key="mocap"><div class="view"></div><div class="cap">
+        <div class="row"><span class="num mono">09</span><span class="name">Mocap suit</span></div>
+        <p class="desc">Smooth body with suit seams and tracking markers on the joints and spine.</p>
+        <span class="meta mono"></span></div></div>
+    </div>
+  </section>
+
+  <p class="foot">Heights are to scale: every figure is 173.8 cm on a 66 cm plinth, the same as the site figure. Whichever style you pick gets skinned to the site's skeleton with the quad wireframe, and its hands get finger joints so they still grip the crutch, scooter bars and wheel.</p>
+</div>
+<canvas id="gl"></canvas>
+
+<!--DATA-->
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const FLOOR = -80.8, PLINTH = 66;
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.autoClear = false;
+
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;
+scene.environmentIntensity = .45;
+scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x9aa6b2, .7));
+const key = new THREE.DirectionalLight(0xffffff, 1.75); key.position.set(-200, 240, 170);
+key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; key.shadow.normalBias = .4;
+Object.assign(key.shadow.camera, { left: -70, right: 70, top: 110, bottom: -110, near: 50, far: 700 });
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xdff7fb, .7); rim.position.set(220, 120, -200); scene.add(rim);
+
+const camera = new THREE.PerspectiveCamera(24, .75, 10, 3000);
+const TARGET = new THREE.Vector3(0, 1, 0);
+
+function decode(d) {
+  const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
+  const q = new Int16Array(b(d.p)), pos = new Float32Array(q.length);
+  for (let i = 0; i < q.length; i++) pos[i] = q[i] / 100;
+  const idx = d.w === 2 ? new Uint16Array(b(d.i)) : new Uint32Array(b(d.i));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals(); return g;
+}
+function targetTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  for (let k = 0; k < 4; k++) { x.fillStyle = k % 2 ? '#141414' : '#f2c230'; x.beginPath(); x.moveTo(64, 64); x.arc(64, 64, 62, k * Math.PI / 2, (k + 1) * Math.PI / 2); x.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const satin = new THREE.MeshStandardMaterial({ color: '#ecebe7', roughness: .36 });
+const facet = new THREE.MeshStandardMaterial({ color: '#f1f0ec', roughness: .62, flatShading: true });
+const plinthMat = new THREE.MeshStandardMaterial({ color: '#f3f3f1', roughness: .7 });
+const edgeMat = new THREE.LineBasicMaterial({ color: '#2a3038', transparent: true, opacity: .38 });
+const ballMat = new THREE.MeshStandardMaterial({ color: '#25292e', roughness: .25 });
+let targetMat = null;
+const plinthGeo = new THREE.BoxGeometry(PLINTH, 5, PLINTH);
+const edgeGroups = [];
+
+const cards = [...document.querySelectorAll('.card')].map(el => {
+  const d = window.LINEUP[el.dataset.key], flat = el.dataset.flat === '1';
+  const group = new THREE.Group(); group.visible = false; scene.add(group);
+  const geo = decode(d), mesh = new THREE.Mesh(geo, flat ? facet : satin);
+  mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+  if (flat) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 8), edgeMat); e.visible = false; group.add(e); edgeGroups.push(e); }
+  for (const m of d.m || []) {
+    const p = new THREE.Vector3(m[0], m[1], m[2]), n = new THREE.Vector3(m[3], m[4], m[5]);
+    if (el.dataset.key === 'mocap') {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(1.15, 16, 12), ballMat); b.position.copy(p).addScaledVector(n, .75); group.add(b);
+    } else {
+      targetMat ||= new THREE.MeshStandardMaterial({ map: targetTexture(), roughness: .5, polygonOffset: true, polygonOffsetFactor: -2 });
+      const t = new THREE.Mesh(new THREE.CircleGeometry(2.5, 32), targetMat); t.position.copy(p).addScaledVector(n, .12);
+      t.lookAt(p.clone().add(n)); group.add(t);
+    }
+  }
+  const pl = new THREE.Mesh(plinthGeo, plinthMat); pl.position.y = FLOOR - 2.5; pl.receiveShadow = true; pl.castShadow = true; group.add(pl);
+  el.querySelector('.meta').textContent = `${(geo.index.count / 3).toLocaleString('en-US')} triangles \u00b7 ${flat ? 'flat' : 'smooth'} shaded`;
+  const card = { el, view: el.querySelector('.view'), group, yaw: 0, held: 0 };
+  let px = null;
+  card.view.addEventListener('pointerdown', e => { px = e.clientX; card.view.setPointerCapture(e.pointerId); });
+  card.view.addEventListener('pointermove', e => { if (px === null) return; card.yaw += (e.clientX - px) * .012; px = e.clientX; card.held = performance.now(); });
+  const up = () => { px = null; card.held = performance.now(); };
+  card.view.addEventListener('pointerup', up); card.view.addEventListener('pointercancel', up);
+  return card;
+});
+
+const btnSpin = document.getElementById('spin'), btnEdges = document.getElementById('edges');
+let spinning = true;
+btnSpin.onclick = () => { spinning = !spinning; btnSpin.setAttribute('aria-pressed', spinning); };
+btnEdges.onclick = () => { const on = btnEdges.getAttribute('aria-pressed') !== 'true'; btnEdges.setAttribute('aria-pressed', on); edgeGroups.forEach(e => e.visible = on); };
+window.__lineup = { still() { spinning = false; }, edges(on) { edgeGroups.forEach(e => e.visible = on); } };
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * renderer.getPixelRatio()) || canvas.height !== Math.round(h * renderer.getPixelRatio())) renderer.setSize(w, h, false);
+  renderer.setScissorTest(false); renderer.clear(); renderer.setScissorTest(true);
+  for (const c of cards) {
+    const r = c.view.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > h || r.right < 0 || r.left > w) continue;
+    if (spinning && now - c.held > 2500) c.yaw += dt * .32;
+    c.group.rotation.y = -.5 + c.yaw;
+    c.group.visible = true;
+    renderer.setViewport(r.left, h - r.bottom, r.width, r.height); renderer.setScissor(r.left, h - r.bottom, r.width, r.height);
+    camera.aspect = r.width / r.height;
+    const dist = 204 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / Math.min(1, camera.aspect / .75);
+    camera.position.set(0, TARGET.y + dist * .12, dist); camera.lookAt(TARGET); camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+    c.group.visible = false;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__ready = true;
+</script>

@@ -1,0 +1,1205 @@
+<title>Gabriel's Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one fixed WebGL stage under a tall scroll of spec-sheet cards that alternate sides; the crystal figure is the page's spine. */
+:root {
+  --vellum: #eeeef3;       /* white void, cool */
+  --vellum-2: #e2e1ea;
+  --graphite: #17151f;     /* ink */
+  --graphite-2: #4d4a5c;
+  --cobalt: #6a2cff;       /* callout + construction ink (violet) */
+  --neon: #00c8e0;         /* gridlines through the figure */
+  --sun: #ff4f9a;          /* vaporwave sunset */
+  --red: #ff2d2d;          /* crystal body */
+  --clay: #ecebe7;
+  --joint: #b3122e;
+  --sheet: rgba(248, 247, 252, .84);
+  --rule: rgba(106, 44, 255, .16);
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vellum: #110e1c; --vellum-2: #1a1530; --graphite: #ece8ff; --graphite-2: #a9a3c4;
+    --cobalt: #b18cff; --neon: #3ff3ff; --sun: #ff4f9a; --red: #ff3b3b; --clay: #dcdad5; --joint: #c0193a; --sheet: rgba(22, 17, 40, .82); --rule: rgba(177, 140, 255, .18);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --vellum: #110e1c; --vellum-2: #1a1530; --graphite: #ece8ff; --graphite-2: #a9a3c4;
+  --cobalt: #b18cff; --neon: #3ff3ff; --sun: #ff4f9a; --red: #ff3b3b; --clay: #dcdad5; --joint: #c0193a; --sheet: rgba(22, 17, 40, .82); --rule: rgba(177, 140, 255, .18);
+  color-scheme: dark;
+}
+html { scroll-behavior: auto; }
+body {
+  background: var(--vellum); color: var(--graphite);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.55;
+  overflow-x: hidden;
+}
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+#sunset {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 38% 46% at 58% 46%, color-mix(in srgb, var(--sun) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--cobalt) 10%, transparent));
+}
+#grid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 120px 120px; opacity: .35;
+  mask-image: radial-gradient(ellipse at 50% 45%, #000 30%, transparent 80%);
+}
+#callouts, #callouts2, #callouts3 { position: fixed; inset: 0; z-index: 1; pointer-events: none; width: 100%; height: 100%; }
+#callouts line, #callouts2 line, #callouts3 line { stroke: var(--cobalt); stroke-width: 1; }
+#callouts circle, #callouts2 circle, #callouts3 circle { fill: var(--vellum); stroke: var(--cobalt); stroke-width: 1.2; }
+#callouts text, #callouts2 text, #callouts3 text { fill: var(--cobalt); font-family: var(--f-mono); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+#callouts circle.dot, #callouts2 circle.dot, #callouts3 circle.dot { fill: var(--cobalt); stroke: none; }
+
+.titleblock {
+  position: fixed; z-index: 3; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid var(--graphite); background: var(--sheet);
+  display: grid; grid-template-columns: auto auto; min-width: 0;
+}
+.titleblock span { padding: 4px 8px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.titleblock span:nth-child(2n) { border-right: 0; font-variant-numeric: tabular-nums; }
+.titleblock span:nth-last-child(-n+2) { border-bottom: 0; }
+
+main { position: relative; z-index: 2; padding-inline: 16px; pointer-events: none; }
+main .card, main .hero-wrap { pointer-events: auto; }
+#stage { cursor: grab; touch-action: pan-y; }
+#stage.dragging { cursor: grabbing; }
+.viewbar {
+  position: fixed; z-index: 3; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px));
+  display: flex; gap: 10px; align-items: center;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--graphite-2);
+}
+.viewbar button {
+  font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--graphite);
+  background: var(--sheet); border: 1px solid var(--graphite); padding: 6px 10px; cursor: pointer;
+}
+.viewbar button:hover { background: var(--graphite); color: var(--vellum); }
+section {
+  min-height: 130vh; display: flex; align-items: center;
+  max-width: 1280px; margin-inline: auto;
+}
+section.right { justify-content: flex-end; }
+section.hero { min-height: 100vh; align-items: flex-end; padding-block: 0 14vh; }
+.card {
+  width: min(400px, 100%); min-width: 0;
+  background: var(--sheet); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--rule); padding: 22px 22px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.eyebrow {
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--cobalt); display: flex; gap: 10px; align-items: baseline;
+}
+.eyebrow b { font-weight: 500; color: var(--graphite-2); }
+h1, h2 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -.02em; }
+h1 { font-size: clamp(56px, 11vw, 148px); line-height: .86; font-weight: 300; font-variation-settings: "opsz" 96; }
+h1 em { font-style: normal; font-weight: 750; display: block; }
+h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.02; font-weight: 600; }
+p { margin: 0; max-width: 62ch; }
+.hero-wrap { display: flex; flex-direction: column; gap: 18px; max-width: 640px; }
+.hero-wrap p { font-size: 18px; color: var(--graphite-2); max-width: 44ch; }
+.scrollhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
+.spec { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-family: var(--f-mono); font-size: 12px; margin: 0; }
+.spec dt { color: var(--graphite-2); }
+.spec dd { margin: 0; font-variant-numeric: tabular-nums; }
+.bom { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-family: var(--f-mono); font-size: 12px; }
+.bom li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; }
+.bom .n { width: 20px; height: 20px; border: 1px solid var(--cobalt); border-radius: 50%; color: var(--cobalt); display: grid; place-items: center; font-size: 10px; }
+.bom .q { color: var(--graphite-2); }
+.chain { font-family: var(--f-mono); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.chain span { border: 1px solid var(--rule); padding: 2px 7px; }
+.note { font-size: 13px; color: var(--graphite-2); }
+a { color: var(--cobalt); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; font-family: var(--f-mono); font-size: 13px; }
+.links span { border-bottom: 1px solid var(--cobalt); }
+#loading { position: fixed; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); z-index: 3; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--graphite-2); }
+/* proof: the as-built photo wipes in over the render, then a strip of builds */
+#proof {
+  position: fixed; z-index: 1; pointer-events: none; right: max(16px, 4vw); top: 9vh; height: 82vh; aspect-ratio: 3 / 4; max-width: calc(100vw - 32px);
+  border: 1px solid var(--graphite); background: var(--vellum-2); opacity: 0; clip-path: inset(0 0 0 100%);
+}
+#proof img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#proof figcaption {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 8px;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  background: var(--sheet); color: var(--graphite); padding: 6px 10px; border-top: 1px solid var(--graphite);
+}
+#proofscan { position: fixed; z-index: 1; pointer-events: none; top: 9vh; height: 82vh; width: 2px; background: var(--neon); box-shadow: 0 0 12px var(--neon); opacity: 0; }
+#proofscan span {
+  position: absolute; top: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2);
+}
+.strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.strip figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.strip img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; border: 1px solid var(--rule); }
+.strip figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
+.strip figcaption b { display: block; color: var(--cobalt); font-weight: 500; letter-spacing: .08em; }
+.media { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+.media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.media img, .media video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); }
+.media figure:only-child img { aspect-ratio: 16 / 10; object-position: 50% 55%; }
+.media figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
+.media figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
+.ctl { display: grid; gap: 8px; font-family: var(--f-mono); font-size: 12px; }
+.ctl label { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 4.5em; gap: 10px; align-items: center; }
+.ctl output { text-align: right; font-variant-numeric: tabular-nums; color: var(--cobalt); }
+.ctl input[type=range] { width: 100%; accent-color: var(--cobalt); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.btnrow button, .padbtn {
+  font: inherit; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--graphite); background: var(--sheet); border: 1px solid var(--graphite); padding: 6px 10px; cursor: pointer;
+}
+.btnrow button[aria-pressed=true], .btnrow button:hover, .padbtn:active { background: var(--graphite); color: var(--vellum); }
+.formula { font-family: var(--f-mono); font-size: 12px; border-left: 2px solid var(--cobalt); padding: 2px 0 2px 10px; color: var(--graphite); }
+.formula small { display: block; color: var(--graphite-2); font-size: 11px; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule); padding: 0 4px; }
+/* gait plot */
+#gait { width: 100%; height: auto; display: block; cursor: ew-resize; touch-action: none; }
+#gait path.curve { fill: none; stroke: var(--red); stroke-width: 2; }
+#gait line, #gait path.axis { stroke: var(--rule); }
+#gait text { font-family: var(--f-mono); font-size: 9px; fill: var(--graphite-2); }
+#gait circle { fill: var(--red); }
+#gait .cursor { stroke: var(--cobalt); stroke-dasharray: 3 3; }
+#gait rect.swing { fill: color-mix(in srgb, var(--neon) 12%, transparent); }
+/* turret: the laser dot */
+#laser {
+  position: fixed; z-index: 6; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; pointer-events: none;
+  background: #ff2030; box-shadow: 0 0 6px 2px #ff2030, 0 0 22px 6px rgba(255, 32, 48, .45); opacity: 0; transition: opacity .2s;
+}
+.modtable { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-family: var(--f-mono); font-size: 11px; text-align: center; }
+.modtable div { border: 1px solid var(--rule); padding: 4px 2px; font-variant-numeric: tabular-nums; }
+.modtable b { display: block; color: var(--cobalt); font-weight: 500; }
+.readout { font-family: var(--f-mono); font-size: 12px; color: var(--cobalt); font-variant-numeric: tabular-nums; min-height: 1.5em; }
+.alsolist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
+.alsolist li { border: 1px solid var(--rule); padding: 3px 8px; background: var(--sheet); }
+.card .media { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+@media (max-width: 720px) {
+  .ctl label { grid-template-columns: 7.5em minmax(0, 1fr) 4em; }
+  .card .media, .card .note, .card .more, .formula small { display: none; }
+  #proof, #proofscan { top: calc(16px + env(safe-area-inset-top, 0px) + 36px); height: 46vh; }
+  #proof { right: 50%; transform: translateX(50%); }
+  section, section.right { justify-content: center; align-items: flex-end; padding-block: 0 8vh; }
+  .card { width: 100%; }
+  .titleblock { display: none; }
+}
+</style>
+
+<canvas id="stage" aria-hidden="true"></canvas>
+<div id="sunset" aria-hidden="true"></div>
+<div id="grid" aria-hidden="true"></div>
+<svg id="callouts" aria-hidden="true"></svg>
+<svg id="callouts2" aria-hidden="true"></svg>
+<svg id="callouts3" aria-hidden="true"></svg>
+<div id="loading">Loading model…</div>
+<figure id="proof" aria-hidden="true"><img src="photos/kicker_build_black.webp" alt=""><figcaption><span>Fig. 07 · as built</span><span>Black PLA · v2</span></figcaption></figure>
+<div id="proofscan" aria-hidden="true"><span>Render ▸ Built</span></div>
+<div id="laser" aria-hidden="true"></div>
+<div class="viewbar"><span id="viewhint">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
+<div class="titleblock" aria-hidden="true">
+  <span>Sheet</span><span id="tb-sheet">01 / 13</span>
+  <span>Scale</span><span>1 : 10</span>
+  <span>Units</span><span>cm</span>
+</div>
+
+<main>
+  <section class="hero" data-s="0">
+    <div class="hero-wrap">
+      <div class="eyebrow">Portfolio <b>Mock 01 · framing</b></div>
+      <h1>Gabriel <em>Price</em></h1>
+      <p>Designer and engineer. I build machines that work with the body, and model every part of them before they exist.</p>
+      <div class="scrollhint">Scroll to start ↓</div>
+    </div>
+  </section>
+
+  <section class="right" data-s="1">
+    <div class="card">
+      <div class="eyebrow">02 <b>About</b></div>
+      <h2>Start from the body.</h2>
+      <p>Placeholder copy. A short paragraph about who you are, where you work, and the kind of problems you like. The figure shifts stance with each section so it can point at what the page is talking about.</p>
+    </div>
+  </section>
+
+  <section data-s="2">
+    <div class="card">
+      <div class="eyebrow">03 <b>Project · Anti-thetis</b></div>
+      <h2>The Kicker</h2>
+      <p>A powered ankle exoskeleton. A calf shell carries a brushless motor and a planetary gearbox, which drive a rack along an aluminium rail to push the shoe cup around the ankle.</p>
+      <dl class="spec">
+        <dt>Joint</dt><dd>Ankle revolute, 1 DOF</dd>
+        <dt>Motor</dt><dd>Tarot 5010 brushless</dd>
+        <dt>Reduction</dt><dd>1-stage planetary, 4 planets</dd>
+        <dt>Output</dt><dd>24T pinion on rack, 2020 V-slot</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="right" data-s="3">
+    <div class="card">
+      <div class="eyebrow">04 <b>Fit</b></div>
+      <h2>Built around one leg.</h2>
+      <p>The shell is shaped from a scan of my own left calf, so the load path runs through soft tissue I measured, not an average.</p>
+    </div>
+  </section>
+
+  <section data-s="4">
+    <div class="card">
+      <div class="eyebrow">05 <b>Drive train</b></div>
+      <h2>Motor to ankle, in four steps.</h2>
+      <div class="chain"><span>Motor</span><span>Sun gear</span><span>4 planets → carrier</span><span>Pinion → rack</span><span>Shoe cup</span></div>
+      <p>The ring gear is fixed to the housing, so the carrier turns slower than the sun and with more torque. The pinion on the carrier walks the rack along the rail, and the rail pushes the toe side of the shoe cup.</p>
+      <p class="note">Gear motion in this mock is driven from the ankle angle with estimated ratios.</p>
+    </div>
+  </section>
+
+  <section class="right" data-s="5">
+    <div class="card">
+      <div class="eyebrow">06 <b>Exploded view</b></div>
+      <h2>Every part, apart.</h2>
+      <ol class="bom" id="bom"></ol>
+    </div>
+  </section>
+
+  <section data-s="6">
+    <div class="card">
+      <div class="eyebrow">07 <b>Built</b></div>
+      <h2>Then I built it.</h2>
+      <p>The model you just watched come apart is the one I printed, wired and wore. Every body came straight out of the Fusion 360 design, in its real position.</p>
+      <ul class="strip">
+        <li><figure><img src="photos/kicker_prototype_clear_worn_thumb.webp" alt="Clear PETG prototype of the Kicker worn on a bare leg over a sneaker"><figcaption><b>v1</b>Clear PETG, first fit on the leg</figcaption></figure></li>
+        <li><figure><img src="photos/kicker_build_black_thumb.webp" alt="Black PLA Kicker standing on its own, motor stator and V-wheels visible"><figcaption><b>v2</b>Black PLA, motor and rail fitted</figcaption></figure></li>
+        <li><figure><img src="photos/kicker_worn_with_knee_crop_thumb.webp" alt="Black Kicker worn with thigh cuffs and a knee hinge"><figcaption><b>v3</b>Worn with the knee module</figcaption></figure></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="right" data-s="7">
+    <div class="card">
+      <div class="eyebrow">08 <b>Anti-thetis · Full leg</b></div>
+      <h2>Then it has to walk.</h2>
+      <p>This is the whole brace from Fusion: the Kicker at the ankle, two die springs along the rail, a knee hinge on a pair of 45 mm bearings, and two cuffs around the thigh. The hinge follows the knee through every step.</p>
+      <p class="more">The knee is nearly straight when the heel lands, bends about 18° to soak up the hit, straightens, then folds to about 60° so the toes clear the floor. The Kicker can only point the foot down, so it does the push-off at the end of stance.</p>
+      <svg id="gait" viewBox="0 0 320 120" role="img" aria-label="Knee flexion angle over one gait cycle; drag to scrub"></svg>
+      <div class="readout" id="gaitRead"></div>
+      <div class="btnrow"><button id="walkBtn" type="button" aria-pressed="true">Walk</button></div>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/legexo_front_thumb.webp" alt="The full-leg exo worn: thigh cuffs, the knee hinge and the Kicker at the ankle"><figcaption><b>Worn</b>Cuffs, hinge, Kicker</figcaption></figure>
+        <figure><img loading="lazy" src="photos/kicker_worn_with_knee_crop_thumb.webp" alt="Close view of the knee hinge on the leg above the black Kicker"><figcaption><b>Detail</b>Hinge on the knee line</figcaption></figure>
+      </div>
+      <p class="note">Model: Assembled BRace v6 with The Kicker v22. Drag the plot to scrub the stride. The curve is an average adult profile, not a measurement of me.</p>
+    </div>
+  </section>
+
+  <section data-s="8">
+    <div class="card">
+      <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
+      <h2>Water, on crutches.</h2>
+      <p>On crutches both hands are busy, so you can't carry a drink. Water Break is a printed helical cage that hooks onto the two rails of a standard aluminium crutch, below the hand grip. A water bottle drops into it.</p>
+      <p>The walk is the one-crutch gait: the crutch and the left foot go forward together, then the right foot steps through past them.</p>
+      <p>The bottle swings with the crutch but the water doesn't. Gravity sets the surface, so all the swing can do is make it slosh. The cap stays on, so nothing spills.</p>
+      <div class="formula">tan φ = r·α / g <small>φ = surface tilt in the bottle, r = bottle's distance from the armpit, α = the crutch's angular acceleration</small></div>
+      <div class="ctl">
+        <label>Stride swing <input id="crSwing" type="range" min="0" max="20" step="1" value="12"><output id="crSwingOut">12°</output></label>
+      </div>
+      <div class="readout" id="crRead"></div>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/crutch_cupholder_thumb.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In a lecture hall, in use</figcaption></figure>
+      </div>
+      <p class="note">Model: Water Break, from Fusion. The crutch and bottle are stand-ins sized to its hooks. The slosh is a damped spring on top of first-order physics, not a fluid simulation.</p>
+    </div>
+  </section>
+
+  <section class="right" data-s="9">
+    <div class="card">
+      <div class="eyebrow">10 <b>Scooter · C6374 · HTD 3M</b></div>
+      <h2>A knee scooter with a belt drive.</h2>
+      <p>Knee scooters are slow on purpose. This one has a C6374 outrunner under the deck driving the rear right wheel through an HTD 3M belt, a throttle on the bars, and a basket because it still has to be useful. The left leg stays free; the right knee rides the pad.</p>
+      <p>Here it weaves a line of cones down the sidewalk by itself. The belt is on this side, inside the rear right wheel.</p>
+      <div class="media">
+        <figure><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
+        <figure><img loading="lazy" src="photos/scooter_parked_thumb.webp" alt="The finished knee scooter parked on a porch, blue rear wheels"><figcaption><b>Built</b>Basket and all</figcaption></figure>
+      </div>
+      <p class="note">Model: Scooter Asm v6. Wheels, steering and the knee pad move on their Fusion joints; the motor turns at the belt ratio. The sidewalk and cones are stand-ins.</p>
+    </div>
+  </section>
+
+  <section data-s="10">
+    <div class="card">
+      <div class="eyebrow">11 <b>Scooter · Belt drive</b></div>
+      <h2>Fast motor, slow wheel.</h2>
+      <p>An outrunner like the C6374 makes its power at high speed and low torque, and a scooter wheel wants the opposite. The belt trades one for the other. A small pulley on the motor drives a big one bolted to the wheel, so the motor turns several times for each turn of the wheel and the wheel gets that many times the torque.</p>
+      <div class="formula">n<sub>motor</sub> = (r<sub>wheel</sub> / r<sub>motor</sub>) · n<sub>wheel</sub> · τ<sub>wheel</sub> ≈ (r<sub>wheel</sub> / r<sub>motor</sub>) · τ<sub>motor</sub> <small>n = speed, τ = torque, r = pulley radius (measured across the model's pulleys, flanges included). A toothed belt loses a few percent, so the torque gain is a little under the ratio.</small></div>
+      <div class="readout" id="scBelt"></div>
+      <div class="media">
+        <figure><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="right" data-s="11">
+    <div class="card">
+      <div class="eyebrow">12 <b>Inside the scooter</b></div>
+      <h2>Twelve parts, pulled apart.</h2>
+      <p>It rolls to a stop and comes apart. The motor lifts off its mount, the belt slides off both pulleys, the wheel pulley comes out of the rear right wheel, and the battery pack drops out of the frame.</p>
+      <ol class="bom" id="bom3"></ol>
+      <p class="note">Model: Scooter Asm v6. Each part moves along its own offset; the rider goes see-through so the parts behind show.</p>
+    </div>
+  </section>
+
+  <section class="right" data-s="12">
+    <div class="card">
+      <div class="eyebrow">13 <b>Scooter · Drive it</b></div>
+      <h2>Take the bars.</h2>
+      <p>Left alone, it keeps weaving the cones. Press a key and it is yours. With a 51 cm wheelbase the turning circle falls straight out of the geometry.</p>
+      <div class="formula">R = L / tan δ <small>L = 51.2 cm (rear axle to front axle in the model), δ = steering angle</small></div>
+      <div class="ctl">
+        <label>Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
+        <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
+      </div>
+      <div class="readout" id="scRead"></div>
+      <p class="note">Drive with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys, or steer with the slider; <kbd>Space</kbd> hops, high enough to clear a cone. The ramps beside the cones are kickers to jump off; the autopilot weaves the other way and never touches them. Leave it for 3 seconds and the autopilot takes it back to the cones. A cone you hit falls over and stands back up.</p>
+    </div>
+  </section>
+
+  <section data-s="13">
+    <div class="card">
+      <div class="eyebrow">14 <b>Couch Surfing</b></div>
+      <h2>A couch that drives sideways.</h2>
+      <p>A full-size sofa on four swerve modules. Each corner has its own drive motor and its own steering motor, so the couch can slide in any direction and spin at the same time. I drive it from the seat with a Thrustmaster T128 wheel and its pedals on a wheel stand.</p>
+      <p>Every module solves one line of vector math: its wheel has to move at the couch's velocity plus what the spin adds at that corner.</p>
+      <div class="formula">v<sub>i</sub> = v + ω × r<sub>i</sub> <small>v = couch velocity, ω = spin rate, r<sub>i</sub> = corner position from the centre</small></div>
+      <div class="modtable" id="modtable"></div>
+      <div class="ctl">
+        <label>Spin ω <input id="cwSpin" type="range" min="-1" max="1" step="0.01" value="0"><output id="cwSpinOut">0</output></label>
+      </div>
+      <p class="note">Drive it like a car with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows and the camera drops in behind you: the front modules hold Ackermann angles, the rear ones stay straight, and it grips like a normal car. Hold <kbd>Shift</kbd> to drift: the steering oversteers and the back end steps out. <kbd>Space</kbd> is the handbrake. Off the throttle, <kbd>A</kbd> and <kbd>D</kbd> spin it on the spot like a tank, and a faint arrow on the floor shows where the steering points. Double-tap <kbd>A</kbd> or <kbd>D</kbd> and the steering swings 90° round the couch, so it drives sideways like a car; while you drive, the street bends left into a roundabout, and two gates plus a drift lap round the roundabout make a timed lap. Leave it and it goes back to showing off sideways moves only a swerve base can do; the spin slider drives that. Past 90° a module reverses its wheel instead of steering all the way round. The red steering rings are the hub from Fusion (Steering hub v9). The wheel and pedals are modelled from Thrustmaster's published dimensions; the sofa, stand and wheels are stand-ins, and the street is a simulation. Scroll on and it drives to the fire.</p>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/wheelstand_couch_thumb.webp" alt="The couch on a driveway beside its wheel stand with the wheel and pedals"><figcaption><b>Built</b>Couch, wheel and pedals</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="right" data-s="14">
+    <div class="card">
+      <div class="eyebrow">15 <b>Assym Restore</b></div>
+      <h2>A lamp that plays with the cat.</h2>
+      <p>Assym Restore stands on the mantel. An MG996R servo in the base turns everything above it through its full 180°, and a 9 g servo tilts the laser through a horn and a push rod. Two angles put the dot on the floor wherever you point.</p>
+      <p>Move your cursor across the floor. The cat does the rest, goes round the couch and the hearth to get there, and jumps up onto the cushions when the dot lands on the couch.</p>
+      <div class="formula">pan = atan2(Δx, Δz) · tilt = atan(h / d) <small>Δx, Δz and d = from the lamp to your cursor on the floor, h = the laser's height. The crank arm is 2.4 cm. The model's horn hole is 1.2 cm out, which capped the tilt near 30°; on the outer hole of a long horn, 2.3 cm out, it reaches about 69°, so the dot lands within about 0.4 h of the lamp. Point at the mantel or the hearth and it tips right down onto them. The pan stops at ±90°, along the mantel either way: any further and the laser would face the brick. Swung wide, it lifts the beam just enough to clear the end of the shelf.</small></div>
+      <div class="readout" id="asRead"></div>
+      <p class="note">Model: Assym Restore v7, from Fusion. The pivots come from the holes in the model; the joint limits are worked out from the linkage, not documented. The mantel is a stand-in. On a phone, touch and drag.</p>
+    </div>
+  </section>
+
+  <section data-s="15">
+    <div class="card">
+      <div class="eyebrow">16 <b>Up close</b></div>
+      <h2>Assym Restore, at play.</h2>
+      <p>Before it comes apart, a slow look at it whole. Here it plays the way it does for the cat: the base stays put while the pan servo darts the head a little to each side and the tilt servo flicks the laser up and down, holding and wiggling the dot between moves, so you can watch the shade, the slot and the linkage work.</p>
+      <p class="note">Solid, as modelled: Assym Restore v7 from Fusion. The moves are a scripted imitation of play, not a recording.</p>
+    </div>
+  </section>
+
+  <section class="right" data-s="16">
+    <div class="card">
+      <div class="eyebrow">17 <b>Inside Assym Restore</b></div>
+      <h2>Thirteen parts, seen through.</h2>
+      <p>The shade, cap and base turn translucent, so the internals show through them. The MG996R pan servo sits on the base with its spline in it, the 9 g tilt servo stands in its housing and pushes the laser's crank through the rod, the ESP32-CAM faces forward under the laser, and two 3 W speakers sit inside the base.</p>
+      <ol class="bom" id="bom2"></ol>
+      <p class="note">Model: Assym Restore v7. The ESP32-CAM's board parts are simple blocks in the model, so they show as blocks here too.</p>
+    </div>
+  </section>
+
+  <section data-s="17">
+    <div class="card">
+      <div class="eyebrow">18 <b>Next</b></div>
+      <h2>Still on the bench.</h2>
+      <p>These are in Fusion and not finished yet.</p>
+      <ul class="alsolist"><li>Flying Bike</li><li>Pipe organ</li><li>ShoppingKart · Honda GX390</li><li>Printers Printing Printers</li><li>Bedside table</li><li>Torque tester</li></ul>
+      <div class="links"><span>gabrielprice.com</span><span>GitHub · TOOPRICEYY</span></div>
+    </div>
+  </section>
+</main>
+
+<script>/*KICKER_DATA*/</script>
+<script>/*FIGURE_DATA*/</script>
+<script>/*WORKSHOP_DATA*/</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
+
+// ---------- free look: drag to orbit/pan; any scroll or Reset eases back to the scripted camera ----------
+const controls = new OrbitControls(camera, canvas);
+controls.enableZoom = false;          // the wheel stays the page's scroll
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE }; // one finger scrolls the page
+controls.screenSpacePanning = true;
+controls.enabled = true;
+canvas.style.touchAction = 'pan-y';
+const free = { on: false, back: 0, fromP: new THREE.Vector3(), fromT: new THREE.Vector3() };
+const resetBtn = document.getElementById('resetview');
+const hintEl = document.getElementById('viewhint');
+controls.addEventListener('start', () => {
+  if (!free.on) controls.target.copy(camTgt);
+  free.on = true; free.back = 0; resetBtn.hidden = false; hintEl.hidden = true; canvas.classList.add('dragging');
+});
+controls.addEventListener('end', () => canvas.classList.remove('dragging'));
+function returnToPath() {
+  if (!free.on || free.back) return;
+  free.back = 1e-6; free.fromP.copy(camera.position); free.fromT.copy(controls.target);
+  resetBtn.hidden = true; hintEl.hidden = false;
+}
+resetBtn.addEventListener('click', returnToPath);
+
+// ---------- theme ----------
+const css = () => getComputedStyle(document.documentElement);
+const tok = (n) => new THREE.Color(css().getPropertyValue(n).trim() || '#888');
+
+// ---------- lights ----------
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(160, 320, 220);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -240, right: 150, top: 220, bottom: -60, near: 50, far: 900 });
+key.shadow.bias = -0.0006;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd0ff, 0.9);
+rim.position.set(-200, 160, -260);
+scene.add(rim);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.ShadowMaterial({ opacity: 0.18 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+scene.add(ground);
+const floorGrid = new THREE.GridHelper(1200, 60);
+floorGrid.material.transparent = true; floorGrid.material.opacity = .32; floorGrid.material.depthWrite = false;
+floorGrid.position.y = 0.05; scene.add(floorGrid);
+
+// ---------- Vitruvian construction lines ----------
+const H = 174;
+const constr = new THREE.Group(); scene.add(constr);
+const lineMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.55 });
+function addLine(pts) { constr.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat)); }
+{
+  const cy = 104, R = 104, z = -40, pts = [];
+  for (let i = 0; i <= 160; i++) { const a = i / 160 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * R, cy + Math.sin(a) * R, z)); }
+  addLine(pts);
+  const s = H / 2;
+  addLine([new THREE.Vector3(-s, 0, z), new THREE.Vector3(s, 0, z), new THREE.Vector3(s, H, z), new THREE.Vector3(-s, H, z), new THREE.Vector3(-s, 0, z)]);
+  for (let y = 0; y <= H; y += 10) { const w = y % 50 === 0 ? 6 : 3; addLine([new THREE.Vector3(-s - w, y, z), new THREE.Vector3(-s, y, z)]); }
+  addLine([new THREE.Vector3(-s - 14, 0, z), new THREE.Vector3(-s - 14, H, z)]);
+  addLine([new THREE.Vector3(-200, 0, 0), new THREE.Vector3(200, 0, 0)]);
+}
+
+// ---------- the figure (rigged, medium-poly; bone frames are world-aligned in rest pose, facing +z) ----------
+// SUPERHOT-style crystal: flat facets, a hot red body that drifts to pink at the head,
+// a bright fresnel rim, and a 10 cm architectural grid baked onto the body in bind-pose space.
+const crystalU = {
+  uLine: { value: new THREE.Color('#00c8e0') }, uRim: { value: new THREE.Color('#ffd6f2') },
+  uTop: { value: new THREE.Color('#ff4f9a') }, uSpacing: { value: 10 }, uHeight: { value: 178 }, uFloor: { value: 0 },
+};
+function crystal(base, rimAmt) {
+  const m = new THREE.MeshStandardMaterial({ color: base, roughness: 0.42, metalness: 0.0, flatShading: false,
+    emissive: new THREE.Color(base).multiplyScalar(0.18) });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, crystalU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrid;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGrid = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vGrid; uniform vec3 uLine; uniform vec3 uRim; uniform vec3 uTop;
+        uniform float uSpacing; uniform float uHeight; uniform float uFloor;
+        float gridLine(vec3 p, float sp) {
+          vec3 q = p / sp; vec3 w = fwidth(q);
+          vec3 g = abs(fract(q - 0.5) - 0.5) / max(w, vec3(1e-4));
+          return 1.0 - clamp(min(min(g.x, g.y), g.z), 0.0, 1.0);
+        }`)
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );',
+        'float hN = clamp((vGrid.y - uFloor) / uHeight, 0.0, 1.0);\n vec4 diffuseColor = vec4( mix(diffuse, uTop, smoothstep(0.55, 1.0, hN) * 0.18), opacity );')
+      .replace('#include <opaque_fragment>', `
+        vec3 nV = normalize(vViewPosition);
+        float rim = pow(1.0 - abs(dot(normalize(normal), nV)), 2.5);
+        outgoingLight += uRim * rim * ${rimAmt.toFixed(2)};
+        float major = gridLine(vGrid, uSpacing);
+        float minor = 0.0;
+        outgoingLight = mix(outgoingLight, uLine * 0.9, clamp(major * 0.55 + minor, 0.0, 1.0));
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+// satin sculpt-clay: a soft white with the mesh's own quad edges drawn on it, as in a sculpting program's wireframe overlay
+const satinU = { uQuad: { value: new THREE.Color('#2b2c31') }, uQuadA: { value: .55 } };
+function satin(base) {
+  const m = new THREE.MeshStandardMaterial({ color: base, roughness: 0.36, metalness: 0.0 });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, satinU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 bary; varying vec3 vBary;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBary = bary;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBary; uniform vec3 uQuad; uniform float uQuadA;')
+      .replace('#include <opaque_fragment>', `
+        vec3 nV = normalize(vViewPosition);
+        outgoingLight += vec3(0.10) * pow(1.0 - abs(dot(normalize(normal), nV)), 3.0);
+        vec3 bw = fwidth(vBary);
+        vec3 bd = vBary / max(bw, vec3(1e-4));
+        float qline = 1.0 - clamp(min(min(bd.x, bd.y), bd.z) - 0.2, 0.0, 1.0);
+        qline *= mix(1.0, 0.35, smoothstep(0.15, 0.6, max(max(bw.x, bw.y), bw.z)));   // lighter where quads shrink to a few pixels
+        outgoingLight = mix(outgoingLight, uQuad, qline * uQuadA);
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+const clayMat = satin('#ecebe7');
+// Gabriel's faceted body (FIGURE_MAN.exact): flat facets, and dual-quaternion skinning so bent knees, hips and elbows keep
+// their volume instead of folding in the way linear blend skinning does (each vertex's bones are blended as rigid motions)
+let figureExact = false, figureCuffScale = 1, figureCuffTilt = null;
+const DQS_PARS = `#include <skinning_pars_vertex>
+#ifdef USE_SKINNING
+vec4 dqMul(vec4 a, vec4 b) { return vec4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz)); }
+vec4 m2q(mat4 m) {
+  float t = m[0][0] + m[1][1] + m[2][2];
+  if (t > 0.0) { float s = sqrt(t + 1.0) * 2.0; return vec4((m[1][2] - m[2][1]) / s, (m[2][0] - m[0][2]) / s, (m[0][1] - m[1][0]) / s, .25 * s); }
+  if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) { float s = sqrt(1.0 + m[0][0] - m[1][1] - m[2][2]) * 2.0; return vec4(.25 * s, (m[1][0] + m[0][1]) / s, (m[2][0] + m[0][2]) / s, (m[1][2] - m[2][1]) / s); }
+  if (m[1][1] > m[2][2]) { float s = sqrt(1.0 + m[1][1] - m[0][0] - m[2][2]) * 2.0; return vec4((m[1][0] + m[0][1]) / s, .25 * s, (m[2][1] + m[1][2]) / s, (m[2][0] - m[0][2]) / s); }
+  float s = sqrt(1.0 + m[2][2] - m[0][0] - m[1][1]) * 2.0; return vec4((m[2][0] + m[0][2]) / s, (m[2][1] + m[1][2]) / s, .25 * s, (m[0][1] - m[1][0]) / s);
+}
+void dqAdd(mat4 bm, float w, vec4 q0, inout vec4 r, inout vec4 d) {
+  mat4 M = bindMatrixInverse * bm * bindMatrix; vec4 q = m2q(M), t = .5 * dqMul(vec4(M[3].xyz, 0.0), q);
+  if (dot(q, q0) < 0.0) { q = -q; t = -t; }
+  r += w * q; d += w * t;
+}
+#endif`;
+const DQS_VERT = `#ifdef USE_SKINNING
+  vec4 q0 = m2q(bindMatrixInverse * boneMatX * bindMatrix), qr = vec4(0.0), qd = vec4(0.0);
+  dqAdd(boneMatX, skinWeight.x, q0, qr, qd); dqAdd(boneMatY, skinWeight.y, q0, qr, qd);
+  dqAdd(boneMatZ, skinWeight.z, q0, qr, qd); dqAdd(boneMatW, skinWeight.w, q0, qr, qd);
+  float ql = length(qr); qr /= ql; qd /= ql;
+  transformed += 2.0 * cross(qr.xyz, cross(qr.xyz, transformed) + qr.w * transformed) + 2.0 * (qr.w * qd.xyz - qd.w * qr.xyz + cross(qr.xyz, qd.xyz));
+#endif`;
+function useDQS(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <skinning_pars_vertex>', DQS_PARS).replace('#include <skinning_vertex>', DQS_VERT);
+  };
+  m.customProgramCacheKey = () => 'dqs'; m.needsUpdate = true;
+  return m;
+}
+const jointMat = crystal('#b3122e', 0.35);
+const figure = new THREE.Group(); scene.add(figure);
+const bones = {};
+const BONE_MAP = { hips: 'root', spine: 'spine04', spine1: 'spine03', spine2: 'spine01', neck: 'neck01', head: 'head',
+  lArm: 'upperarm01.L', lFore: 'lowerarm01.L', lHand: 'wrist.L', rArm: 'upperarm01.R', rFore: 'lowerarm01.R', rHand: 'wrist.R',
+  lUp: 'upperleg01.L', lLeg: 'lowerleg01.L', lFoot: 'foot.L', rUp: 'upperleg01.R', rLeg: 'lowerleg01.R', rFoot: 'foot.R' };
+// Poses are authored against a T-pose with legs straight. The mesh rests in an A-pose, so each limb chain
+// carries a correction C (rest direction → T direction): chain root gets E·C, the bones below it C⁻¹·E·C.
+const CHAINS = { lArm: ['lFore', 'lHand'], rArm: ['rFore', 'rHand'], lUp: ['lLeg', 'lFoot'], rUp: ['rLeg', 'rFoot'] };
+const corr = {};
+let figureScale = 1, figureMesh = null, thighAxis = null;
+// per-vertex push (bind space, vertex index then xyz) that keeps the left thigh inside the brace cuffs; measured against
+// the cuff geometry over the walk, crutch, scooter and couch poses and spread one ring to neighbours so the skin eases in
+const THIGH_FIT = [10945,-0.02,0.00,-0.04,10946,-0.00,0.00,-0.00,11019,-0.00,-0.00,0.01,11021,-0.02,-0.01,0.01,11022,-0.01,-0.01,0.01,11023,-0.03,-0.01,-0.00,11024,-0.03,-0.01,0.00,11025,-0.00,-0.00,-0.01,11033,-0.02,-0.00,-0.04,11034,0.00,0.00,-0.02,11035,-0.01,-0.00,-0.02,11036,-0.02,-0.01,-0.01,11041,0.00,0.00,-0.00,11047,-0.02,-0.01,-0.01,11052,-0.05,0.02,-0.19,11053,-0.04,-0.03,0.06,11054,-0.01,-0.01,0.02,11055,-0.16,-0.08,0.08,11056,-0.09,-0.06,0.09,11057,-0.25,-0.09,-0.03,11058,-0.23,-0.10,0.03,11059,-0.15,-0.00,-0.25,11060,0.01,0.03,-0.11,11061,-0.14,-0.02,-0.15,11062,-0.16,-0.04,-0.09,11063,0.02,0.01,-0.03,11064,0.01,0.00,-0.00,11067,-0.21,-0.06,-0.07,11069,-0.01,-0.01,0.02,11071,-0.17,0.10,-0.74,11072,-0.18,-0.13,0.29,11073,-0.04,-0.04,0.09,11074,-0.78,-0.39,0.40,11075,-0.44,-0.27,0.43,11076,-1.21,-0.43,-0.14,11077,-1.08,-0.45,0.17,11078,-0.69,-0.02,-1.07,11079,0.10,0.14,-0.45,11080,-0.53,-0.07,-0.58,11081,-0.82,-0.21,-0.47,11082,0.05,0.05,-0.15,11083,0.03,0.02,-0.03,11086,-0.97,-0.29,-0.32,11088,-0.02,-0.02,0.04,11089,-0.00,-0.00,0.01,11090,-0.23,0.44,-2.32,11091,-0.49,-0.43,1.05,11092,-0.12,-0.10,0.24,11093,-2.68,-1.37,1.52,11094,-1.47,-0.93,1.63,11095,-4.45,-1.57,-0.57,11096,-3.85,-1.61,0.63,11097,-1.69,0.10,-3.30,11098,0.58,0.56,-1.50,11099,-1.48,-0.20,-1.61,11100,-2.91,-0.76,-1.62,11101,0.17,0.15,-0.38,11102,0.04,0.04,-0.09,11103,0.00,0.00,-0.00,11105,-3.29,-0.97,-1.15,11107,-0.00,-0.00,0.00,11109,-0.14,0.51,-2.48,11110,-0.17,-0.10,0.15,11111,-0.05,-0.03,0.05,11112,-1.96,-0.93,0.78,11113,-0.66,-0.35,0.42,11114,-2.64,-0.87,-0.61,11115,-1.52,-0.60,0.10,11116,-1.26,0.22,-3.10,11117,0.34,0.39,-1.15,11118,-2.39,-0.24,-2.96,11119,-1.86,-0.37,-1.48,11120,0.10,0.11,-0.31,11121,0.03,0.03,-0.07,11122,0.00,0.00,-0.00,11124,-1.82,-0.49,-0.91,11128,-0.09,0.13,-0.72,11129,-0.07,-0.04,0.05,11130,-0.00,-0.00,0.00,11131,-0.50,-0.23,0.17,11132,-0.18,-0.09,0.10,11133,-0.69,-0.23,-0.16,11134,-0.44,-0.17,0.02,11135,-0.39,0.06,-0.91,11136,0.06,0.11,-0.37,11137,-0.66,-0.06,-0.84,11138,-0.59,-0.11,-0.48,11139,0.03,0.04,-0.11,11140,0.01,0.01,-0.03,11141,0.01,0.00,0.00,11142,0.00,0.00,0.00,11143,-0.56,-0.15,-0.29,11147,-0.06,0.06,-0.36,11150,-0.07,-0.03,0.03,11151,-0.05,-0.02,0.02,11152,-0.13,-0.04,-0.04,11153,-0.11,-0.04,0.01,11154,-0.23,0.01,-0.45,11155,0.01,0.04,-0.16,11156,-0.32,-0.04,-0.38,11157,-0.26,-0.06,-0.17,11158,0.01,0.02,-0.06,11159,0.01,0.01,-0.00,11160,0.05,0.02,0.02,11161,0.02,0.01,0.01,11162,-0.16,-0.05,-0.08,11163,0.00,0.00,0.00,11165,0.00,0.00,0.00,11166,-0.08,0.15,-0.78,11169,-0.01,-0.01,0.01,11171,-0.04,-0.01,-0.01,11172,-0.00,-0.00,-0.00,11173,-0.57,0.01,-1.00,11174,0.02,0.10,-0.34,11175,-0.75,-0.10,-0.80,11176,-0.51,-0.16,-0.16,11177,0.03,0.04,-0.10,11178,0.04,0.02,-0.03,11179,0.23,0.07,0.09,11180,0.05,0.01,0.02,11181,-0.12,-0.04,-0.04,11182,0.01,0.00,0.00,11185,-0.10,0.26,-1.00,11190,-0.01,-0.00,-0.00,11192,-0.27,0.11,-0.80,11193,0.18,0.32,-0.80,11194,-0.23,0.00,-0.37,11195,-0.15,-0.03,-0.10,11196,0.10,0.12,-0.27,11197,0.04,0.04,-0.07,11198,0.05,0.02,0.02,11199,0.02,0.01,0.01,11200,-0.04,-0.01,-0.02,11201,0.01,0.00,0.00,11204,-0.04,0.29,-1.34,11211,-0.16,0.14,-1.05,11212,0.21,0.37,-1.12,11213,-0.08,0.03,-0.28,11214,-0.04,-0.00,-0.06,11215,0.30,0.24,-0.47,11216,0.09,0.08,-0.15,11217,0.01,0.00,0.00,11218,0.01,0.00,0.00,11219,-0.01,-0.00,-0.01,11220,0.00,0.00,0.00,11223,0.09,0.20,-0.78,11230,-0.02,0.06,-0.35,11231,0.51,0.67,-2.28,11232,-0.01,0.02,-0.11,11233,-0.01,0.00,-0.02,11234,0.74,0.57,-1.29,11235,0.17,0.13,-0.29,11236,0.01,0.00,-0.01,11242,0.04,0.06,-0.23,11249,0.00,0.02,-0.10,11250,0.13,0.17,-0.54,11251,-0.00,0.00,-0.02,11253,0.18,0.15,-0.36,11254,0.06,0.05,-0.11,11261,0.01,0.02,-0.05,11268,-0.00,0.00,-0.01,11269,0.03,0.03,-0.10,11272,0.03,0.03,-0.08,11273,0.01,0.01,-0.03,11288,0.00,0.00,-0.02,11291,0.00,0.00,-0.01,12994,0.01,0.00,-0.00,12995,0.01,0.01,-0.01,12996,0.01,0.00,-0.01,12997,0.01,0.00,-0.00,12998,0.04,0.01,0.01,12999,0.13,0.04,0.02,13000,0.04,0.02,-0.01,13001,0.03,0.02,-0.03,13002,0.03,0.02,-0.05,13003,0.01,0.01,-0.03,13332,0.47,0.49,-1.37,13333,0.15,0.14,-0.39,13334,0.05,0.04,-0.09,13335,0.01,0.01,-0.02,13336,0.00,0.00,-0.00,13340,-0.02,-0.01,0.03,13341,-0.08,-0.06,0.12,13342,-0.37,-0.25,0.47,13343,-1.22,-0.73,1.19,13344,-1.68,-0.80,0.72,13345,-3.09,-1.25,0.33,13346,-2.62,-0.90,-0.46,13347,-3.81,-1.09,-1.59,13348,-3.54,-0.80,-2.44,13349,-2.78,-0.35,-3.12,13350,-1.39,0.16,-3.05,13351,-0.22,0.53,-2.70];
+const restHead = {};
+async function buildFigure() {
+  // MakeHuman 1.1 base mesh + default rig and weights (CC0), body only, triangulated; units cm, faces +z.
+  const man = window.FIGURE_MAN;
+  const bin = Uint8Array.from(atob(window.FIGURE_B64), c => c.charCodeAt(0)).buffer;
+  let o = 0;
+  const pos = new Float32Array(bin, o, man.nv * 3); o += man.nv * 12;
+  const idx = new Uint16Array(bin, o, man.nt * 3); o += man.nt * 6;
+  const si = new Uint8Array(bin, o, man.nv * 4); o += man.nv * 4;
+  const sw = new Uint8Array(bin, o, man.nv * 4);
+  let g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(si), 4));
+  g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4, true));
+  g.computeVertexNormals(); g.computeBoundingBox();
+  // left thigh: a morph target slims it toward its own axis under the brace's two cuffs (the dummy's thigh is thicker
+  // than the cuffs), and the axis is kept so the cuffs centre on the mesh rather than on the bone line, which runs off-centre
+  {
+    const H = new THREE.Vector3(...man.bones[18][2]), K = new THREE.Vector3(...man.bones[20][2]), ax = H.clone().sub(K), Lt = ax.length(); ax.divideScalar(Lt);
+    const N = 20, acc = Array.from({ length: N }, () => ({ s: new THREE.Vector3(), n: 0 })), v = new THREE.Vector3(), T = new Float32Array(man.nv), W = new Float32Array(man.nv);
+    for (let i = 0; i < man.nv; i++) {
+      let w = 0; for (let j = 0; j < 4; j++) { const b = si[i * 4 + j]; if (b === 18 || b === 19) w += sw[i * 4 + j] / 255; }
+      v.fromArray(pos, i * 3); const t = v.clone().sub(K).dot(ax) / Lt; T[i] = t; W[i] = w;
+      if (w > .6 && t > 0 && t < 1 && v.x > 3) { const a = acc[Math.min(N - 1, Math.floor(t * N))]; a.s.add(v); a.n++; }
+    }
+    const pts = acc.map((a, b) => a.n ? { t: (b + .5) / N, c: a.s.divideScalar(a.n) } : null).filter(Boolean);
+    const cAt = (t) => { let i = 0; while (i < pts.length - 2 && pts[i + 1].t < t) i++; const a = pts[i], b = pts[i + 1]; return a.c.clone().lerp(b.c, (t - a.t) / (b.t - a.t)); };
+    const band = (t) => smooth(seg(t, .06, .16)) * (1 - smooth(seg(t, .8, .9)));
+    const d = new Float32Array(man.nv * 3);
+    for (let i = 0; i < man.nv; i++) {
+      const k = man.exact ? 0 : .15 * W[i] * band(T[i]); if (k <= 0 || pos[i * 3] < 1) continue;   // the exact body keeps its own thigh
+      v.fromArray(pos, i * 3).sub(cAt(T[i])); v.addScaledVector(ax, -v.dot(ax));
+      d[i * 3] = -v.x * k; d[i * 3 + 1] = -v.y * k; d[i * 3 + 2] = -v.z * k;
+    }
+    if (!man.exact) for (let j = 0; j < THIGH_FIT.length; j += 4) for (let c = 0; c < 3; c++) d[THIGH_FIT[j] * 3 + c] += THIGH_FIT[j + 1 + c];
+    g.morphAttributes.position = [new THREE.BufferAttribute(d, 3)]; g.morphTargetsRelative = true;
+    thighAxis = { a: cAt(.24).sub(H), b: cAt(.61).sub(H) };          // upperleg01.L's frame (rest bones carry no rotation)
+    if (man.thighAxis) thighAxis = { a: new THREE.Vector3(...man.thighAxis.a), b: new THREE.Vector3(...man.thighAxis.b) };   // measured on true cross-sections
+  }
+  // quad wireframe: the mesh is MakeHuman's all-quad body, stored as triangle pairs. Each corner carries barycentric
+  // coordinates; a quad's diagonal gets +1 on the coordinate that would vanish along it, so only real quad edges draw.
+  {
+    const hide = new Uint8Array(bin, o + man.nv * 4, man.nt), bary = new Float32Array(man.nt * 9);
+    for (let t = 0; t < man.nt; t++) for (let k = 0; k < 3; k++) {
+      const q = t * 9 + k * 3; bary[q + k] = 1;
+      for (let e = 0; e < 3; e++) if (hide[t] & (1 << e)) bary[q + (e + 2) % 3] += 1;   // edge e runs v_e → v_(e+1), opposite corner (e+2)%3
+    }
+    g.userData.bary = bary;
+  }
+
+  // per-corner barycentrics need unshared vertices (normals were computed while shared, so shading stays smooth)
+  const gq = g.toNonIndexed(); gq.setAttribute('bary', new THREE.BufferAttribute(g.userData.bary, 3)); gq.boundingBox = g.boundingBox;
+  gq.morphTargetsRelative = true; g = gq;
+
+  const list = man.bones.map(([name, parent, head]) => {
+    const b = new THREE.Bone(); b.name = name; restHead[name] = new THREE.Vector3(...head); return { b, parent, head: restHead[name] };
+  });
+  list.forEach(({ b, parent, head }) => {
+    if (parent >= 0) { b.position.copy(head).sub(list[parent].head); list[parent].b.add(b); } else b.position.copy(head);
+  });
+  const rootBone = list[0].b;
+  const skinned = new THREE.SkinnedMesh(g, clayMat); figureMesh = skinned;
+  skinned.add(rootBone);
+  skinned.bind(new THREE.Skeleton(list.map(x => x.b)));
+  skinned.castShadow = true; skinned.receiveShadow = true; skinned.frustumCulled = false;
+  figureExact = !!man.exact; figureCuffScale = man.cuffScale || 1; figureCuffTilt = man.cuffTilt || null;
+  if (figureExact) {
+    clayMat.flatShading = true; useDQS(clayMat);
+    skinned.customDepthMaterial = useDQS(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+  }
+
+  const holder = new THREE.Group(); holder.add(skinned);
+  const hgt = g.boundingBox.max.y - g.boundingBox.min.y;
+  figureScale = 178 / hgt;
+  holder.scale.setScalar(figureScale); holder.position.y = -g.boundingBox.min.y * figureScale;
+  figure.add(holder);
+  for (const k in BONE_MAP) { bones[k] = list.find(x => x.b.name === BONE_MAP[k]).b; bones[k].userData.rest = bones[k].quaternion.clone(); }
+
+  const dirOf = (a, b) => restHead[BONE_MAP[b]].clone().sub(restHead[BONE_MAP[a]]).normalize();
+  const canon = { lArm: new THREE.Vector3(1, 0, 0), rArm: new THREE.Vector3(-1, 0, 0), lUp: new THREE.Vector3(0, -1, 0), rUp: new THREE.Vector3(0, -1, 0) };
+  for (const k in CHAINS) {
+    const C = new THREE.Quaternion().setFromUnitVectors(dirOf(k, CHAINS[k][0]), canon[k]);
+    corr[k] = { C, Ci: C.clone().invert(), root: true };
+    // restFix: this body's rest elbow / knee bend differs from the MakeHuman rest the poses were authored on; D turns it onto that rest
+    for (const c of CHAINS[k]) { const D = man.restFix && man.restFix[BONE_MAP[c]]; corr[c] = { C: D ? C.clone().multiply(new THREE.Quaternion(...D)) : C, Ci: corr[k].Ci, root: false }; }
+  }
+  crystalU.uHeight.value = hgt; crystalU.uFloor.value = g.boundingBox.min.y; crystalU.uSpacing.value = 10 / figureScale;
+}
+// ---------- poses ----------
+const poses = {
+  vitruvian: { lArm: [0, 0, .1], rArm: [0, 0, -.1], lUp: [0, 0, .17], rUp: [0, 0, -.17], lFoot: [0, 0, -.17], rFoot: [0, 0, .17] },
+  about: { hips: [0, -.16, .04], spine1: [0, 0, -.04], spine2: [0, .14, -.02], head: [.06, .34, 0],
+    lArm: [0, 0, -.95], lFore: [0, -.5, -1.6],
+    rArm: [.08, 0, 1.3], rFore: [0, .2, 0],
+    lUp: [-.1, 0, .07], lLeg: [.3, 0, 0], lFoot: [-.18, 0, -.07], rUp: [0, 0, -.04], rFoot: [0, 0, .04] },
+  ready: { hips: [0, .3, 0], spine2: [0, -.1, 0], head: [.14, -.3, 0],
+    lArm: [0, 0, -1.3], rArm: [0, 0, 1.3], lFore: [0, -.25, 0], rFore: [0, .25, 0],
+    lUp: [-.12, 0, .04], rUp: [.04, 0, -.04], lLeg: [.16, 0, 0], lFoot: [-.04, 0, -.04] },
+  lift: { hips: [.03, .18, 0], spine: [-.05, 0, 0], spine2: [-.03, -.1, 0], head: [.42, -.2, 0],
+    lArm: [-.2, 0, -.7], rArm: [-.25, 0, .6], lFore: [0, -.45, 0], rFore: [0, .45, 0],
+    lUp: [-1.5, 0, .03], lLeg: [.3, 0, 0], lFoot: [0, 0, 0],
+    rUp: [-.04, 0, -.03], rLeg: [.08, 0, 0], rFoot: [-.04, 0, .03] },
+  // A-pose: arms ~55° below horizontal, legs slightly apart; Fore y undoes the bent elbow of the MakeHuman rest the poses are written against, Fore x turns the palms ~38° toward the front
+  neutral: { lArm: [0, 0, -.95], rArm: [0, 0, .95], lFore: [-.72, .81, 0], rFore: [-.72, -.81, 0],
+    lUp: [0, 0, .09], rUp: [0, 0, -.09], lFoot: [0, 0, -.09], rFoot: [0, 0, .09] },
+};
+const boneNames = Object.keys(BONE_MAP);
+// [s, poseName] keyframes; s = continuous section index
+const poseKeys = [[0, 'neutral'], [.95, 'about'], [1.95, 'ready'], [2.35, 'ready'], [3.1, 'lift'], [6.35, 'lift'], [7, 'neutral']];
+
+// ---------- camera keys: [s, pos, target, relativeToDevice] ----------
+const camKeys = [
+  [0,    [0, 100, 480],   [0, 94, 0], 0],
+  [1,    [-120, 112, 440], [-8, 98, 0], 0],
+  [2,    [160, 70, 210],  [14, 44, 0], 0],
+  [2.4,  [150, 64, 190],  [16, 36, 0], 0],
+  // close-ups sit on the figure's -x side: the inner (medial) face of the left foot
+  // target z offsets push the device away from whichever side that section's card is on (+z = screen right)
+  [3.3,  [-125, 52, 58],  [0, -2, 18], 1],
+  [4.6,  [-105, 60, 14],  [0, -2, -16], 1],
+  [5.2,  [-150, 78, 90],  [0, 0, 20], 1],
+  [5.6,  [-150, 78, 90],  [0, 0, 20], 1],
+  [6.2,  [-120, 52, 24],  [0, -2, -16], 1],
+  [7,    [0, 100, 480],   [0, 94, 0], 0],
+];
+
+// ---------- the Kicker ----------
+const kicker = { ready: false };
+// Fusion "The kicker" v20 (Assembled Actuator v64, Shoe Cup v40); device frame, cm
+const N_AX = new THREE.Vector3(0, -0.364, 0.932).normalize();   // gearbox axis (Carrier Revolute)
+const U_RAIL = new THREE.Vector3(0, 0.932, 0.364).normalize();  // rail axis (Rack Slider)
+const G0 = new THREE.Vector3(3.088, -1.986, -7.905);           // gearbox centre, in the planet plane
+const A_DEV = new THREE.Vector3(0.2, -16.058, -2.292);          // ankle axis, midway between the 608 bearings
+const ANKLE_TILT = Math.atan2(0.1506, 0.9878);                  // flatten shoe plate (sole normal in v20)
+const CAP_PT = new THREE.Vector3(0, -14.086, -15.634);          // lower M8 pin: rail foot ↔ shoe cup
+const P_TOP = new THREE.Vector3(0, 9.071, -6.593);              // upper M8 pin: actuator ↔ calf shell
+const TOP_DEV = new THREE.Vector3(-1.14, 8, -0.38);             // centre of the calf shell's top rim
+const X_AX = new THREE.Vector3(1, 0, 0);
+const TOP_LIFT = 5.08;                                          // (v20 fit) brace top stood 2 in in front of the shin centre
+// Assembled BRace v6: the knee hinge's axis (centre of its two 45x55x6 bearings), device frame. The brace is mounted
+// ankle-axis-on-ankle and knee-axis-on-knee, which puts the shell rim ~4.7 cm in front of the ankle–knee line.
+const KNEE_CAD = new THREE.Vector3(-9.2, 25.4, 9.4);
+const CUFF_CAD = new THREE.Vector3(-4.35, 51.16, 14.95);         // centre of the upper thigh cuff (Top v1, the enlarged cuff in Hinge Mirrored v15), CAD pose
+const CUFF_MOUNT = new THREE.Vector3(-11.42, 35.74, 10.52), CUFF_UP = new THREE.Vector3(-0.114, 0.959, 0.258);   // lower cuff's mount on the upright; up the upright through both mounts
+const ANKLE_ROM = 25 * Math.PI / 180;                           // plantarflexion swing from flat; flat is already near the rack's dorsiflexion end
+
+const mats = {
+  shell: new THREE.MeshStandardMaterial({ color: 0x2a2d32, roughness: .55, metalness: .05 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xc9cdd3, roughness: .3, metalness: 1 }),
+  alu: new THREE.MeshStandardMaterial({ color: 0xb4bac2, roughness: .42, metalness: .9 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x3a3e45, roughness: .45, metalness: .6 }),
+  anod: new THREE.MeshStandardMaterial({ color: 0x2c55c9, roughness: .35, metalness: .7 }),
+  spring: new THREE.MeshStandardMaterial({ color: 0xd8262e, roughness: .4, metalness: .5 }),
+};
+const ghostKeys = ['housing', 'ring', 'endcap', 'calf', 'cuffs'];
+const partMat = { calf: 'shell', shoe: 'shell', housing: 'dark', ring: 'steel', endcap: 'dark', carriage: 'alu', topcarriage: 'alu',
+  sun: 'steel', motor: 'anod', rack: 'steel', rail: 'alu', railcap: 'dark',
+  wheel1: 'dark', wheel2: 'dark', wheel3: 'dark', wheel4: 'dark', springs: 'spring', kneeShin: 'alu', kneeThigh: 'alu', cuffs: 'shell' };
+const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), 400);
+for (const m of Object.values(mats)) { m.clippingPlanes = [clip]; m.transparent = true; m.opacity = 0; m.clipShadows = true; }
+
+const BOM = [
+  ['calf', 'Calf shell', 1], ['housing', 'Actuator housing', 1], ['motor', 'Tarot 5010 motor', 1], ['sun', 'Sun gear', 1],
+  ['planet1', 'Planet gear', 4], ['carriage', 'Planet carrier', 1], ['ring', 'Ring gear', 1], ['endcap', 'End cap', 1],
+  ['rack', 'Rack', 1], ['rail', '2020 V-slot rail', 1], ['wheel1', 'V-wheel', 4], ['shoe', 'Shoe cup', 1],
+  ['pinTop', 'M8 pivot pin', 2], ['brg1', '608 ankle bearing', 2], ['springs', 'Die spring', 2],
+  ['kneeShin', 'Knee hinge, shin side', 1], ['kneeThigh', 'Knee hinge, thigh side', 1], ['cuffs', 'Thigh cuff', 2],
+];
+document.getElementById('bom').innerHTML = BOM.map(([k, n, q], i) => `<li><span class="n">${i + 1}</span><span>${n}</span><span class="q">×${q}</span></li>`).join('');
+
+function decode() {
+  const bin = Uint8Array.from(atob(window.KICKER_B64), c => c.charCodeAt(0)).buffer;
+  const geos = {};
+  for (const e of window.KICKER_MAN) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bin, e.p, e.nv * 3), 3));
+    g.setAttribute('normal', new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(new Int8Array(bin, e.n, e.nv * 4), 4), 3, 0, true));
+    g.setIndex(new THREE.BufferAttribute(new Uint16Array(bin, e.i, e.ni), 1));
+    g.computeBoundingBox();
+    geos[e.k] = { g, c: new THREE.Vector3(...e.c) };
+  }
+  return geos;
+}
+
+function buildKicker() {
+  const geos = decode();
+  // Device frame → leg frame. Device: +y up the shin, -z toward the toes, x along the ankle axis.
+  // The ankle axis sits on the figure's ankle and the shell's top rim on the centre of the shin,
+  // so the device lies along the figure's real shin line, not the bone's rest (A-pose) axis.
+  const knee = restHead['lowerleg01.L'], ank = restHead['foot.L'];
+  // the brace's ankle axis → knee axis (sagittal only; the hinge's lateral offset is not a tilt) maps onto the figure's ankle → knee
+  const devAxis = KNEE_CAD.clone().sub(A_DEV); devAxis.x = 0;
+  const legA = ank.clone().sub(knee);
+  const legT = new THREE.Vector3();    // knee, relative to the knee: the mount aims the device axis from the ankle at it
+  devAxis.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI).normalize();
+  const yawPi = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+  // unslim undoes the shin slimming on lLeg so the device stays rigid and at true scale
+  const unslim = new THREE.Group(); bones.lLeg.add(unslim);
+  const shinMount = new THREE.Group(); unslim.add(shinMount);
+  const inv = 1 / figureScale; shinMount.scale.setScalar(inv);
+  const devShin = new THREE.Group(); devShin.position.copy(A_DEV).negate(); shinMount.add(devShin);
+
+  // shoe cup: one revolute about device x through the ankle (the Fusion "Ankle Revolute")
+  const footTilt = new THREE.Group(); footTilt.position.copy(A_DEV); devShin.add(footTilt);
+  const devFoot = new THREE.Group(); devFoot.position.copy(A_DEV).negate(); footTilt.add(devFoot);
+  // actuator (housing, gearbox, motor, rail) swings about the upper pin; the rail foot is pinned to the shoe
+  const actPivot = new THREE.Group(); actPivot.position.copy(P_TOP); devShin.add(actPivot);
+  const act = new THREE.Group(); act.position.copy(P_TOP).negate(); actPivot.add(act);
+
+  const parts = {};
+  function part(k, parent, pivot) {
+    // explode wrapper → pivot (rotation centre) → mesh with geometry offset by pivot
+    const ex = new THREE.Group(); parent.add(ex);
+    const pv = new THREE.Group(); ex.add(pv);
+    const pivotPt = pivot ? pivot.clone() : new THREE.Vector3();
+    pv.position.copy(pivotPt);
+    let mat = mats[partMat[k] || 'steel'];
+    if (ghostKeys.includes(k)) { mat = mat.clone(); mat.clippingPlanes = [clip]; mats['ghost_' + k] = mat; }
+    const m = new THREE.Mesh(geos[k].g, mat); m.position.copy(pivotPt).negate();
+    m.castShadow = true; m.receiveShadow = true; pv.add(m);
+    parts[k] = { ex, pv, m, c: geos[k].c.clone(), pivot: pivotPt };
+    return parts[k];
+  }
+  for (const k of ['calf', 'pinTop', 'brg1', 'brg2']) part(k, devShin);
+  for (const k of ['housing', 'ring', 'endcap']) part(k, act);
+  for (let i = 1; i <= 4; i++) { part('spacer' + i, act); part('wheel' + i, act); part('screw' + i, act); }
+  part('motor', act, G0); part('sun', act, G0);
+  const carrier = part('carriage', act, G0);
+  // carrier children live in carrier pivot space (origin = G0)
+  const cRoot = new THREE.Group(); cRoot.position.copy(G0).negate(); carrier.pv.add(cRoot);
+  part('topcarriage', cRoot);
+  for (let i = 1; i <= 4; i++) {
+    part('planet' + i, cRoot, geos['planet' + i].c);
+  }
+  const rail = new THREE.Group(); act.add(rail);
+  for (const k of ['rail', 'railcap', 'rack']) part(k, rail);
+  part('shoe', devFoot); part('pinBot', devFoot);
+  part('springs', rail);
+  part('kneeShin', devShin);
+  // thigh side of the knee hinge + cuffs: one revolute about device x through the hinge bearings
+  const thighPivot = new THREE.Group(); thighPivot.position.copy(KNEE_CAD); devShin.add(thighPivot);
+  const devThigh = new THREE.Group(); devThigh.position.copy(KNEE_CAD).negate(); thighPivot.add(devThigh);
+  part('kneeThigh', devThigh); part('cuffs', devThigh);
+  // a body with a thicker thigh than Gabriel's (FIGURE_MAN.cuffScale): both cuffs grow across the thigh only, about the line through
+  // their mounts on the hinge upright, so they keep their height and stay on the upright while opening round the leg
+  if (figureCuffScale !== 1) {
+    const a = CUFF_UP.clone().normalize(), k = figureCuffScale - 1, S = new THREE.Matrix4().set(
+      1 + k * (1 - a.x * a.x), -k * a.x * a.y, -k * a.x * a.z, 0,  -k * a.y * a.x, 1 + k * (1 - a.y * a.y), -k * a.y * a.z, 0,
+      -k * a.z * a.x, -k * a.z * a.y, 1 + k * (1 - a.z * a.z), 0,  0, 0, 0, 1);
+    const m = parts.cuffs.m; m.matrixAutoUpdate = false;
+    m.matrix.makeTranslation(CUFF_MOUNT.x, CUFF_MOUNT.y, CUFF_MOUNT.z).multiply(S).multiply(new THREE.Matrix4().makeTranslation(-CUFF_MOUNT.x, -CUFF_MOUNT.y, -CUFF_MOUNT.z));
+  }
+
+  // explode offsets in each part's parent frame (device frame; carrier children follow the carrier)
+  const t = (c) => c.clone().sub(G0).dot(N_AX);
+  const offs = {
+    calf: new THREE.Vector3(0, 6, 16), housing: new THREE.Vector3(0, 0, 0),
+    shoe: new THREE.Vector3(0, -10, -4),
+    ring: N_AX.clone().multiplyScalar(-9), endcap: N_AX.clone().multiplyScalar(4),
+    motor: N_AX.clone().multiplyScalar(-26), sun: N_AX.clone().multiplyScalar(-18),
+    carriage: N_AX.clone().multiplyScalar(-13), topcarriage: N_AX.clone().multiplyScalar(-5),
+  };
+  for (let i = 1; i <= 4; i++) {
+    const c = geos['planet' + i].c; const radial = c.clone().sub(G0); radial.addScaledVector(N_AX, -radial.dot(N_AX)).normalize();
+    offs['planet' + i] = radial.multiplyScalar(4.5).addScaledVector(N_AX, 1.5);
+    const cs = geos['spacer' + i].c.clone().sub(G0); cs.addScaledVector(N_AX, -cs.dot(N_AX)).normalize();
+    offs['spacer' + i] = cs.multiplyScalar(4.5).addScaledVector(N_AX, 4);
+  }
+  // rail parts slide off along the rail and out sideways
+  offs.rail = U_RAIL.clone().multiplyScalar(-10).add(new THREE.Vector3(-7, 0, 0));
+  offs.railcap = U_RAIL.clone().multiplyScalar(-16).add(new THREE.Vector3(-7, 0, 0));
+  offs.rack = U_RAIL.clone().multiplyScalar(-4).add(new THREE.Vector3(-13, 0, 0));
+  // pins pull out along their axes, the ankle bearings slide off sideways
+  offs.pinTop = new THREE.Vector3(9, 2, 0); offs.pinBot = new THREE.Vector3(9, -10, -4);
+  offs.brg1 = new THREE.Vector3(5, 0, 0); offs.brg2 = new THREE.Vector3(-5, 0, 0);
+  offs.springs = new THREE.Vector3(10, -4, 0); offs.kneeShin = new THREE.Vector3(-9, 0, 0);
+  offs.kneeThigh = new THREE.Vector3(-9, 8, 0); offs.cuffs = new THREE.Vector3(0, 16, 4);
+  for (const k in parts) parts[k].off = (offs[k] || new THREE.Vector3()).multiplyScalar(1.5);
+
+  Object.assign(kicker, { parts, rail, footTilt, actPivot, unslim, shinMount, legA, legT, devAxis, yawPi, carrier, thighPivot, devShin, ready: true });
+  document.getElementById('loading').hidden = true;
+}
+
+// ---------- callout balloons ----------
+const svg = document.getElementById('callouts');
+const NS = 'http://www.w3.org/2000/svg';
+const balloons = BOM.map(([k], i) => {
+  const g = document.createElementNS(NS, 'g');
+  const l = document.createElementNS(NS, 'line'); const d = document.createElementNS(NS, 'circle'); d.setAttribute('class', 'dot'); d.setAttribute('r', 2);
+  const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 10);
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = i + 1;
+  g.append(l, d, c, tx); svg.append(g); return { k, g, l, d, c, tx };
+});
+
+// ---------- timeline helpers ----------
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+const smooth = (x) => x * x * (3 - 2 * x);
+const ease = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const seg = (s, a, b) => clamp01((s - a) / (b - a));
+function sampleKeys(keys, s) {
+  if (s <= keys[0][0]) return [0, 0, 0];
+  for (let i = 0; i < keys.length - 1; i++) if (s <= keys[i + 1][0]) return [i, i + 1, ease(seg(s, keys[i][0], keys[i + 1][0]))];
+  const n = keys.length - 1; return [n, n, 0];
+}
+const tmpE = new THREE.Euler(), tmpQ = new THREE.Quaternion();
+function applyPose(s) {
+  const [i, j, f] = sampleKeys(poseKeys, s);
+  const A = poses[poseKeys[i][1]], B = poses[poseKeys[j][1]];
+  for (const n of boneNames) {
+    const bn = bones[n]; if (!bn) continue;
+    const a = A[n] || [0, 0, 0], b = B[n] || [0, 0, 0];
+    tmpE.set(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f);
+    if (poseMix.w > 0) { const m = poseMix.pose[n] || [0, 0, 0], w = poseMix.w; tmpE.set(tmpE.x + (m[0] - tmpE.x) * w, tmpE.y + (m[1] - tmpE.y) * w, tmpE.z + (m[2] - tmpE.z) * w); }
+    tmpQ.setFromEuler(tmpE);
+    const c = corr[n];
+    if (c) { if (c.root) tmpQ.multiply(c.C); else tmpQ.premultiply(c.Ci).multiply(c.C); }
+    bn.quaternion.copy(bn.userData.rest).multiply(tmpQ);
+  }
+}
+const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3(), devAnchor = new THREE.Vector3(0, 30, 0);
+const _sh = new THREE.Vector3(), _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
+function keyWorld(k, P, T) {
+  P.set(...k[1]); T.set(...k[2]); if (k[3]) { P.add(devAnchor); T.add(devAnchor); }
+  // k[4]: sideways pan in cm on wide screens, so the subject clears the card (positive = subject right of centre)
+  if (k[4] && innerWidth >= 720) { const f = _sh.copy(T).sub(P); f.set(-f.z, 0, f.x).normalize().multiplyScalar(-k[4]); P.add(f); T.add(f); }
+  else if (k[4]) { P.sub(T).multiplyScalar(1.35).add(T); T.y -= .14 * P.distanceTo(T); }   // phones: narrow view, card at the bottom: back off, lift the subject into the top half
+}
+function applyCam(s) {
+  const [i, j, f] = sampleKeys(camKeys, s);
+  keyWorld(camKeys[i], _p1, _t1); keyWorld(camKeys[j], _p2, _t2);
+  camTgt.copy(_t1).lerp(_t2, f);
+  if (camKeys[i].length > 4 && camKeys[j].length > 4) {
+    // between device scenes: orbit (lerp distance, azimuth, elevation) so the camera swings round the figure instead of cutting through it
+    _p1.sub(_t1); _p2.sub(_t2);
+    const r1 = _p1.length(), r2 = _p2.length(), a1 = Math.atan2(_p1.x, _p1.z), a2 = Math.atan2(_p2.x, _p2.z);
+    const e1 = Math.asin(_p1.y / r1), e2 = Math.asin(_p2.y / r2), da = Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1));
+    const r = r1 + (r2 - r1) * f, az = a1 + da * f, el = e1 + (e2 - e1) * f;
+    camPos.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(r).add(camTgt);
+  } else camPos.copy(_p1).lerp(_p2, f);
+}
+
+// rest-pose centre of the left shin's cross-section at height y (figure mesh units)
+function shinCentre(y) {
+  const knee = restHead['lowerleg01.L'], ank = restHead['foot.L'];
+  const c = knee.clone().lerp(ank, (y - knee.y) / (ank.y - knee.y));
+  let sk; figure.traverse(o => { if (o.isSkinnedMesh) sk = o; });
+  // cut every triangle edge with the plane at y, so the section is the full ring even on a coarse mesh
+  const p = sk.geometry.attributes.position, I = sk.geometry.index ? sk.geometry.index.array : null, n = I ? I.length : p.count, at = (k) => I ? I[k] : k;
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for (let t = 0; t < n; t += 3) for (let e = 0; e < 3; e++) {
+    const a = at(t + e), b = at(t + (e + 1) % 3), ya = p.getY(a), yb = p.getY(b);
+    if ((ya - y) * (yb - y) > 0 || ya === yb) continue;
+    const k = (y - ya) / (yb - ya), x = p.getX(a) + (p.getX(b) - p.getX(a)) * k, z = p.getZ(a) + (p.getZ(b) - p.getZ(a)) * k;
+    if (Math.hypot(x - c.x, z - c.z) > 9) continue;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z);
+  }
+  return x0 > x1 ? c : new THREE.Vector3((x0 + x1) / 2, y, (z0 + z1) / 2);
+}
+// three-pin linkage (device frame): shoe angle → actuator swing about the upper pin and rail extension,
+// so the rail foot stays on the shoe's pin at every angle
+const PIN_D0 = CAP_PT.distanceTo(P_TOP);
+const U_PIN = P_TOP.clone().sub(CAP_PT).normalize();
+const _f = new THREE.Vector3();
+function linkage(theta) {
+  _f.copy(CAP_PT).sub(A_DEV).applyAxisAngle(X_AX, theta).add(A_DEV).sub(P_TOP);
+  const swing = Math.atan2(_f.z, _f.y) - Math.atan2(CAP_PT.z - P_TOP.z, CAP_PT.y - P_TOP.y);
+  return { swing, ext: _f.length() - PIN_D0 };
+}
+const _a = new THREE.Vector3(), _t = new THREE.Vector3(), _ax = new THREE.Vector3(), _q = new THREE.Quaternion();
+const RATIO = 5.2, PIN_R = 0.75, PLANET_K = -1.6;
+const qa = new THREE.Quaternion();
+
+// ---------- scroll → s ----------
+const sections = [...document.querySelectorAll('section[data-s]')];
+let sTarget = 0, sNow = 0;
+function readScroll() {
+  const mid = scrollY + innerHeight * .5;
+  const centers = sections.map(el => el.offsetTop + el.offsetHeight * .5);
+  if (mid <= centers[0]) { sTarget = 0; return; }
+  for (let i = 0; i < centers.length - 1; i++) {
+    if (mid <= centers[i + 1]) { sTarget = i + (mid - centers[i]) / (centers[i + 1] - centers[i]); return; }
+  }
+  sTarget = centers.length - 1;
+}
+addEventListener('scroll', () => { readScroll(); returnToPath(); }, { passive: true });
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.fov = w < 720 ? 42 : 30; camera.updateProjectionMatrix();
+}
+addEventListener('resize', () => { resize(); readScroll(); });
+
+function themeColors() {
+  clayMat.color.copy(tok('--clay')); jointMat.color.copy(tok('--joint'));
+  clayMat.emissive.setRGB(0, 0, 0); jointMat.emissive.copy(jointMat.color).multiplyScalar(.18);
+  crystalU.uLine.value.copy(tok('--neon')); crystalU.uTop.value.copy(tok('--sun'));
+  lineMat.color.copy(tok('--cobalt'));
+  floorGrid.material.color.copy(tok('--sun')); floorGrid.material.vertexColors = false; floorGrid.material.needsUpdate = true;
+  ground.material.opacity = matchDark() ? .35 : .18;
+}
+const matchDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeColors);
+new MutationObserver(themeColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/*RIGS*/
+
+// ---------- frame ----------
+const clock = new THREE.Clock();
+let phase = 0;
+const wp = new THREE.Vector3(), wc = new THREE.Vector3();
+const sheetEl = document.getElementById('tb-sheet');
+const proofEl = document.getElementById('proof'), scanEl = document.getElementById('proofscan');
+function frame() {
+  const dt = Math.min(clock.getDelta(), .05);
+  sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
+  const s = sNow;
+  sheetEl.textContent = String(Math.min(sections.length, Math.round(s) + 1)).padStart(2, '0') + ' / ' + String(sections.length).padStart(2, '0');
+
+  poseMix.w = rigs.ready ? walkWeight(s) : 0;
+  if (poseMix.w > 0) poseMix.pose = walkPose(ui.gait.pc);
+  applyPose(s);
+  // idle breathing / turn in the hero
+  const hero = 1 - seg(s, 0, .6);
+  figure.rotation.x = figure.rotation.z = 0; figure.rotation.y = reduced ? 0 : Math.sin(clock.elapsedTime * .35) * .12 * hero;
+  rigFrame(s, dt);
+  if (kicker.ready) { figure.updateMatrixWorld(true); kicker.parts.housing.m.localToWorld(devAnchor.copy(kicker.parts.housing.c)); }
+  applyCam(s);
+  if (rigs.chase && rigs.chase.w > 0) { camPos.lerp(rigs.chase.p, rigs.chase.w); camTgt.lerp(rigs.chase.t, rigs.chase.w); }   // third-person drive (couch)
+  { const fv = (innerWidth < 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
+  if (free.on && !free.back) {
+    controls.update();
+  } else if (free.back) {
+    free.back = Math.min(1, free.back + dt / .7);
+    const k = ease(free.back);
+    camera.position.copy(free.fromP).lerp(camPos, k);
+    controls.target.copy(free.fromT).lerp(camTgt, k);
+    camera.lookAt(controls.target);
+    if (free.back >= 1) { free.on = false; free.back = 0; }
+  } else {
+    camera.position.copy(camPos); camera.lookAt(camTgt);
+  }
+  if (Array.isArray(window.__cam)) { camera.position.fromArray(window.__cam[0]); camera.lookAt(_p1.fromArray(window.__cam[1])); } // debug hook for render checks
+  // construction overlay: only in the opening hero and the closing shot
+  lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 16.3, 16.9)));
+  constr.visible = lineMat.opacity > .002;
+
+  // proof: wipe the as-built photo in over the render once the parts are back together
+  {
+    const w = smooth(seg(s, 5.95, 6.2)), out = 1 - smooth(seg(s, 6.55, 6.8));
+    const vis = w * out;
+    proofEl.style.opacity = vis > 0.001 ? 1 : 0;
+    proofEl.style.clipPath = `inset(0 0 0 ${((1 - w) * 100).toFixed(2)}%)`;
+    if (out < 1) proofEl.style.opacity = out;
+    const r = proofEl.getBoundingClientRect();
+    scanEl.style.left = (r.left + (1 - w) * r.width - 1) + 'px';
+    scanEl.style.opacity = (w > 0.001 && w < 0.999) ? out : 0;
+  }
+  if (kicker.ready) {
+    const { parts, rail, footTilt } = kicker;
+    // reveal: sweep a clip plane down the leg while fading in
+    // worn only in its own sections: it comes off as the crutch scene fades in, stays off for the later builds, and sweeps
+    // back on (the same clip plane down the leg) for the closing shot
+    const rev0 = smooth(seg(s, 1.45, 2.35)), revEnd = smooth(seg(s, 16.2, 16.9)), rev = s > 12 ? revEnd : rev0;
+    clip.constant = -(70 - rev * 80);
+    const worn = Math.max(rev0 * (1 - smooth(seg(s, 7.5, 7.78))), revEnd);
+    const op = clamp01(worn * 1.6);
+    const ghost = Math.max(smooth(seg(s, 3.3, 3.7)) * (1 - smooth(seg(s, 4.55, 4.8))), rigs.ghost || 0);   // brace close-up, or the scooter apart
+    // the figure goes see-through with the shells so the foot in the shoe cup and the leg inside the calf shell read too;
+    // drawn last with no depth write, so the device behind it still shows through
+    clayMat.transparent = ghost > .002; clayMat.opacity = 1 - .7 * ghost; clayMat.depthWrite = ghost < .5;
+    figureMesh.renderOrder = ghost > .002 ? 5 : 0;
+    for (const [n, m] of Object.entries(mats)) {
+      const o = n.startsWith('ghost_') ? op * (1 - ghost * (n === 'ghost_calf' ? .55 : .8)) : op;
+      m.opacity = o; m.transparent = o < .999; m.depthWrite = o > .5;
+    }
+    kicker.unslim.visible = op > .002;            // hidden outright whenever it is off: zero opacity still casts shadows
+    // tuck the figure's foot into the shoe cup once the device is on
+    const tuck = figureExact ? 1 : 1 - .22 * worn; bones.lFoot.scale.set(tuck, tuck, tuck * .92);
+    // slim the figure's shin so the scanned shell sits on it; the device stays rigid at true scale,
+    // with its ankle axis on the figure's ankle and its top rim centred on the (slimmed) shin
+    const slim = figureExact ? 1 : 1 - .2 * worn; bones.lLeg.scale.set(slim, 1, slim);
+    figureMesh.morphTargetInfluences[0] = clamp01(worn * 2.5);       // fully fitted before the cuffs turn opaque
+    kicker.unslim.scale.set(1 / slim, 1, 1 / slim);
+    _a.copy(kicker.legA).multiply(_t.set(slim, 1, slim));
+    _t.copy(kicker.legT).multiply(_ax.set(slim, 1, slim)).sub(_a).normalize();
+    kicker.shinMount.position.copy(_a);
+    kicker.shinMount.quaternion.setFromUnitVectors(kicker.devAxis, _t).multiply(kicker.yawPi);
+    // knee hinge follows the figure's knee: thigh direction (knee → hip) seen in the device frame
+    kicker.devShin.updateWorldMatrix(true, false);
+    bones.lUp.localToWorld(_p1.copy(thighAxis.b)); bones.lUp.localToWorld(_p2.copy(thighAxis.a));
+    kicker.devShin.worldToLocal(_p1); kicker.devShin.worldToLocal(_p2); _p1.sub(_p2);  // _p1: up the thigh's mesh axis, _p2: a point on it (device frame)
+    // turn the thigh side about the hinge so the upper cuff's centre lands on the figure's thigh axis
+    // (the figure's thigh also leans in, which a single-axis hinge can't follow, so the frontal lean is absorbed here)
+    {
+      const P = KNEE_CAD, r = CUFF_CAD.distanceTo(P), d = _p1.normalize(), K = _p2;   // K: point on the thigh axis, d: toward the hip
+      const w = _t.copy(K).sub(P), bq = w.dot(d), cq = w.lengthSq() - r * r, disc = bq * bq - cq;
+      const tq = disc > 0 ? -bq + Math.sqrt(disc) : -bq;
+      _ax.copy(K).addScaledVector(d, tq).sub(P).normalize();
+      kicker.thighPivot.quaternion.setFromUnitVectors(_a.copy(CUFF_CAD).sub(P).normalize(), _ax);
+      // body-specific [about the hinge axis, outward]: a thigh bulkier near the hip than Gabriel's needs the thigh side tipped
+      // slightly forward and out about the hinge so the upper cuff clears it (the hinge itself stays put)
+      if (figureCuffTilt) kicker.thighPivot.quaternion.premultiply(_q.setFromAxisAngle(X_AX, figureCuffTilt[0])).premultiply(_q.setFromAxisAngle(_t.set(0, 0, 1), figureCuffTilt[1]));
+    }
+
+    // articulation: ankle cycles while in the drive-train section
+    const amp = smooth(seg(s, 3.45, 3.95)) * (1 - smooth(seg(s, 4.55, 4.85)));
+    if (amp > 0 && !reduced) phase += dt * 2.4;
+    const scrubbed = Math.sin((s - 3.45) * Math.PI * 3);
+    // plantarflex only: from flat (rack near its retracted end) down to ANKLE_ROM and back
+    let ankle = -ANKLE_ROM * amp * .5 * (1 - (reduced ? scrubbed : Math.cos(phase)));
+    // walking: the Kicker can only plantarflex, so it follows the gait's push-off and stays flat otherwise
+    if (poseMix.w > 0) ankle += poseMix.w * Math.max(-ANKLE_ROM, Math.min(0, curveAt(GAIT_A, ui.gait.pc) * RD));
+    // the shoe turns on the ankle revolute; the figure's foot rides in it about the same axis
+    const theta = ANKLE_TILT + ankle;
+    footTilt.rotation.x = theta;
+    _ax.copy(X_AX).applyQuaternion(kicker.shinMount.quaternion);
+    bones.lFoot.quaternion.slerp(_q.setFromAxisAngle(_ax, ankle), worn);
+    // actuator swings on the upper pin and the rail extends to keep the lower pin on the shoe
+    const { swing, ext } = linkage(theta);
+    kicker.actPivot.rotation.x = swing;
+    const slide = -(ext - linkage(ANKLE_TILT).ext);
+    rail.position.copy(U_PIN).multiplyScalar(-ext);
+    const carrierAng = slide / PIN_R;
+    parts.carriage.pv.quaternion.setFromAxisAngle(N_AX, carrierAng);
+    parts.sun.pv.quaternion.setFromAxisAngle(N_AX, carrierAng * RATIO);
+    for (let i = 1; i <= 4; i++) parts['planet' + i].pv.quaternion.setFromAxisAngle(N_AX, carrierAng * PLANET_K);
+
+    // explode, hold, rebound with a damped bounce
+    const out = ease(seg(s, 4.7, 5.15));
+    const back = seg(s, 5.6, 6.05);
+    let e = out;
+    if (back > 0) { const x = back; e = (1 - x) * Math.pow(1 - x, 1.5) + Math.sin(x * Math.PI * 3) * Math.pow(1 - x, 2) * .18 * (x > .33 ? 1 : 0); e = back >= 1 ? 0 : Math.max(e, -0.08); }
+    for (const k in parts) parts[k].ex.position.copy(parts[k].off).multiplyScalar(e);
+
+    // balloons
+    const show = clamp01(e * 3) * (s > 4.6 && s < 6.1 ? 1 : 0);
+    svg.style.opacity = show;
+    if (show > 0.01) {
+      const W = innerWidth, Hh = innerHeight;
+      parts.housing.m.getWorldPosition(wc); // device frame anchor
+      const center = new THREE.Vector3();
+      kicker.parts.ring.m.localToWorld(center.copy(G0)); center.project(camera);
+      balloons.forEach((b, i) => {
+        const p = parts[b.k];
+        p.m.localToWorld(wp.copy(p.c)); wp.project(camera);
+        const x = (wp.x * .5 + .5) * W, y = (-wp.y * .5 + .5) * Hh;
+        let dx = wp.x - center.x, dy = -(wp.y - center.y); const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const bx = x + dx * 46, by = y + dy * 46;
+        b.l.setAttribute('x1', x); b.l.setAttribute('y1', y); b.l.setAttribute('x2', bx); b.l.setAttribute('y2', by);
+        b.d.setAttribute('cx', x); b.d.setAttribute('cy', y);
+        b.c.setAttribute('cx', bx); b.c.setAttribute('cy', by); b.tx.setAttribute('x', bx); b.tx.setAttribute('y', by);
+      });
+    }
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+resize(); themeColors(); readScroll(); sNow = sTarget;
+buildFigure().then(() => {
+  buildKicker(); rigBuild();
+  window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; } }; // debug hook for render checks
+  requestAnimationFrame(frame);
+})
+  .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
+</script>
+

@@ -1,0 +1,690 @@
+<style>
+/* Workshop: an opaque sheet that scrolls up over the figure stage; one bench per build, each with its own toy. */
+#workshop {
+  position: relative; z-index: 4; background: var(--vellum); padding: 12vh 16px 18vh;
+  background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 40px 40px; border-top: 1px solid var(--graphite);
+}
+#workshop > header, .bench { max-width: 1180px; margin-inline: auto; }
+#workshop > header { display: flex; flex-direction: column; gap: 14px; margin-bottom: 10vh; }
+#workshop > header h2 { font-size: clamp(44px, 8vw, 104px); font-weight: 300; line-height: .9; }
+#workshop > header h2 em { font-style: normal; font-weight: 750; }
+#workshop > header p { font-size: 18px; color: var(--graphite-2); max-width: 52ch; }
+.benchnav { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
+.benchnav a { display: inline-block; text-decoration: none; color: var(--graphite); border: 1px solid var(--graphite); background: var(--sheet); padding: 5px 10px; }
+.benchnav a:hover { background: var(--graphite); color: var(--vellum); }
+.bench {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: stretch;
+  margin-bottom: 16vh; scroll-margin-top: 24px;
+}
+.bench.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.bench.flip > .card { order: 2; }
+.bench > .card { width: auto; align-self: start; }
+.rig { position: relative; min-width: 0; display: grid; gap: 10px; grid-template-rows: minmax(0, 1fr) auto; }
+.view {
+  position: relative; min-height: 440px; border: 1px solid var(--graphite); background: var(--sheet);
+  overflow: hidden; touch-action: pan-y;
+}
+.view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.view .tag, .view .readout {
+  position: absolute; z-index: 1; pointer-events: none; font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+}
+.view .tag { left: 10px; top: 8px; color: var(--graphite-2); }
+.view .readout { right: 10px; top: 8px; text-align: right; color: var(--cobalt); font-variant-numeric: tabular-nums; line-height: 1.5; }
+.view .readout b { color: var(--graphite); font-weight: 500; }
+.media { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+.media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.media img, .media video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); }
+.media figure:only-child img { aspect-ratio: 16 / 10; object-position: 50% 55%; }
+.media figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
+.media figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
+.ctl { display: grid; gap: 8px; font-family: var(--f-mono); font-size: 12px; }
+.ctl label { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 4.5em; gap: 10px; align-items: center; }
+.ctl output { text-align: right; font-variant-numeric: tabular-nums; color: var(--cobalt); }
+.ctl input[type=range] { width: 100%; accent-color: var(--cobalt); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.btnrow button, .padbtn {
+  font: inherit; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--graphite); background: var(--sheet); border: 1px solid var(--graphite); padding: 6px 10px; cursor: pointer;
+}
+.btnrow button[aria-pressed=true], .btnrow button:hover, .padbtn:active { background: var(--graphite); color: var(--vellum); }
+.formula { font-family: var(--f-mono); font-size: 12px; border-left: 2px solid var(--cobalt); padding: 2px 0 2px 10px; color: var(--graphite); }
+.formula small { display: block; color: var(--graphite-2); font-size: 11px; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule); padding: 0 4px; }
+/* gait plot */
+#gait { width: 100%; height: auto; display: block; cursor: ew-resize; touch-action: none; }
+#gait path.curve { fill: none; stroke: var(--red); stroke-width: 2; }
+#gait line, #gait path.axis { stroke: var(--rule); }
+#gait text { font-family: var(--f-mono); font-size: 9px; fill: var(--graphite-2); }
+#gait circle { fill: var(--red); }
+#gait .cursor { stroke: var(--cobalt); stroke-dasharray: 3 3; }
+#gait rect.swing { fill: color-mix(in srgb, var(--neon) 12%, transparent); }
+/* turret: the laser dot */
+#laser {
+  position: fixed; z-index: 6; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; pointer-events: none;
+  background: #ff2030; box-shadow: 0 0 6px 2px #ff2030, 0 0 22px 6px rgba(255, 32, 48, .45); opacity: 0; transition: opacity .2s;
+}
+#bench-turret .view { cursor: none; }
+/* couch: swerve sim */
+#swerve { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.modtable { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-family: var(--f-mono); font-size: 11px; text-align: center; }
+.modtable div { border: 1px solid var(--rule); padding: 4px 2px; font-variant-numeric: tabular-nums; }
+.modtable b { display: block; color: var(--cobalt); font-weight: 500; }
+.hubinset { position: absolute; right: 10px; bottom: 10px; width: 132px; height: 132px; border: 1px solid var(--rule); background: var(--sheet); z-index: 1; }
+/* crutch */
+#crutch { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: ew-resize; }
+#crutch .rail { fill: none; stroke: var(--graphite-2); stroke-width: 7; stroke-linecap: round; }
+#crutch .holder { fill: none; stroke: var(--graphite); stroke-width: 5; }
+#crutch .cup { fill: color-mix(in srgb, var(--vellum-2) 70%, transparent); stroke: var(--graphite); stroke-width: 2; }
+#crutch .coffee { fill: #6b3a1e; }
+#crutch .cupline { fill: none; stroke: var(--graphite); stroke-width: 2; }
+#crutch .floor { stroke: var(--graphite); stroke-width: 1.5; }
+#crutch .drop { fill: #6b3a1e; }
+#crutch .lvl { stroke: var(--neon); stroke-width: 1; stroke-dasharray: 4 4; }
+.alsolist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
+.alsolist li { border: 1px solid var(--rule); padding: 3px 8px; background: var(--sheet); }
+@media (max-width: 860px) {
+  .bench, .bench.flip { grid-template-columns: minmax(0, 1fr); }
+  .bench.flip > .card { order: 0; }
+  .view { min-height: 340px; }
+  .ctl label { grid-template-columns: 7.5em minmax(0, 1fr) 4em; }
+  .hubinset { width: 96px; height: 96px; }
+}
+</style>
+
+<div id="laser" aria-hidden="true"></div>
+<div id="workshop">
+  <header>
+    <div class="eyebrow">09 <b>Workshop</b></div>
+    <h2>The rest of <em>the bench.</em></h2>
+    <p>The Kicker is one build. These are the others, each pulled out of its Fusion 360 file and wired up so you can poke at the idea behind it.</p>
+    <ul class="benchnav">
+      <li><a href="#bench-knee">Knee hinge</a></li>
+      <li><a href="#bench-scooter">Knee scooter</a></li>
+      <li><a href="#bench-couch">Swerve couch</a></li>
+      <li><a href="#bench-turret">Cat turret</a></li>
+      <li><a href="#bench-crutch">Crutch cup holder</a></li>
+    </ul>
+  </header>
+
+  <!-- 1 · knee hinge: the Fusion "Knee" revolute driven by a gait curve -->
+  <article class="bench" id="bench-knee">
+    <div class="card">
+      <div class="eyebrow">09.1 <b>Anti-thetis · Leg</b></div>
+      <h2>A knee that knows how to walk.</h2>
+      <p>The full-leg exo adds thigh cuffs and this hinge above the Kicker. Two 45×55×6 bearings carry the shin side around the thigh block, one revolute joint, nothing clever. The clever part is what a knee actually does in a stride.</p>
+      <p>Press <b>Walk</b> and the hinge follows a textbook gait-lab curve for level walking. The knee is almost straight when your heel lands, flexes about 18° to absorb the hit, straightens again, then whips to about 60° so your toes clear the floor in swing.</p>
+      <svg id="gait" viewBox="0 0 320 120" role="img" aria-label="Knee flexion angle over one gait cycle; drag to scrub"></svg>
+      <div class="ctl">
+        <label>Knee flexion <input id="kneeAng" type="range" min="0" max="120" step="1" value="5"><output id="kneeOut">5°</output></label>
+      </div>
+      <div class="btnrow"><button id="kneeWalk" type="button" aria-pressed="true">Walk</button></div>
+      <p class="note">Hinge geometry is from Hinge v47 in Fusion. The curve is an average adult profile, not a measurement of me.</p>
+    </div>
+    <div class="rig">
+      <div class="view" id="v-knee"><span class="tag">Hinge v47 · Fusion</span><span class="readout" id="kneeRead"></span></div>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/legexo_front_thumb.webp" alt="The full-leg exo worn: thigh cuffs, the knee hinge and the Kicker at the ankle"><figcaption><b>Worn</b>Thigh cuffs, hinge, Kicker</figcaption></figure>
+        <figure><img loading="lazy" src="photos/kicker_worn_with_knee_crop_thumb.webp" alt="Close view of the knee hinge on the leg above the black Kicker"><figcaption><b>Detail</b>Hinge at the knee line</figcaption></figure>
+      </div>
+    </div>
+  </article>
+
+  <!-- 2 · knee scooter: steer it, it drives the turning circle the geometry allows -->
+  <article class="bench flip" id="bench-scooter">
+    <div class="card">
+      <div class="eyebrow">09.2 <b>Scooter · HTD 3M</b></div>
+      <h2>A knee scooter with a motor where the wheel should be.</h2>
+      <p>Knee scooters are slow on purpose. This one has powered rear wheels, a throttle on the bars, and a basket because it still has to be useful. The Fusion folders show it went through GT2 and HTD 3M belt revisions on the way.</p>
+      <p>Steer it. The front axle swings on the steering joint, and with a 51 cm wheelbase the turning radius falls straight out of the geometry:</p>
+      <div class="formula">R = L / tan δ <small>L = 51.2 cm (rear axle to front axle in the model), δ = steering angle</small></div>
+      <div class="ctl">
+        <label>Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="14"><output id="scSteerOut">14°</output></label>
+        <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
+      </div>
+      <p class="note">Model: Scooter Asm v4. Wheels, steering and the knee-height slider all move on their Fusion joints.</p>
+    </div>
+    <div class="rig">
+      <div class="view" id="v-scooter"><span class="tag">Scooter Asm v4 · Fusion</span><span class="readout" id="scRead"></span></div>
+      <div class="media">
+        <figure><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test run</figcaption></figure>
+        <figure><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear hub motors spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear hub motors spinning</figcaption></figure>
+        <figure><img loading="lazy" src="photos/scooter_parked_thumb.webp" alt="The finished knee scooter parked on a porch, blue hub-motor rear wheels"><figcaption><b>Built</b>Parked, basket and all</figcaption></figure>
+      </div>
+    </div>
+  </article>
+
+  <!-- 3 · swerve couch: drive the couch, watch each module solve v + ω × r -->
+  <article class="bench" id="bench-couch">
+    <div class="card">
+      <div class="eyebrow">09.3 <b>Couch Surfing</b></div>
+      <h2>A couch that drives sideways.</h2>
+      <p>It is a full-size sofa on four swerve modules. Each corner has its own drive wheel and its own steering motor, so the couch can translate in any direction and spin at the same time, like an office chair with opinions.</p>
+      <p>Drive it. Every module solves one line of vector math: its wheel has to move at the couch's velocity plus the spin's contribution at that corner.</p>
+      <div class="formula">v<sub>i</sub> = v + ω × r<sub>i</sub> <small>v = couch velocity, ω = spin rate, r<sub>i</sub> = corner position from the centre</small></div>
+      <div class="modtable" id="modtable"></div>
+      <div class="ctl">
+        <label>Spin ω <input id="cwSpin" type="range" min="-1" max="1" step="0.01" value="0"><output id="cwSpinOut">0</output></label>
+      </div>
+      <p class="note">Drag on the driveway to drive, or use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>Q</kbd>/<kbd>E</kbd>. Leave it alone and it shows off. Red arrows are wheels running backwards: past 90° it is quicker to reverse a wheel than to steer it all the way round. The inset is the real steering hub from Fusion, turned by the front-left module.</p>
+    </div>
+    <div class="rig">
+      <div class="view" id="v-couch"><canvas id="swerve" aria-label="Top-down swerve drive simulator of the couch"></canvas><span class="tag">Top view · 4 swerve modules</span><div class="hubinset" id="v-hub" aria-hidden="true"></div></div>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/wheelstand_couch_thumb.webp" alt="The couch on a driveway beside its steering column and footrest unit"><figcaption><b>Built</b>Couch, wheel and pedals</figcaption></figure>
+      </div>
+    </div>
+  </article>
+
+  <!-- 4 · cat turret: it follows the cursor with a laser -->
+  <article class="bench flip" id="bench-turret">
+    <div class="card">
+      <div class="eyebrow">09.4 <b>Cat Turret</b></div>
+      <h2>Two servos and a laser, versus one cat.</h2>
+      <p>A pan servo, a tilt servo on top of it, and a laser module on the tilt horn. That is the entire machine. Two angles are enough to point anywhere in front of it.</p>
+      <p>Move your cursor over it. Then try to make it stop.</p>
+      <div class="formula">find pan, tilt so that beam(pan, tilt) ∥ (target − barrel) <small>The pan axis in this design leans 45°, so there is no tidy atan2. The page solves both angles numerically every frame.</small></div>
+      <p class="note">Model: Cat Turret v4. Both servo joints are its Fusion revolutes. On a phone, tap and drag.</p>
+    </div>
+    <div class="rig">
+      <div class="view" id="v-turret"><span class="tag">Cat Turret v4 · Fusion</span><span class="readout" id="tuRead"></span></div>
+    </div>
+  </article>
+
+  <!-- 5 · crutch cup holder: swing the crutch, the coffee stays level -->
+  <article class="bench" id="bench-crutch">
+    <div class="card">
+      <div class="eyebrow">09.5 <b>Scooter · accessories</b></div>
+      <h2>Coffee, on crutches.</h2>
+      <p>On crutches you lose both hands, which means you lose your coffee. This is a printed helical holder that clamps between the two rails of a standard aluminium crutch.</p>
+      <p>Swing the crutch. The cup tilts with it, but the coffee surface doesn't: gravity sets the surface, not the crutch, so all it can do is slosh. Swing hard enough and the slosh wins.</p>
+      <div class="ctl">
+        <label>Stride swing <input id="crSwing" type="range" min="0" max="40" step="1" value="12"><output id="crSwingOut">12°</output></label>
+      </div>
+      <div class="btnrow"><span class="readout" id="crRead" style="font-family:var(--f-mono);font-size:12px;color:var(--cobalt)"></span></div>
+      <p class="note">Drag the crutch to swing it yourself. The surface tilt is first-order physics (tangential acceleration over g) plus a toy slosh, not a fluid simulation.</p>
+    </div>
+    <div class="rig">
+      <div class="view" id="v-crutch"><svg id="crutch" viewBox="0 0 400 440" preserveAspectRatio="xMidYMid meet" aria-label="A crutch with a cup holder swinging, coffee surface staying level"></svg><span class="tag">Illustration</span></div>
+      <div class="media">
+        <figure><img loading="lazy" src="photos/crutch_cupholder_thumb.webp" alt="Black printed helical cup holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In a lecture hall, in use</figcaption></figure>
+      </div>
+    </div>
+  </article>
+
+  <article class="bench" style="grid-template-columns:minmax(0,1fr)">
+    <div class="card" style="width:auto">
+      <div class="eyebrow">09.6 <b>Also in Fusion</b></div>
+      <h2>Still on the bench.</h2>
+      <ul class="alsolist"><li>Flying Bike</li><li>Pipe organ</li><li>ShoppingKart · Honda GX390</li><li>Printers Printing Printers</li><li>Bedside table</li><li>Torque tester</li></ul>
+      <div class="links"><span>gabrielprice.com</span><span>GitHub · TOOPRICEYY</span></div>
+    </div>
+  </article>
+</div>
+
+<script>/*WORKSHOP_DATA*/</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = () => getComputedStyle(document.documentElement);
+const tok = (n) => new THREE.Color(css().getPropertyValue(n).trim() || '#888');
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const D = Math.PI / 180;
+
+// ---------- the workshop sheet covers the stage: tell the main loop to stop drawing it ----------
+const wsEl = document.getElementById('workshop');
+function cover() { document.body.classList.toggle('ws-cover', wsEl.getBoundingClientRect().top <= 0); }
+addEventListener('scroll', cover, { passive: true }); addEventListener('resize', cover); cover();
+
+// ---------- mesh data ----------
+const bin = Uint8Array.from(atob(window.WS_B64), c => c.charCodeAt(0)).buffer;
+const geoCache = {};
+function geo(e) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bin, e.p, e.nv * 3), 3));
+  g.setAttribute('normal', new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(new Int8Array(bin, e.n, e.nv * 4), 4), 3, 0, true));
+  g.setIndex(new THREE.BufferAttribute(e.w === 2 ? new Uint16Array(bin, e.i, e.ni) : new Uint32Array(bin, e.i, e.ni), 1));
+  return g;
+}
+function parts(slug) { const o = {}; for (const e of window.WS_MAN[slug].parts) o[e.k] = geo(e); return o; }
+const joint = (slug, name) => window.WS_MAN[slug].joints.find(j => j.name === name);
+
+// ---------- materials (shared look: graphite hardware, crystal-red moving parts) ----------
+const mats = [];
+function mat(tokName, opts = {}) { const m = new THREE.MeshStandardMaterial({ roughness: .5, metalness: .15, ...opts }); m.userData.tok = tokName; mats.push(m); return m; }
+const M = { dark: mat('--graphite', { roughness: .62 }), red: mat('--red', { roughness: .38 }), metal: mat('--graphite-2', { metalness: .7, roughness: .32 }), soft: mat('--graphite', { roughness: .9 }) };
+function themeMats() {
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
+  for (const m of mats) { m.color.copy(tok(m.userData.tok)); if (m.userData.tok === '--graphite' && dark) m.color.setHex(0x3a3550); }
+  M.red.emissive.copy(M.red.color).multiplyScalar(.12);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeMats);
+new MutationObserver(themeMats).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+themeMats();
+
+// ---------- tiny viewer: one renderer per bench, drawn only while on screen ----------
+const viewers = [];
+function viewer(el, { fov = 32, orbit = true } = {}) {
+  const canvas = document.createElement('canvas'); el.prepend(canvas);
+  const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.toneMapping = THREE.ACESFilmicToneMapping;
+  const scene = new THREE.Scene();
+  const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, .7));
+  const key = new THREE.DirectionalLight(0xffffff, 1.8); key.position.set(3, 5, 4); scene.add(key);
+  const camera = new THREE.PerspectiveCamera(fov, 1, .1, 5000);
+  let controls = null;
+  if (orbit) {
+    controls = new OrbitControls(camera, canvas);
+    Object.assign(controls, { enableZoom: false, enablePan: false, enableDamping: true, dampingFactor: .08 });
+    controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  }
+  const v = { el, canvas, r, scene, camera, controls, on: false, update: null, w: 0, h: 0 };
+  new IntersectionObserver(([en]) => { v.on = en.isIntersecting; }, { rootMargin: '80px' }).observe(el);
+  new ResizeObserver(() => {
+    v.w = el.clientWidth; v.h = el.clientHeight; if (!v.w || !v.h) return;
+    r.setSize(v.w, v.h, false); camera.aspect = v.w / v.h; camera.updateProjectionMatrix();
+  }).observe(el);
+  viewers.push(v); return v;
+}
+function frameTo(v, obj, dir, k = 1.15) {
+  const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), rad = box.getSize(new THREE.Vector3()).length() / 2;
+  const asp = (v.el.clientWidth || 1) / (v.el.clientHeight || 1), half = Math.min(v.camera.fov * D / 2, Math.atan(Math.tan(v.camera.fov * D / 2) * asp));
+  const dist = rad * k / Math.sin(half);
+  v.camera.position.copy(c).addScaledVector(dir.clone().normalize(), dist);
+  v.camera.near = dist / 50; v.camera.far = dist * 20; v.camera.updateProjectionMatrix();
+  if (v.controls) v.controls.target.copy(c); else v.camera.lookAt(c);
+  return c;
+}
+// a pivot about an axis through a point: children live in the original (Fusion) frame
+function pivot(parent, origin) {
+  const p = new THREE.Group(); p.position.fromArray(origin); parent.add(p);
+  const inner = new THREE.Group(); inner.position.fromArray(origin).negate(); p.add(inner);
+  return { p, inner };
+}
+
+// ================= 1 · knee hinge =================
+const GAIT = [[0, 5], [5, 10], [10, 16], [15, 18], [20, 16], [30, 9], [40, 5], [50, 7], [55, 13], [60, 30], [65, 48], [70, 60], [73, 62], [80, 55], [85, 40], [90, 22], [95, 8], [100, 5]];
+const PHASES = [[2, 'Initial contact'], [12, 'Loading response'], [31, 'Mid stance'], [50, 'Terminal stance'], [62, 'Pre-swing'], [75, 'Initial swing'], [87, 'Mid swing'], [100, 'Terminal swing']];
+function gaitAt(pc) { // Catmull-Rom through the table, periodic
+  pc = ((pc % 100) + 100) % 100;
+  const n = GAIT.length, i = Math.max(0, GAIT.findIndex((g, j) => j < n - 1 && pc <= GAIT[j + 1][0]));
+  const p0 = GAIT[i > 0 ? i - 1 : n - 2][1], p1 = GAIT[i][1], p2 = GAIT[i + 1][1], p3 = GAIT[i + 2 < n ? i + 2 : 1][1];
+  const t = (pc - GAIT[i][0]) / (GAIT[i + 1][0] - GAIT[i][0]);
+  return .5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+}
+{
+  const v = viewer(document.getElementById('v-knee'));
+  const g = parts('hinge');
+  const root = new THREE.Group(); root.rotation.z = -Math.PI / 2; v.scene.add(root); // femur (-x) up, knee axis (y) horizontal
+  root.add(new THREE.Mesh(g.thigh, M.dark));
+  const knee = pivot(root, [0, 0, 0]); knee.inner.add(new THREE.Mesh(g.shin, M.red));
+  { const frameBox = new THREE.Mesh(new THREE.BoxGeometry(14, 34, 14)); frameBox.position.y = -4; v.scene.add(frameBox); frameTo(v, frameBox, new THREE.Vector3(.55, .25, 1), 1.0); v.scene.remove(frameBox); } // frame the knee, let the rods run off
+  // axis marker through the knee
+  const axisLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -7, 0), new THREE.Vector3(0, 7, 0)]), new THREE.LineDashedMaterial({ color: 0x00c8e0, dashSize: .6, gapSize: .4 }));
+  axisLine.computeLineDistances(); root.add(axisLine);
+
+  const svg = document.getElementById('gait'), NS = 'http://www.w3.org/2000/svg';
+  const X = (pc) => 28 + pc / 100 * 284, Y = (a) => 104 - a / 70 * 92;
+  const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; };
+  el('rect', { class: 'swing', x: X(62), y: 8, width: X(100) - X(62), height: 96 });
+  for (const a of [0, 30, 60]) { el('line', { x1: 28, x2: 312, y1: Y(a), y2: Y(a) }); el('text', { x: 4, y: Y(a) + 3 }).textContent = a + '°'; }
+  el('text', { x: X(22), y: 116 }).textContent = 'stance';
+  el('text', { x: X(76), y: 116 }).textContent = 'swing';
+  let d = ''; for (let pc = 0; pc <= 100; pc += 1) d += (pc ? 'L' : 'M') + X(pc).toFixed(1) + ' ' + Y(gaitAt(pc)).toFixed(1);
+  el('path', { class: 'curve', d });
+  const cur = el('line', { class: 'cursor', y1: 8, y2: 104 }), dot = el('circle', { r: 4 });
+
+  const range = document.getElementById('kneeAng'), out = document.getElementById('kneeOut'), btn = document.getElementById('kneeWalk'), read = document.getElementById('kneeRead');
+  let walking = !reduced, pc = 0, ang = 5;
+  btn.setAttribute('aria-pressed', walking);
+  btn.onclick = () => { walking = !walking; btn.setAttribute('aria-pressed', walking); };
+  range.oninput = () => { walking = false; btn.setAttribute('aria-pressed', false); ang = +range.value; pc = -1; };
+  const scrub = (e) => { const b = svg.getBoundingClientRect(); pc = clamp(((e.clientX - b.left) / b.width * 320 - 28) / 284 * 100, 0, 100); walking = false; btn.setAttribute('aria-pressed', false); ang = gaitAt(pc); };
+  svg.addEventListener('pointerdown', (e) => { svg.setPointerCapture(e.pointerId); scrub(e); });
+  svg.addEventListener('pointermove', (e) => { if (svg.hasPointerCapture(e.pointerId)) scrub(e); });
+  v.update = (t, dt) => {
+    if (walking) { pc = (pc < 0 ? 0 : pc + dt / 1.1 * 100) % 100; ang = gaitAt(pc); }
+    knee.p.rotation.y = ang * D;
+    range.value = Math.round(ang); out.textContent = Math.round(ang) + '°';
+    const show = pc >= 0;
+    cur.style.display = dot.style.display = show ? '' : 'none';
+    if (show) { cur.setAttribute('x1', X(pc)); cur.setAttribute('x2', X(pc)); dot.setAttribute('cx', X(pc)); dot.setAttribute('cy', Y(ang)); }
+    read.innerHTML = '<b>' + Math.round(ang) + '°</b> flexion<br>' + (show ? Math.round(pc) + '% · ' + PHASES.find(p => pc <= p[0])[1] : 'manual');
+  };
+}
+
+// ================= 2 · knee scooter =================
+{
+  const v = viewer(document.getElementById('v-scooter'));
+  const g = parts('scooter');
+  const WB = 46 - (-5.2), RW = 10.16;          // wheelbase and wheel radius from the Fusion joints (cm)
+  const car = new THREE.Group(); v.scene.add(car);
+  const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; root.position.set(0, RW, -5.2); car.add(root); // Fusion z-up, +y forward → three y-up, -z forward; rear axle at the car origin
+  root.add(new THREE.Mesh(g.frame, M.dark));
+  const kneepad = new THREE.Group(); kneepad.add(new THREE.Mesh(g.kneepad, M.soft)); root.add(kneepad);
+  const steer = pivot(root, joint('scooter', 'Steering').origin); steer.inner.add(new THREE.Mesh(g.steer, M.dark));
+  const wheels = [];
+  for (const [k, jn, par] of [['wRL', 'Rear L Wheel', root], ['wRR', 'Rear R Wheel', root], ['wFL', 'Front L Wheel', steer.inner], ['wFR', 'Front R Wheel', steer.inner]]) {
+    const w = pivot(par, joint('scooter', jn).origin); w.inner.add(new THREE.Mesh(g[k], k === 'wRR' ? M.red : M.dark)); wheels.push(w);
+    if (k === 'wRL') w.inner.children[0].material = M.red; // both rear wheels are driven
+  }
+  // floor, path trail
+  const grid = new THREE.GridHelper(4000, 200); grid.material.transparent = true; grid.material.opacity = .25; v.scene.add(grid);
+  const N = 400, trailPos = new Float32Array(N * 3);
+  const trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00c8e0 }));
+  trail.geometry.setAttribute('position', new THREE.BufferAttribute(trailPos, 3)); trail.frustumCulled = false; v.scene.add(trail);
+  const centre = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.4, 24), new THREE.MeshBasicMaterial({ color: 0x6a2cff })); centre.rotation.x = -Math.PI / 2; v.scene.add(centre);
+  frameTo(v, car, new THREE.Vector3(1, .7, .9), 1.6);
+  const camOff = v.camera.position.clone().sub(v.controls.target);
+  const steerIn = document.getElementById('scSteer'), steerOut = document.getElementById('scSteerOut'), kneeIn = document.getElementById('scKnee'), kneeOut = document.getElementById('scKneeOut'), read = document.getElementById('scRead');
+  let psi = 0, X = 0, Z = 0, spin = 0, n = 0, delta = 14 * D;
+  const SPEED = 90; // cm/s, display speed
+  v.update = (t, dt) => {
+    const target = +steerIn.value * D; delta += (target - delta) * (1 - Math.pow(.002, dt));
+    steerOut.textContent = steerIn.value + '°'; kneeOut.textContent = (+kneeIn.value > 0 ? '+' : '') + kneeIn.value + ' cm';
+    kneepad.position.z = +kneeIn.value;
+    steer.p.rotation.z = delta;
+    const sp = reduced ? 0 : SPEED;
+    psi += sp * Math.tan(delta) / WB * dt;
+    X += -Math.sin(psi) * sp * dt; Z += -Math.cos(psi) * sp * dt;
+    car.position.set(X, 0, Z); car.rotation.y = psi;
+    spin -= sp / RW * dt; for (const w of wheels) w.p.rotation.x = spin;
+    // keep the camera riding along
+    const dx = X - v.controls.target.x, dz = Z - v.controls.target.z;
+    v.controls.target.x += dx; v.controls.target.z += dz; v.camera.position.x += dx; v.camera.position.z += dz;
+    grid.position.set(Math.round(X / 20) * 20, 0, Math.round(Z / 20) * 20);
+    if (!reduced) { trailPos.copyWithin(3, 0, (N - 1) * 3); trailPos[0] = X; trailPos[1] = .1; trailPos[2] = Z; n = Math.min(N, n + 1); trail.geometry.setDrawRange(0, n); trail.geometry.attributes.position.needsUpdate = true; }
+    // instantaneous centre of rotation: on the rear-axle line, R to the side
+    const R = Math.abs(delta) > .005 ? WB / Math.tan(delta) : Infinity;
+    centre.visible = isFinite(R) && Math.abs(R) < 600;
+    if (centre.visible) centre.position.set(X - Math.cos(psi) * R, .2, Z + Math.sin(psi) * R);
+    read.innerHTML = 'Turning radius <b>' + (isFinite(R) && Math.abs(R) < 5000 ? (Math.abs(R) / 100).toFixed(2) + ' m' : 'straight') + '</b><br>wheel ' + Math.round(sp / RW / (2 * Math.PI) * 60) + ' rpm';
+  };
+  // play clips only while visible
+  for (const vid of document.querySelectorAll('#bench-scooter video')) {
+    new IntersectionObserver(([en]) => {
+      if (en.isIntersecting) { if (!vid.src) vid.src = vid.dataset.src; if (!reduced) vid.play().catch(() => {}); } else vid.pause();
+    }).observe(vid);
+  }
+}
+
+// ================= 3 · swerve couch =================
+{
+  const cv = document.getElementById('swerve'), ctx = cv.getContext('2d');
+  const view = document.getElementById('v-couch'), table = document.getElementById('modtable');
+  const spinIn = document.getElementById('cwSpin'), spinOut = document.getElementById('cwSpinOut');
+  const L = 213, W = 91;                                 // a three-seat sofa, cm
+  const mods = [['FL', -W / 2 + 12, -L / 2 + 14], ['FR', W / 2 - 12, -L / 2 + 14], ['RL', -W / 2 + 12, L / 2 - 14], ['RR', W / 2 - 12, L / 2 - 14]]
+    .map(([n, x, y]) => ({ n, x, y, a: 0, s: 0 }));
+  table.innerHTML = mods.map(m => `<div><b>${m.n}</b><span>0°</span><br><span>0%</span></div>`).join('');
+  const cells = [...table.children].map(d => d.querySelectorAll('span'));
+  const st = { x: 0, y: 0, h: 0, vx: 0, vy: 0, w: 0 };   // pose (cm, rad) and commanded field-relative velocity
+  const VMAX = 160, WMAX = 1.4;
+  const keys = new Set(); let drag = null, lastInput = -1e9, tNow = 0;
+  view.addEventListener('pointerenter', () => view.dataset.hover = 1); view.addEventListener('pointerleave', () => delete view.dataset.hover);
+  addEventListener('keydown', (e) => { if (!view.dataset.hover) return; const k = e.key.toLowerCase(); if ('wasdqe'.includes(k) && k.length === 1) { keys.add(k); lastInput = tNow; e.preventDefault(); } });
+  addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); drag = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }; lastInput = tNow; });
+  cv.addEventListener('pointermove', (e) => { if (drag) { drag.x = e.clientX; drag.y = e.clientY; lastInput = tNow; } });
+  const end = () => { drag = null; }; cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  spinIn.addEventListener('input', () => lastInput = tNow);
+  spinIn.addEventListener('change', () => { spinIn.value = 0; });
+  let hubAngle = 0;
+  function step(dt) {
+    tNow += dt;
+    let vx = 0, vy = 0, w = +spinIn.value;
+    if (keys.has('w')) vy -= 1; if (keys.has('s')) vy += 1; if (keys.has('a')) vx -= 1; if (keys.has('d')) vx += 1;
+    if (keys.has('q')) w = -1; if (keys.has('e')) w = 1;
+    if (drag) { const dx = drag.x - drag.x0, dy = drag.y - drag.y0, m = Math.hypot(dx, dy); if (m > 4) { vx = dx / Math.max(m, 70); vy = dy / Math.max(m, 70); } }
+    const idle = tNow - lastInput > 3 && !reduced;
+    if (idle) { const t = tNow * .5; vx = Math.cos(t) * .8; vy = Math.sin(t) * .8; w = .7; }  // drive a circle while spinning: only a holonomic base can do this
+    const m = Math.hypot(vx, vy); if (m > 1) { vx /= m; vy /= m; }
+    const k = 1 - Math.pow(.02, dt);
+    st.vx += (vx * VMAX - st.vx) * k; st.vy += (vy * VMAX - st.vy) * k; st.w += (w * WMAX - st.w) * k;
+    st.x += st.vx * dt; st.y += st.vy * dt; st.h += st.w * dt;
+    spinOut.textContent = (st.w / WMAX).toFixed(2);
+    // inverse kinematics in the couch frame
+    const c = Math.cos(-st.h), s = Math.sin(-st.h), lvx = st.vx * c - st.vy * s, lvy = st.vx * s + st.vy * c;
+    let top = 1;
+    for (const md of mods) { md.tx = lvx - st.w * md.y; md.ty = lvy + st.w * md.x; md.ts = Math.hypot(md.tx, md.ty); top = Math.max(top, md.ts / VMAX); }
+    mods.forEach((md, i) => {
+      let s = md.ts / VMAX / top;
+      if (s > .02) {
+        let a = Math.atan2(md.tx, -md.ty), da = Math.atan2(Math.sin(a - md.a), Math.cos(a - md.a));
+        if (Math.abs(da) > Math.PI / 2) { da -= Math.sign(da) * Math.PI; s = -s; }   // flip the wheel instead of steering past 90°
+        md.a += clamp(da, -7 * dt, 7 * dt);                                          // steering motors have a top speed
+      } else s = 0;
+      md.s = s;
+      cells[i][0].textContent = Math.round(((md.a / D) % 360 + 540) % 360 - 180) + '°';
+      cells[i][1].textContent = Math.round(s * 100) + '%';
+    });
+    hubAngle = mods[0].a;
+  }
+  const dpr = Math.min(devicePixelRatio, 2);
+  const sc = () => Math.min(cv.clientWidth / 520, cv.clientHeight / 420) * 1.15;
+  let on = false; new IntersectionObserver(([en]) => on = en.isIntersecting, { rootMargin: '80px' }).observe(view);
+  function draw() {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const cs = css(), ink = cs.getPropertyValue('--graphite').trim(), ink2 = cs.getPropertyValue('--graphite-2').trim(), rule = cs.getPropertyValue('--rule').trim(),
+      co = cs.getPropertyValue('--cobalt').trim(), red = cs.getPropertyValue('--red').trim(), neon = cs.getPropertyValue('--neon').trim();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    const k = sc();
+    // driveway slabs scroll under the couch
+    ctx.save(); ctx.translate(w / 2, h / 2); ctx.scale(k, k);
+    ctx.strokeStyle = rule; ctx.lineWidth = 1 / k;
+    const S = 120, hw = w / k / 2 + S, hh = h / k / 2 + S, ox = ((-st.x % S) + S) % S, oy = ((-st.y % S) + S) % S;
+    for (let x = ox - Math.ceil(hw / S) * S; x < hw; x += S) { ctx.beginPath(); ctx.moveTo(x, -hh); ctx.lineTo(x, hh); ctx.stroke(); }
+    for (let y = oy - Math.ceil(hh / S) * S; y < hh; y += S) { ctx.beginPath(); ctx.moveTo(-hw, y); ctx.lineTo(hw, y); ctx.stroke(); }
+    // couch body
+    ctx.rotate(st.h);
+    ctx.fillStyle = 'rgba(139,90,60,.85)'; ctx.strokeStyle = ink; ctx.lineWidth = 1.5 / k;
+    const rr = (x, y, ww, hh2, r) => { ctx.beginPath(); ctx.roundRect(x, y, ww, hh2, r); ctx.fill(); ctx.stroke(); };
+    rr(-W / 2, -L / 2, W, L, 10);
+    ctx.fillStyle = 'rgba(160,108,74,.95)';
+    rr(-W / 2, -L / 2, W, 20, 8); rr(-W / 2, L / 2 - 20, W, 20, 8);           // armrests
+    rr(W / 2 - 24, -L / 2 + 20, 24, L - 40, 6);                               // backrest
+    for (let i = 0; i < 3; i++) rr(-W / 2 + 4, -L / 2 + 22 + i * (L - 44) / 3, W - 30, (L - 44) / 3 - 2, 6); // seat cushions
+    // steering column + pedals live at the front-left of the couch (from the photo)
+    ctx.strokeStyle = ink; ctx.lineWidth = 3 / k; ctx.beginPath(); ctx.arc(-W / 2 - 26, -L / 2 + 36, 14, 0, Math.PI * 2); ctx.stroke();
+    // modules: wheel at its steering angle, arrow for commanded wheel velocity
+    for (const md of mods) {
+      ctx.save(); ctx.translate(md.x, md.y);
+      ctx.strokeStyle = ink2; ctx.lineWidth = 1 / k; ctx.setLineDash([3 / k, 3 / k]); ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.rotate(md.a);
+      ctx.fillStyle = ink; ctx.fillRect(-5, -11, 10, 22);
+      const len = md.s * 60;
+      ctx.strokeStyle = md.s >= 0 ? co : red; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 3 / k;
+      if (Math.abs(len) > 2) {
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -len); ctx.stroke();
+        const sgn = Math.sign(len); ctx.beginPath(); ctx.moveTo(0, -len - sgn * 8); ctx.lineTo(-5, -len); ctx.lineTo(5, -len); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // spin indicator around the centre
+    if (Math.abs(st.w) > .05) {
+      ctx.strokeStyle = neon; ctx.lineWidth = 2 / k; ctx.beginPath();
+      const a0 = -Math.PI / 2, a1 = a0 + clamp(st.w, -WMAX, WMAX) * 1.6; ctx.arc(0, 0, 30, Math.min(a0, a1), Math.max(a0, a1)); ctx.stroke();
+    }
+    ctx.restore();
+    // field-relative velocity vector from the centre
+    if (Math.hypot(st.vx, st.vy) > 3) {
+      ctx.save(); ctx.translate(w / 2, h / 2); ctx.strokeStyle = neon; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(st.vx * k * .6, st.vy * k * .6); ctx.stroke(); ctx.restore();
+    }
+  }
+  let last = performance.now();
+  (function loop(now) {
+    const dt = Math.min((now - last) / 1000, .05); last = now;
+    if (on) { step(dt); draw(); }
+    requestAnimationFrame(loop);
+  })(last);
+
+  // inset: the steering hub from Fusion, turned by FL
+  const v = viewer(document.getElementById('v-hub'), { orbit: false, fov: 28 });
+  const g = parts('couchhub');
+  const hub = new THREE.Group(); v.scene.add(hub);
+  const mesh = new THREE.Mesh(g.ring, M.red); hub.add(mesh);
+  const bb = new THREE.Box3().setFromObject(mesh), c = bb.getCenter(new THREE.Vector3()); mesh.position.copy(c).negate();
+  hub.rotation.z = Math.PI / 2;           // the ring's axis is Fusion x: stand it so we look down the axis from above
+  const spinG = new THREE.Group(); spinG.add(hub); v.scene.add(spinG);
+  v.camera.position.set(0, 26, 22); v.camera.lookAt(0, 0, 0);
+  frameTo(v, spinG, new THREE.Vector3(0, 1, .55), .95);
+  v.update = () => { spinG.rotation.y = -hubAngle; };
+}
+
+// ================= 4 · cat turret =================
+{
+  const view = document.getElementById('v-turret');
+  const v = viewer(view);
+  const g = parts('turret4');
+  const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; v.scene.add(root);
+  root.add(new THREE.Mesh(g.base, M.dark));
+  const j3 = joint('turret4', 'Revolute 3'), j2 = joint('turret4', 'Revolute 2');
+  const pan = pivot(root, j3.origin); pan.inner.add(new THREE.Mesh(g.pan, M.dark));
+  const tilt = pivot(pan.inner, j2.origin); tilt.inner.add(new THREE.Mesh(g.laser, M.red));
+  const a3 = new THREE.Vector3().fromArray(j3.axes.primaryAxisVector).normalize(), a2 = new THREE.Vector3().fromArray(j2.axes.primaryAxisVector).normalize();
+  frameTo(v, root, new THREE.Vector3(-.875, .423, .235), 1.0); // from the turret's working side, where both servos can reach a camera-facing wall
+  const dot = document.getElementById('laser'), read = document.getElementById('tuRead');
+  // laser barrel from the mesh (principal axis of the laser body, lens end), in Fusion coords
+  const d0 = new THREE.Vector3(.945, -.227, -.237).normalize(), o0 = new THREE.Vector3(-.71, -2.62, 4.12).addScaledVector(d0, .44);
+  const J2 = new THREE.Vector3().fromArray(j2.origin), J3 = new THREE.Vector3().fromArray(j3.origin);
+  const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
+  const beamOrg = (p, q, out) => out.copy(o0).sub(J2).applyQuaternion(q2.setFromAxisAngle(a2, q)).add(J2).sub(J3).applyQuaternion(q1.setFromAxisAngle(a3, p)).add(J3);
+  const beamDir = (p, q, out) => out.copy(d0).applyQuaternion(q2.setFromAxisAngle(a2, q)).applyQuaternion(q1.setFromAxisAngle(a3, p));
+  const tO = new THREE.Vector3(), tD = new THREE.Vector3(), tW = new THREE.Vector3();
+  const miss = (p, q, tgt) => { beamOrg(p, q, tO); beamDir(p, q, tD); return 1 - tD.dot(tW.copy(tgt).sub(tO).normalize()); };
+  // inverse kinematics by pattern search on (pan, tilt): two angles, smooth error, warm-started each frame
+  function solve(tgt, p, q) {
+    let e = miss(p, q, tgt), h = .25;
+    for (let it = 0; it < 40 && h > 1e-4; it++) {
+      let moved = false;
+      for (const [dp, dq] of [[h, 0], [-h, 0], [0, h], [0, -h]]) {
+        const np = clamp(p + dp, -1.57, 1.57), nq = clamp(q + dq, -1.57, 1.57), ne = miss(np, nq, tgt);
+        if (ne < e) { e = ne; p = np; q = nq; moved = true; break; }
+      }
+      if (!moved) h /= 2;
+    }
+    return [p, q];
+  }
+  const beamPos = new Float32Array(6);
+  const beam = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xff2030, transparent: true, opacity: .85 }));
+  beam.geometry.setAttribute('position', new THREE.BufferAttribute(beamPos, 3)); beam.frustumCulled = false; root.add(beam);
+  const centre = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
+  let ptr = null, pa = 0, ta = 0, pT = 0, tT = 0, tLast = -1e9;
+  const now = () => performance.now() / 1000;
+  const setPtr = (e) => { ptr = { x: e.clientX, y: e.clientY }; tLast = now(); };
+  view.addEventListener('pointermove', setPtr); view.addEventListener('pointerdown', setPtr);
+  view.addEventListener('pointerleave', () => { ptr = null; });
+  const ray = new THREE.Raycaster(), plane = new THREE.Plane(), nd = new THREE.Vector2(), hit = new THREE.Vector3(), camDir = new THREE.Vector3(), endW = new THREE.Vector3();
+  v.off = () => { dot.style.opacity = 0; };
+  v.update = (t, dt) => {
+    const b = view.getBoundingClientRect();
+    let x, y;
+    if (ptr && now() - tLast < 4) { x = ptr.x; y = ptr.y; }
+    else { // nobody home: the laser wanders, as lasers do around cats
+      const u = reduced ? 0 : t * .9;
+      x = b.left + b.width * (.5 + .36 * Math.sin(u * 1.3) * Math.cos(u * .41)); y = b.top + b.height * (.55 + .3 * Math.sin(u * 2.1 + 1));
+    }
+    // the cursor, pushed onto a wall through the turret that faces the camera
+    v.camera.getWorldDirection(camDir); plane.setFromNormalAndCoplanarPoint(camDir, root.localToWorld(centre.clone()).addScaledVector(camDir, -3));
+    nd.set((x - b.left) / b.width * 2 - 1, -((y - b.top) / b.height) * 2 + 1); ray.setFromCamera(nd, v.camera);
+    if (ray.ray.intersectPlane(plane, hit)) { root.worldToLocal(hit); [pT, tT] = solve(hit, pT, tT); }
+    const k = 1 - Math.pow(.0005, dt); pa += (pT - pa) * k; ta += (tT - ta) * k; // servos lag a little
+    pan.p.quaternion.setFromAxisAngle(a3, pa);
+    tilt.p.quaternion.setFromAxisAngle(a2, ta);
+    // the beam leaves the barrel along its real direction; the dot is where it lands
+    beamOrg(pa, ta, tO); beamDir(pa, ta, tD);
+    const L = hit.distanceTo(tO) || 10; endW.copy(tO).addScaledVector(tD, L);
+    beamPos.set([tO.x, tO.y, tO.z, endW.x, endW.y, endW.z]); beam.geometry.attributes.position.needsUpdate = true;
+    root.localToWorld(endW).project(v.camera);
+    const sx = b.left + (endW.x * .5 + .5) * b.width, sy = b.top + (-endW.y * .5 + .5) * b.height;
+    dot.style.transform = `translate(${sx}px, ${sy}px)`; dot.style.opacity = sx > b.left && sx < b.right && sy > b.top && sy < b.bottom ? 1 : 0;
+    read.innerHTML = 'pan <b>' + (pa / D).toFixed(0) + '°</b><br>tilt <b>' + (ta / D).toFixed(0) + '°</b>';
+  };
+}
+
+// ================= 5 · crutch cup holder =================
+{
+  const svg = document.getElementById('crutch'), NS = 'http://www.w3.org/2000/svg';
+  const mk = (n, a, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+  const TIP = [200, 428], CUP = [200, 218], FILL = 218;      // tip on the floor; cup centre and fill line (svg units)
+  mk('line', { class: 'floor', x1: 10, x2: 390, y1: TIP[1], y2: TIP[1] });
+  const lvl = mk('line', { class: 'lvl', x1: 60, x2: 340 });
+  const crutch = mk('g', {});
+  // aluminium crutch: underarm pad, two parallel rails, hand grip, rails meet the single adjustable leg
+  mk('path', { class: 'rail', d: 'M165 34 L165 286 L200 334 L235 286 L235 34 M165 128 L235 128 M200 334 L200 428' }, crutch);
+  mk('rect', { x: 150, y: 22, width: 100, height: 16, rx: 8, fill: 'var(--graphite)' }, crutch);
+  mk('rect', { x: 160, y: 122, width: 80, height: 12, rx: 6, fill: 'var(--graphite)' }, crutch);
+  const defs = mk('defs', {});
+  const clip = mk('clipPath', { id: 'cupclip' }, defs);
+  mk('path', { d: 'M171 202 L229 202 L223 260 L177 260 Z' }, clip);
+  mk('path', { class: 'cup', d: 'M170 200 L230 200 L224 262 L176 262 Z' }, crutch);
+  const liquidG = mk('g', { 'clip-path': 'url(#cupclip)' }, crutch);
+  const liquid = mk('g', {}, liquidG);
+  mk('rect', { class: 'coffee', x: 60, y: FILL, width: 280, height: 200 }, liquid);
+  mk('path', { class: 'cupline', d: 'M170 200 L230 200 L224 262 L176 262 Z' }, crutch);
+  // the printed holder: a ring at the rim, a helix down the cup, a slotted base
+  mk('ellipse', { class: 'holder', cx: 200, cy: 203, rx: 40, ry: 7 }, crutch);
+  mk('path', { class: 'holder', d: 'M162 206 C 214 222 246 214 230 238 C 216 258 168 244 174 262' }, crutch);
+  mk('ellipse', { class: 'holder', cx: 200, cy: 263, rx: 28, ry: 5 }, crutch);
+  const drops = mk('g', {});
+  const swingIn = document.getElementById('crSwing'), swingOut = document.getElementById('crSwingOut'), read = document.getElementById('crRead');
+  let th = 0, thPrev = 0, wPrev = 0, phi = 0, dphi = 0, t = 0, dragA = null, spilled = 0;
+  const parts2 = [];
+  svg.addEventListener('pointerdown', (e) => { svg.setPointerCapture(e.pointerId); dragA = e.clientX; });
+  svg.addEventListener('pointermove', (e) => { if (dragA !== null) { const b = svg.getBoundingClientRect(); th = clamp((e.clientX - b.left - b.width / 2) / b.width * 1.6, -.75, .75); } });
+  const up = () => dragA = null; svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  let on = false; new IntersectionObserver(([en]) => on = en.isIntersecting, { rootMargin: '80px' }).observe(svg);
+  let last = performance.now();
+  (function loop(now) {
+    const dt = Math.min((now - last) / 1000, .033); last = now;
+    if (on) {
+      t += dt; swingOut.textContent = swingIn.value + '°';
+      const OM = 2 * Math.PI / 1.6, A = reduced ? 0 : +swingIn.value * D;
+      let al;
+      if (dragA === null) { th = A * Math.sin(t * OM); al = -A * OM * OM * Math.sin(t * OM); wPrev = A * OM * Math.cos(t * OM); }
+      else { const w = (th - thPrev) / dt; al = clamp((w - wPrev) / dt, -40, 40); wPrev += (w - wPrev) * .5; }
+      thPrev = th;
+      // slosh: surface tilt relative to level, a damped pendulum kicked by the cup's angular acceleration
+      // in the cup's frame gravity tips by atan(r·α / g), r = tip-to-cup distance (~0.9 m on a real crutch); the surface chases that, with a little slosh
+      const eq = Math.atan(.9 * al / 9.81), w0 = 8, z = .25;
+      dphi += (-w0 * w0 * (phi - eq) - 2 * z * w0 * dphi) * dt; phi += dphi * dt; phi = clamp(phi, -1, 1);
+      crutch.setAttribute('transform', `rotate(${th / D} ${TIP[0]} ${TIP[1]})`);
+      // surface stays level in the world: counter-rotate the liquid by the crutch angle, add the slosh
+      liquid.setAttribute('transform', `rotate(${(-th + phi) / D} ${CUP[0]} ${FILL})`);
+      // dashed world-level reference through the cup
+      const cx = TIP[0] + (CUP[0] - TIP[0]) * Math.cos(th) - (FILL - TIP[1]) * Math.sin(th), cy = TIP[1] + (CUP[0] - TIP[0]) * Math.sin(th) + (FILL - TIP[1]) * Math.cos(th);
+      lvl.setAttribute('y1', cy); lvl.setAttribute('y2', cy); lvl.setAttribute('x1', cx - 70); lvl.setAttribute('x2', cx + 70);
+      // spill when the surface tips past the rim (16 px of freeboard over a 30 px half-width)
+      if (Math.abs(phi) > Math.atan2(16, 30) && Math.random() < .5) {
+        spilled += .4; const sx = cx + Math.sign(phi) * 32, sy = cy - 16;
+        parts2.push({ x: sx, y: sy, vx: Math.sign(phi) * (40 + Math.random() * 60), vy: -60 - Math.random() * 40, e: mk('circle', { class: 'drop', r: 2.5 + Math.random() * 2 }, drops) });
+      }
+      for (let i = parts2.length - 1; i >= 0; i--) {
+        const p = parts2[i]; p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.y > TIP[1]) { p.e.remove(); parts2.splice(i, 1); } else { p.e.setAttribute('cx', p.x); p.e.setAttribute('cy', p.y); }
+      }
+      read.textContent = 'Spilled: ' + spilled.toFixed(1) + ' ml' + (spilled > 0 ? ' · ease off' : ' · surface level');
+    }
+    requestAnimationFrame(loop);
+  })(last);
+}
+
+// ---------- one loop for the 3D benches ----------
+const clk = new THREE.Clock(); let T = 0;
+(function loop() {
+  const dt = Math.min(clk.getDelta(), .05); T += dt;
+  for (const v of viewers) {
+    if (!v.on || !v.w) { v.off && v.off(); continue; }
+    v.update && v.update(T, dt);
+    v.controls && v.controls.update();
+    v.r.render(v.scene, v.camera);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>

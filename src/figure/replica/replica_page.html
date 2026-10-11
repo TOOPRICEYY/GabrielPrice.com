@@ -1,0 +1,79 @@
+<title>Reference Replica</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+:root{--bg:#ffffff;--fg:#1c2026;--muted:#646c75;--line:#d9dde2;--chip:#ffffff;--chip-on:#1c2026;--chip-on-fg:#ffffff;color-scheme:light}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 "Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;padding-inline:16px}
+.wrap{max-width:760px;margin:0 auto;padding-block:24px 48px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px 24px}
+h1{margin:0;font-size:26px;font-weight:600;letter-spacing:-.01em}
+p{margin:0;color:var(--muted);max-width:60ch}
+.ctl{display:flex;gap:8px;flex-wrap:wrap}
+button{font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--fg);cursor:pointer}
+button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-fg);border-color:var(--chip-on)}
+#stage{width:100%;max-width:100%;aspect-ratio:1/1;cursor:grab;touch-action:pan-y;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+#stage:active{cursor:grabbing}
+#stage canvas{display:block;width:100%;height:100%}
+.meta{font:12px/1.4 "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+</style>
+<div class="wrap">
+  <header>
+    <div><h1>Reference replica</h1><p>Your image-to-3D model, cleaned up to 1,500 triangles and scaled to 174 cm. Pick a view to match a photo, or drag to turn it.</p></div>
+    <div class="ctl" id="views"><button data-v="0" aria-pressed="true">Front ¾</button><button data-v="1" aria-pressed="false">Side</button><button data-v="2" aria-pressed="false">Back ¾</button><button data-v="3" aria-pressed="false">Front</button><button data-v="4" aria-pressed="false">Back</button><button id="edges" aria-pressed="false">Facet edges</button><button id="model" aria-pressed="false">Previous version</button></div>
+  </header>
+  <div id="stage"></div>
+  <span class="meta" id="meta"></span>
+</div>
+<script>/*MESH*/</script>
+<script>/*MESH2*/</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+const stage = document.getElementById('stage');
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(devicePixelRatio, 2));
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; stage.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#ffffff');
+scene.add(new THREE.HemisphereLight(0xffffff, 0xa4a7ac, 2.1));   // soft studio fill
+const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(-160, 230, 200); key.castShadow = true;
+const rim = new THREE.DirectionalLight(0xffffff, .35); rim.position.set(200, 120, -160); scene.add(rim);
+key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -100, right: 100, top: 200, bottom: -20, near: 10, far: 900 });
+key.shadow.bias = -.0005; key.shadow.normalBias = .3; scene.add(key);
+function geo(M) { let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(M.p, 3)); g.setIndex(M.i); return g.toNonIndexed(); }
+const GEOS = [geo(window.REFMESH), window.REFMESH_PREV ? geo(window.REFMESH_PREV) : null]; let g = GEOS[0];
+const PH = 14, figGroup = new THREE.Group(); scene.add(figGroup);   // plinth turns with the figure, like a turntable
+const fig = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#f3f3f1', roughness: 1, flatShading: true }));
+fig.castShadow = fig.receiveShadow = true; fig.position.y = PH; figGroup.add(fig);
+const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 1), new THREE.LineBasicMaterial({ color: 0x2a3038, transparent: true, opacity: .45 }));
+edges.position.y = PH; edges.visible = false; figGroup.add(edges);
+const plinth = new THREE.Mesh(new THREE.BoxGeometry(64, PH, 64), new THREE.MeshStandardMaterial({ color: '#e4e4e2', roughness: 1 }));
+plinth.position.y = PH / 2; plinth.receiveShadow = true; figGroup.add(plinth);
+// camera and figure yaw fitted to each of the reference photos (degrees, cm)
+const VIEWS = /*VIEWS*/[];
+const cam = new THREE.PerspectiveCamera(19, 1, 10, 5000);
+const q0 = +(new URLSearchParams(location.search).get('v') || 0);
+let cur = { ...VIEWS[q0] }, goal = VIEWS[q0], drag = 0;
+function place() { const e = cur.el * Math.PI / 180; cam.position.set(cur.cx, cur.ty + cur.d * Math.sin(e), cur.d * Math.cos(e)); cam.lookAt(cur.cx, cur.ty, 0); }
+const meta = () => document.getElementById('meta').textContent = `${(fig.geometry.attributes.position.count / 3).toLocaleString('en-US')} triangles · 174 cm tall · 64 cm plinth`; meta();
+const bm = document.getElementById('model');
+if (!GEOS[1]) bm.hidden = true;
+bm.onclick = () => {   // compare the traced-facet build with the earlier outline-fitted build
+  const on = bm.getAttribute('aria-pressed') !== 'true'; bm.setAttribute('aria-pressed', on);
+  fig.geometry = GEOS[on ? 1 : 0]; edges.geometry.dispose(); edges.geometry = new THREE.EdgesGeometry(fig.geometry, 1); meta();
+};
+function size() { const w = stage.clientWidth, h = stage.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+new ResizeObserver(size).observe(stage); size();
+let px = null;
+stage.addEventListener('pointerdown', e => { px = e.clientX; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => { if (px === null) return; drag += (e.clientX - px) * .7; px = e.clientX; });
+stage.addEventListener('pointerup', () => px = null); stage.addEventListener('pointercancel', () => px = null);
+const be = document.getElementById('edges');
+be.onclick = () => { const on = be.getAttribute('aria-pressed') !== 'true'; be.setAttribute('aria-pressed', on); edges.visible = on; };
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => {
+  goal = VIEWS[+b.dataset.v]; drag = 0; let dy = ((goal.fy - cur.fy) % 360 + 540) % 360 - 180; cur.fy = goal.fy - dy;
+  document.querySelectorAll('[data-v]').forEach(o => o.setAttribute('aria-pressed', o === b));
+});
+(function loop() {
+  for (const k of ['fy', 'el', 'd', 'ty', 'cx']) cur[k] += (goal[k] - cur[k]) * .12;
+  place(); figGroup.rotation.y = (cur.fy + drag) * Math.PI / 180; r.render(scene, cam); requestAnimationFrame(loop);
+})();
+window.__ready = true;
+</script>
