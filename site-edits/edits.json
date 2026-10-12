@@ -154,6 +154,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:09:45.766Z"
     },
+    "s15.div1.p1": {
+      "fp": "A laser lamp for the cat. Point at the floor and the cat goes after the dot.",
+      "html": "Your cat missed you today. Now you never have to leave them again. With a laser, camera, mic and speaker your codependency can sore to new heights!",
+      "key": "s15.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A laser lamp for the cat. Point at the floor and the cat goes after the dot.",
+      "sec": 15,
+      "section": "15 CatZoom",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:11:11.973Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
