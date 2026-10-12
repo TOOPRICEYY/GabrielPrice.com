@@ -27,6 +27,16 @@
   "vars": {
     "GITHUB_REPO": "TOOPRICEYY/GabrielPrice.com"
   },
+  // Workers Builds runs `wrangler preview` for PR branches. Preview bindings and variables
+  // are explicit; assets and the compatibility date stay at the top level.
+  "previews": {
+    "vars": {
+      "GITHUB_REPO": "TOOPRICEYY/GabrielPrice.com"
+    },
+    "r2_buckets": [
+      { "binding": "FLOW", "bucket_name": "gabrielprice-flow-preview" }
+    ]
+  },
   // Secrets, set once in the Cloudflare dashboard (Workers → gabrielprice → Settings → Variables and Secrets) or with
   // `npx wrangler secret put NAME`. They are never in this repo:
   //   GITHUB_TOKEN        fine-grained token for this one repo: Contents, Issues and Pull requests read/write
