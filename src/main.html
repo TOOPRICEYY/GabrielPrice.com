@@ -498,9 +498,18 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
 // the cards still scroll and read without it. A module whose import fails fires error on its script tag (no bubbling, so capture).
 window.no3D = (why) => { const el = document.getElementById('loading'); if (!el || el.hidden || el.dataset.no3d) return; el.dataset.no3d = 1;
   el.innerHTML = why + ' <button type="button" onclick="location.reload()">Reload</button>'; el.classList.add('no3d');
+  // what went wrong, small, so a visitor's screenshot tells us: the first script error, and how far the page got
+  const d = document.createElement('small'); d.style.cssText = 'display:block;margin-top:4px;opacity:.7;word-break:break-word';
+  d.textContent = (no3D.err ? no3D.err + ' · ' : '') + document.readyState + ' · ' + Math.round(performance.now() / 1000) + ' s · ' + (navigator.userAgent.match(/(Android [\d.]+|iPhone OS [\d_]+|Chrome\/\d+|Version\/[\d.]+)/g) || []).join(' ');
+  el.appendChild(d);
   const hint = document.getElementById('viewhint'); if (hint) hint.hidden = true; };
-addEventListener('error', (e) => { if (e.target instanceof HTMLScriptElement && e.target.type === 'module') no3D('The 3D view could not load.'); }, true);
-addEventListener('load', () => setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); }, 20000));
+addEventListener('error', (e) => {
+  if (e.target instanceof HTMLScriptElement) { no3D.err ||= 'script failed: ' + (e.target.src || e.target.type || 'inline'); if (e.target.type === 'module') no3D('The 3D view could not load.'); }
+  else if (!(e.target instanceof Element) && !window.__rig) no3D.err ||= String(e.message).slice(0, 140);
+}, true);
+addEventListener('unhandledrejection', (e) => { if (!window.__rig) no3D.err ||= String(e.reason && e.reason.message || e.reason).slice(0, 140); });
+// counted from here, not from load: a download that never finishes never fires load either
+setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); }, 25000);
 </script>
 <div id="laser" aria-hidden="true"></div>
 <div class="viewbar"><span id="viewhint">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
