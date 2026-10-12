@@ -216,7 +216,7 @@
     },
     "s2.div1.p1": {
       "fp": "A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.",
-      "html": "A 2HP peak power bio-adaptive ankle exoskeleton",
+      "html": "A 2HP bio-adaptive ankle exoskeleton",
       "key": "s2.div1.p1",
       "kind": "text",
       "name": "Paragraph",
@@ -224,7 +224,7 @@
       "sec": 2,
       "section": "03 Project · Anti-thetis",
       "tag": "p",
-      "updatedAt": "2026-10-12T03:18:47.738Z"
+      "updatedAt": "2026-10-12T03:18:54.265Z"
     },
     "s3.div1.h21": {
       "fp": "Built around one leg.",
