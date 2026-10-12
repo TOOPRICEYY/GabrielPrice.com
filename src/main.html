@@ -526,6 +526,8 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// Reduce Motion only calms the camera ease, the hero sway and decorative sparkle. The figure's walking, riding and driving are
+// the content of the page, so they always play.
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -1233,10 +1235,9 @@ function frame() {
 
     // articulation: ankle cycles while in the drive-train section
     const amp = smooth(seg(s, 3.45, 3.95)) * (1 - smooth(seg(s, 4.55, 4.85)));
-    if (amp > 0 && !reduced) phase += dt * 2.4;
-    const scrubbed = Math.sin((s - 3.45) * Math.PI * 3);
+    if (amp > 0) phase += dt * 2.4;
     // plantarflex only: from flat (rack near its retracted end) down to ANKLE_ROM and back
-    let ankle = -ANKLE_ROM * amp * .5 * (1 - (reduced ? scrubbed : Math.cos(phase)));
+    let ankle = -ANKLE_ROM * amp * .5 * (1 - Math.cos(phase));
     // walking: the Kicker can only plantarflex, so it follows the gait's push-off and stays flat otherwise
     if (poseMix.w > 0) ankle += poseMix.w * Math.max(-ANKLE_ROM, Math.min(0, curveAt(GAIT_A, ui.gait.pc) * RD));
     // the shoe turns on the ankle revolute; the figure's foot rides in it about the same axis
