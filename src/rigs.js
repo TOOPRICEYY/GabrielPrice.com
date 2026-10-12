@@ -217,7 +217,7 @@ function matSet() {
 function fade(group, o) {
   group.visible = o > .002;
   if (!group.visible) return;
-  group.traverse(m => { if (m.material && !m.material.userData.own) { const k = m.material.userData.k ?? 1; m.material.opacity = o * k; m.material.transparent = o * k < .999; m.material.depthWrite = o * k > .5; } });
+  group.traverse(m => { if (m.material && !m.material.userData.own) { const k = m.material.userData.k ?? 1; m.material.opacity = o * k; seeThrough(m.material, o * k < .999); m.material.depthWrite = o * k > .5; } });
 }
 const wsBin = () => rigs.bin || (rigs.bin = b64(window.WS_B64));
 function wsEntryGeo(e) {
@@ -2372,7 +2372,7 @@ function hearthFrame(s, dt, T) {
   for (const k of ['shade', 'cap', 'base']) Hh.AM[k].userData.k = 1 - .8 * xr;
   fade(Hh.g, wH);
   const fireM = Hh.embers.material;
-  fireM.opacity = wH; fireM.transparent = wH < .999; Hh.embers.visible = wH > .002;
+  fireM.opacity = wH; seeThrough(fireM, wH < .999); Hh.embers.visible = wH > .002;
   fireM.emissiveIntensity = 1 + .35 * Math.sin(T * 7.3) + .2 * Math.sin(T * 13.1 + 1);
   Hh.fireLight.intensity = wH * (4000 + 900 * Math.sin(T * 9.1) + 600 * Math.sin(T * 17.3));
   Hh.beam.visible = false; ui.laser.style.opacity = 0;

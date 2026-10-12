@@ -933,6 +933,10 @@ function useDQS(m) {
   m.customProgramCacheKey = () => 'dqs'; m.needsUpdate = true;
   return m;
 }
+// fades: three keeps the shader it picked for a material until something makes it pick again (a light coming or going, a clip plane), and
+// one picked while the material was opaque writes alpha 1, so a fade drawn with it shows solid. Turning see-through makes it pick again;
+// turning opaque doesn't need to (the see-through shader draws an opaque material the same).
+function seeThrough(m, on) { if (on && !m.transparent) m.needsUpdate = true; m.transparent = on; }
 const jointMat = crystal('#b3122e', 0.35);
 const figure = new THREE.Group(); scene.add(figure);
 const bones = {};
@@ -1464,11 +1468,11 @@ function frameBody() {
     const ghost = Math.max(smooth(seg(s, 3.3, 3.7)) * (1 - smooth(seg(s, 4.55, 4.8))), rigs.ghost || 0);   // brace close-up, or the scooter apart
     // the figure goes see-through with the shells so the foot in the shoe cup and the leg inside the calf shell read too;
     // drawn last with no depth write, so the device behind it still shows through
-    clayMat.transparent = ghost > .002; clayMat.opacity = 1 - .7 * ghost; clayMat.depthWrite = ghost < .5;
+    seeThrough(clayMat, ghost > .002); clayMat.opacity = 1 - .7 * ghost; clayMat.depthWrite = ghost < .5;
     figureMesh.renderOrder = ghost > .002 ? 5 : 0;
     for (const [n, m] of Object.entries(mats)) {
       const o = n.startsWith('ghost_') ? op * (1 - ghost * (n === 'ghost_calf' ? .55 : .8)) : op;
-      m.opacity = o; m.transparent = o < .999; m.depthWrite = o > .5;
+      m.opacity = o; seeThrough(m, o < .999); m.depthWrite = o > .5;
     }
     kicker.unslim.visible = op > .002;            // hidden outright whenever it is off: zero opacity still casts shadows
     // tuck the figure's foot into the shoe cup once the device is on
@@ -1567,20 +1571,22 @@ function warmShaders() {
   scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) lit.add(p); });
   for (const g of lit) g.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) hearth.add(m); });
   const all = [...draws.keys()], faded = all.filter((m) => m.transparent);
+  const clear = all.filter((m) => !m.transparent && shown.has(m));   // on screen and opaque now: the figure goes see-through later (seeThrough)
   const parallel = renderer.extensions.has('KHR_parallel_shader_compile');   // (compileAsync without it logs a warning per call)
   // run fn, then put back the program three had picked for every material: the warm-up only fills the cache, and each material still
   // switches programs exactly when it would have without it
   const quietly = (fn) => {
     const props = all.map((m) => renderer.properties.get(m)), kept = props.map((p) => p.currentProgram && { ...p });
-    const was = faded.map((m) => m.transparent), seen = [...lit].map((g) => g.visible);
+    const was = all.map((m) => m.transparent), seen = [...lit].map((g) => g.visible);
     try { return fn(); } finally {
       props.forEach((p, i) => { if (kept[i]) Object.assign(p, kept[i]); else p.__version = undefined; });
-      faded.forEach((m, i) => { m.transparent = was[i]; });
+      all.forEach((m, i) => { m.transparent = was[i]; });
       [...lit].forEach((g, i) => { g.visible = seen[i]; });
     }
   };
-  const compile = (o, solid, fire) => () => quietly(() => {
+  const compile = (o, solid, fire, see) => () => quietly(() => {
     if (solid) for (const m of faded) m.transparent = false;
+    if (see) for (const m of clear) m.transparent = true;
     if (fire) for (const g of lit) g.visible = true;
     return parallel ? renderer.compileAsync(o, camera, scene) : renderer.compile(o, camera, scene);   // issues the compile now
   });
@@ -1604,6 +1610,7 @@ function warmShaders() {
   for (const [m, o] of draws) warmQ.push(compile(o, false, false));
   for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
   for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
+  for (const [m, o] of draws) if (clear.includes(m)) warmQ.push(compile(o, false, false, true));   // the figure see-through (brace close-up)
   // where the GPU compiles in parallel, every compile goes now (the brace waits for the frame loop, which draws its speck before a frame)
   if (parallel) Promise.all(warmQ.splice(+kicker.ready).map((f) => f())).catch(() => {});
 }
