@@ -1585,8 +1585,9 @@ function warmShaders() {
   const speck = new THREE.Scene(), dot = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ clippingPlanes: [new THREE.Plane()] }));
   dot.frustumCulled = false; speck.add(dot);
   const brace = () => {
+    const sc = renderer.getScissor(new THREE.Vector4()), on = renderer.getScissorTest();
     renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true);
-    try { renderer.render(speck, camera); } finally { renderer.setScissorTest(false); }
+    try { renderer.render(speck, camera); } finally { renderer.setScissor(sc); renderer.setScissorTest(on); }
     for (const [solid, fire] of [[false, false], [true, false], [true, true]]) quietly(() => {
       for (const m of Object.values(mats)) m.transparent = !solid;
       if (fire) for (const g of lit) g.visible = true;
@@ -1598,8 +1599,8 @@ function warmShaders() {
   for (const [m, o] of draws) warmQ.push(compile(o, false, false));
   for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
   for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
-  // where the GPU compiles in parallel, everything goes now
-  if (renderer.extensions.has('KHR_parallel_shader_compile')) Promise.all(warmQ.splice(0).map((f) => f())).catch(() => {});
+  // where the GPU compiles in parallel, every compile goes now (the brace waits for the frame loop, which draws its speck before a frame)
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) Promise.all(warmQ.splice(+kicker.ready).map((f) => f())).catch(() => {});
 }
 function warmStep() {   // from the frame loop, before the frame is drawn: until a new program is created, at rest only
   if (Math.abs(sTarget - sNow) > .01 || free.on) return;
