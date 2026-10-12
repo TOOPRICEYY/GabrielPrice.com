@@ -177,6 +177,18 @@
       "section": "07 Built",
       "tag": "p",
       "updatedAt": "2026-10-12T03:01:15.491Z"
+    },
+    "s7.div1.h21": {
+      "fp": "Then it has to walk.",
+      "html": "Running before you can walk",
+      "key": "s7.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Then it has to walk.",
+      "sec": 7,
+      "section": "08 Exoleg · Full leg",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:01:41.832Z"
     }
   }
 }
