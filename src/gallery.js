@@ -23,7 +23,7 @@ const PROJECTS = [
     mat: (k, m) => m.startsWith('Pine') ? 'pine' : m.startsWith('Marble') ? 'marble' : 'steel',
     // the top (board, slab, its rails and the latch) runs sideways on the two drawer slides (Component17 + mirror, along Fusion x);
     // the latch pin hangs outside the -x wall, so it can only open towards +x. The slides' middle members go half as far.
-    slide: { parts: ['Component9', 'Component10', 'Component7', 'Component8', 'Latch'], by: [22, 0, 0], half: ['Component17'] },
+    slide: { parts: ['Component9', 'Component10', 'Component7', 'Component8', 'Latch v5:1+Component1'], by: [22, 0, 0], half: ['Component17'] },
     props: sideTableProps, anim: () => sideTableProps.anim?.(),
     text: {
       open: ['Slide the top.', 'Lift the latch and the top board, marble slab and all, runs sideways on a pair of drawer slides, opening the box underneath where the books and odds and ends live. The tea rides along on top.'],
