@@ -75,6 +75,20 @@ const PROJECTS = [
       specs: ['Pedestal Desk', ''] },
     specs: `<dl class="spec"><dt>Built</dt><dd>July 2026</dd><dt>Stock</dt><dd>Pine 2×4s, a 4×4 post, a pine top</dd><dt>Adjust</dt><dd>Sleeve slides on the post, bolt holds the height</dd></dl>
       <div class="gx-hf"><img src="photos/pedestal_desk.webp" alt="The pedestal desk in a yard with a laptop, a drill and printed parts on its top"></div>` },
+  { id: 'hexacopter', title: 'Heavy Lift Hexacopter', kind: 'Drone', ph: 'hex',
+    blurb: 'A six-rotor ArduPilot drone that lifts an 8 kg payload.',
+    chapters: [{ key: 'hero', cam: [30, 20, 3.3], spin: .6 }, { key: 'flight', cam: [-24, 8, 3.1], side: 'right' }, { key: 'liftoff', cam: [0, 78, 3.4] }, { key: 'specs', cam: [-40, 18, 3.4], spin: .6 }],   // props aren't in the radius, so these sit further out
+    props: hexProps, anim: () => hexProps.anim?.(),
+    text: {
+      hero: ['Heavy Lift Hexacopter.', 'Six rotors on ArduPilot, lifting 8 kg.'],
+      flight: ['Off the ground.', ''],
+      liftoff: ['From its camera.', 'Takeoff to the rooftops, 4× speed.'],
+      specs: ['Heavy Lift Hexacopter', ''] },
+    flight: `<figure class="gx-vid"><video src="photos/drone_flight.mp4" poster="photos/drone_flight.webp" autoplay muted loop playsinline preload="metadata" aria-label="The hexacopter hovering over a backyard shed"></video></figure>`,
+    liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" autoplay muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighbourhood roofs"></video></figure>`,
+    specs: `<dl class="spec"><dt>Autopilot</dt><dd>ArduPilot</dd><dt>Payload</dt><dd>8 kg</dd><dt>Frame</dt><dd>Six aluminium arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fibre</dd></dl>
+      <div class="gx-gal two"><figure><img loading="lazy" src="photos/drone_build.webp" alt="The heavy lift hexacopter on a wood floor with its transmitter"><figcaption><b>Built</b></figcaption></figure>
+      <figure><img loading="lazy" src="photos/drone_thrust.webp" alt="Thrust test rig: an Arduino drives an ESC, the motor and carbon prop sit on a kitchen scale, a multimeter reads the current from a Turnigy LiPo"><figcaption><b>Thrust test</b>Motor on a scale</figcaption></figure></div>` },
   { id: 'flyingbike', title: 'Flying Bike', kind: 'In progress', model: 'flyingbike', soon: true,
     blurb: 'Coming soon.', mat: () => 'neon' },
 ];
@@ -149,6 +163,9 @@ section.gallery { display: block; min-height: 100vh; max-width: 1280px; margin-i
 .gx-gal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .gx-gal figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .gx-gal img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border: 1px solid var(--rule); }
+.gx-gal.two { grid-template-columns: repeat(2, 1fr); }
+.gx-vid { margin: 12px 0 0; }
+.gx-vid video { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; border: 1px solid var(--rule); background: var(--vellum-2); }
 .gx-gal figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .gx-gal figcaption b { display: block; color: var(--cobalt); font-weight: 500; letter-spacing: .08em; }
 .gx-hf { display: flex; gap: 10px; align-items: flex-end; }
@@ -301,7 +318,48 @@ function sideTableProps(parts) {
 }
 const MM_OUTLINE = [[-15.59,25.68],[-15.59,25.62],[-15.3,25.56],[-15.22,25.45],[-14.7,25.24],[-14.44,24.93],[-14.32,24.55],[-13.89,24.24],[-12.45,23.72],[-11.18,23.4],[-8.79,22.36],[-8.27,22.42],[-7.78,22.19],[-6.86,21.96],[-6.77,21.87],[-6.83,21.35],[-5.68,20.89],[-5.59,20.66],[-5.56,20.12],[-5.68,20.06],[-5.71,19.57],[-5.91,19.14],[-5.85,19.02],[-5.56,18.88],[-5.13,18.9],[-5.13,18.79],[-5.53,18.36],[-5.53,18.16],[-5.24,17.75],[-4.9,17.52],[-4.76,17.58],[-4.58,17.95],[-4.03,18.59],[-3.0,20.43],[-2.68,20.66],[-2.51,20.92],[-2.39,20.92],[-2.28,20.69],[-1.93,20.61],[-1.59,20.89],[-1.5,21.15],[-1.35,21.3],[-0.78,21.38],[-0.75,21.21],[-0.98,21.04],[-1.38,20.46],[-1.04,20.2],[-0.89,20.2],[-0.61,20.58],[0.2,21.12],[0.4,21.59],[0.55,21.73],[0.84,21.84],[1.41,21.87],[1.7,21.76],[1.96,21.76],[2.22,21.9],[2.8,21.9],[3.26,22.33],[3.6,22.54],[3.98,22.54],[5.01,22.31],[5.48,22.1],[5.62,21.96],[5.62,20.92],[5.3,20.86],[5.3,20.49],[5.16,20.32],[4.9,20.2],[4.76,19.94],[4.78,19.48],[4.96,19.22],[5.33,18.93],[5.33,18.79],[4.99,18.65],[4.38,18.62],[3.92,18.18],[3.83,18.04],[3.8,16.74],[3.57,16.14],[3.26,15.82],[2.94,15.85],[2.77,16.05],[2.77,16.25],[3.0,16.92],[3.0,17.2],[2.82,17.49],[2.82,17.72],[2.94,17.95],[2.65,17.78],[2.54,17.35],[2.25,17.15],[2.13,16.69],[1.99,16.57],[1.7,16.57],[1.5,16.48],[1.15,16.17],[1.12,15.56],[1.07,15.48],[0.43,15.24],[0.4,15.01],[0.52,14.76],[0.52,14.41],[0.29,13.46],[-0.03,12.71],[-0.63,12.05],[-0.35,11.47],[-0.32,11.12],[-0.69,10.09],[-0.69,9.71],[-0.52,9.16],[0.4,6.95],[0.17,4.01],[0.12,3.98],[0.06,3.54],[-0.37,2.74],[-1.07,1.84],[-1.44,1.01],[-1.79,0.66],[-1.9,0.63],[-1.9,0.55],[-1.59,0.52],[-1.5,0.4],[-0.86,0.35],[5.5,0.23],[7.49,0.12],[7.52,0.03],[9.11,0.03],[9.14,0.12],[11.33,0.14],[11.61,0.43],[11.84,0.86],[12.31,1.21],[12.59,1.59],[12.74,2.56],[12.85,2.88],[13.14,3.17],[13.6,3.31],[13.86,3.52],[13.89,4.09],[14.12,4.44],[14.12,4.73],[14.27,4.87],[14.64,4.93],[14.7,4.76],[14.99,4.58],[15.19,4.67],[15.36,5.45],[15.48,6.74],[15.16,7.38],[14.73,9.54],[14.15,11.44],[13.89,11.9],[13.4,12.16],[13.08,12.22],[12.31,11.82],[11.96,11.76],[11.76,11.53],[11.61,11.47],[11.47,11.01],[11.33,10.84],[11.18,10.46],[10.86,10.32],[10.43,9.77],[9.68,9.94],[9.34,10.23],[9.37,10.78],[9.57,11.47],[9.77,11.64],[10.17,11.7],[10.61,11.96],[10.72,12.1],[10.75,12.54],[10.89,12.8],[11.33,13.05],[11.61,13.4],[11.82,14.55],[11.87,15.45],[11.73,15.99],[11.44,16.34],[11.3,16.4],[11.27,16.63],[11.44,16.95],[11.7,16.97],[11.79,17.09],[11.47,17.72],[11.38,18.07],[11.12,18.44],[10.66,18.53],[10.17,18.85],[9.88,18.88],[9.45,19.28],[9.22,19.34],[8.82,19.31],[8.5,19.83],[8.24,20.06],[7.23,20.2],[6.51,20.78],[6.4,21.79],[6.48,21.96],[6.8,22.19],[7.03,22.19],[7.81,21.84],[8.18,21.96],[8.65,21.96],[9.45,21.84],[9.57,21.93],[9.48,22.19],[9.11,22.45],[9.02,22.77],[8.9,22.88],[8.41,23.05],[8.44,23.26],[8.18,24.12],[7.93,24.5],[7.64,24.61],[7.38,24.5],[7.29,24.38],[7.03,24.35],[6.66,24.55],[6.08,24.47],[5.3,24.64],[5.22,24.78],[5.22,25.3],[5.42,25.71],[5.3,26.08],[4.27,26.08],[3.8,25.76],[3.46,25.68],[0.84,25.62],[0.26,25.22],[-0.32,25.01],[-0.98,24.41],[-1.1,24.41],[-1.47,24.64],[-1.96,24.55],[-2.39,25.01],[-2.59,25.01],[-2.94,24.78],[-3.66,24.81],[-3.89,25.27],[-4.21,25.62],[-4.67,26.43],[-5.16,26.8],[-5.48,26.92],[-6.43,27.06],[-6.77,27.03],[-6.89,26.8],[-7.03,26.8],[-7.06,26.95],[-6.92,27.09],[-6.8,27.09],[-6.8,27.18],[-6.69,27.26],[-6.71,27.32],[-7.29,26.95],[-7.52,26.89],[-7.64,26.74],[-7.78,26.77],[-7.67,27.26],[-7.29,27.75],[-6.22,28.88],[-5.88,29.05],[-5.53,29.37],[-5.01,29.39],[-4.9,29.48],[-4.99,29.77],[-5.48,29.91],[-5.5,30.0],[-6.22,30.0],[-6.25,29.91],[-6.83,29.83],[-7.52,29.57],[-7.95,29.08],[-9.39,28.21],[-9.68,27.75],[-9.88,27.64],[-10.46,27.61],[-10.75,27.23],[-11.04,27.09],[-11.79,26.89],[-13.0,26.89],[-13.92,26.17],[-14.44,25.99],[-15.16,25.97]], MM_W = 31.18;
 // built-in visuals for projects with no Fusion model: Holdfast's monitor and phone (textured with its real interface), and a stand-in mitten
+// Hexacopter: sized from the build photo (cm, y up): a grey centre plate under a clear dome, six round aluminium arms with
+// pancake motors, two skids on four legs and the battery tray below. The carbon props ride on the motors (hexProps) so they can spin.
+function hexPlaceholder() {
+  const std = (color, o) => new THREE.MeshStandardMaterial({ color, ...o });
+  const plate = std(0x6d7078, { roughness: .5, metalness: .3 }), alu = MATS.steel, motorM = std(0xc9ccd2, { roughness: .25, metalness: .9 }),
+    blue = std(0x2f45c8, { roughness: .5 }), black = std(0x1c1d22, { roughness: .6 }),
+    dome = new THREE.MeshStandardMaterial({ color: 0xe8f0ff, roughness: .05, metalness: 0, transparent: true, opacity: .28, depthWrite: false, side: THREE.DoubleSide });
+  const part = (k, g, mat, name = k.replace(/ \d$/, '')) => { g.computeBoundingBox(); return { mesh: new THREE.Mesh(g, mat), k, name, c: g.boundingBox.getCenter(new THREE.Vector3()), lo: g.boundingBox.min.y }; };
+  const Y = 22, out = [part('Centre plate', new THREE.CylinderGeometry(12, 12, 1.2, 6).translate(0, Y, 0), plate),
+    part('Dome', new THREE.SphereGeometry(11.5, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, Y + .6, 0), dome),
+    part('Battery', new THREE.BoxGeometry(16, 4.5, 7).translate(0, Y - 4, 0), blue)];
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3 + Math.PI / 6, cx = Math.cos(a), cz = Math.sin(a), L = 46;
+    const arm = new THREE.CylinderGeometry(1.1, 1.1, L - 8, 16); arm.rotateZ(Math.PI / 2); arm.translate((L - 8) / 2 + 8, Y + 1.4, 0); arm.rotateY(-a);
+    out.push(part('Arm ' + i, arm, alu));
+    out.push(part('Motor ' + i, new THREE.CylinderGeometry(3.3, 3.3, 3.2, 28).translate(cx * L, Y + 4.2, cz * L), motorM));
+  }
+  // legs splay from under the centre plate out onto the skids
+  const tube = (a, b, r) => { const d = b.clone().sub(a), g = new THREE.CylinderGeometry(r, r, d.length(), 12);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); return g.translate(...a.clone().add(b).multiplyScalar(.5).toArray()); };
+  const SK = 13;
+  for (const [x, z] of [[-7, -1], [7, -1], [-7, 1], [7, 1]]) out.push(part('Leg ' + out.length, tube(new THREE.Vector3(x, Y - .6, z * 7), new THREE.Vector3(x * 1.15, 1.4, z * SK), .7), alu, 'Leg'));
+  for (const z of [-SK, SK]) {
+    const sk = new THREE.CylinderGeometry(.8, .8, 40, 14); sk.rotateZ(Math.PI / 2); sk.translate(0, 1.2, z); out.push(part('Skid ' + (z > 0 ? 1 : 2), sk, alu));
+    for (const x of [-20.5, 20.5]) { const f = new THREE.CylinderGeometry(1.3, 1.3, 3.5, 14); f.rotateZ(Math.PI / 2); f.translate(x, 1.2, z); out.push(part('Foot ' + (x > 0 ? 1 : 2) + z, f, black, 'Foot')); }
+  }
+  return out;
+}
+function hexProps(parts) {
+  const carbon = new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: .3, metalness: .4 });
+  const blade = new THREE.BoxGeometry(38, .35, 3.4); const props = [];
+  parts.filter(p => p.k.startsWith('Motor')).forEach((p, i) => {
+    const pr = new THREE.Group(); pr.position.copy(p.c).add(new THREE.Vector3(0, 2, 0));
+    const b = new THREE.Mesh(blade, carbon); b.rotation.x = .12; pr.add(b);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1.2, 16), carbon); pr.add(hub);
+    pr.rotation.y = i * 1.1; pr.userData.dir = i % 2 ? 1 : -1; p.mesh.add(pr); props.push(pr);
+  });
+  // idle spin: props turn over slowly on the turntable, the way they read in a photo rather than a blur
+  hexProps.anim = () => { const t = performance.now() / 1000; props.forEach((pr, i) => { pr.rotation.y = i * 1.1 + pr.userData.dir * t * 2.2; }); };
+}
 function placeholder(P) {
+  if (P.ph === 'hex') return hexPlaceholder();
   // Pedestal Desk: blocks sized from the photo (cm, y up): crossed 2×4 feet, a 4×4 post, a two-board sleeve with a front collar, and the top
   if (P.ph === 'desk') {
     const box = (k, w, h, d, x, y, z, mat = MATS.pine) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); g.computeBoundingBox(); return { mesh: new THREE.Mesh(g, mat), k, name: k.replace(/ \d$/, ''), c: g.boundingBox.getCenter(new THREE.Vector3()), lo: g.boundingBox.min.y }; };
