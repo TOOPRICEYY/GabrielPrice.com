@@ -30,6 +30,14 @@ If you have already connected the repo to Cloudflare's **Workers Builds** (Worke
 3. In the GitHub repo, go to **Settings → Secrets and variables → Actions** and add two repository secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 4. Go to **Actions → Deploy → Run workflow** on `main`. Until these secrets exist, the workflow only builds and tests. The first deploy creates the Worker `gabrielprice-com` and puts it on gabrielprice.com and www.
 
+### Pull-request previews
+
+Workers Builds uses `npx wrangler preview` for non-production branches. The `previews` block in `wrangler.jsonc` supplies the repository variable and binds `FLOW` to the private R2 bucket `gabrielprice-flow-preview`. Create that bucket before the first preview build. Preview visits stay separate from the live site's `gabrielprice-flow` bucket. Static assets and the compatibility date remain at the top level of the configuration.
+
+Set the four editor secrets listed below in **Settings → Runtime variables and secrets → Previews Base** as well as Production. New previews receive those Base secrets; secrets never belong in `wrangler.jsonc`.
+
+If Workers Builds reports a missing `previews` block, bring the updated configuration onto the PR branch and retry its build. A retry of an old commit still reads that commit's old configuration.
+
 ### 3. Put a lock on /admin (Cloudflare Access)
 
 1. In the Cloudflare dashboard, open **Zero Trust**. The first time, it asks you for a team name, which becomes `<team>.cloudflareaccess.com`, and to pick a plan. The Free plan covers up to 50 users. It may ask for a card even though nothing is charged.
