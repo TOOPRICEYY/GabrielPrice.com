@@ -225,6 +225,30 @@
       "section": "09 Water Break · Crutch",
       "tag": "p",
       "updatedAt": "2026-10-12T03:03:28.208Z"
+    },
+    "s9.div1.h21": {
+      "fp": "A knee scooter with a belt drive.",
+      "html": "The Quad Father",
+      "key": "s9.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "A knee scooter with a belt drive.",
+      "sec": 9,
+      "section": "10 QuadFather · C6374 · HTD 3M",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:05:24.737Z"
+    },
+    "s9.div1.p1": {
+      "fp": "A motorized knee scooter: a C6374 motor under the deck, belted to the rear wheel.",
+      "html": "A motorized knee scooter. What could go wrong?",
+      "key": "s9.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A motorized knee scooter: a C6374 motor under the deck, belted to the rear wheel.",
+      "sec": 9,
+      "section": "10 QuadFather · C6374 · HTD 3M",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:04:47.972Z"
     }
   }
 }
