@@ -274,6 +274,13 @@ test('each visit records its hardware, network, frame rate and load time, within
   const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));
   assert.equal(v2.fps, 58.7, 'the 29 s batch outweighs the 1 s one, however many samples each kept');
   assert.equal(v2.full, 41000);
+  // the first batch left before the device was read (tab hidden while loading): a later batch carries it
+  const sid3 = 'edededededededed';
+  await post(batch({ sid: sid3 }));
+  await post(batch({ sid: sid3, seq: 1, meta: undefined, samples: [], events: [], hw }));
+  const v3 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid3));
+  assert.deepEqual([v3.scr, v3.cores, v3.gpu, v3.load, v3.full], ['390x844', 6, 'Apple GPU', 2140, 6310]); assert.ok(v3.dev, 'the first batch still names the device');
+  assert.equal(checkBatch(batch({ hw })).hw, undefined, 'the first batch carries it in meta only');
   // junk is dropped, not stored
   const bad = checkBatch(batch({ fps: 'fast', meta: { ...batch().meta, hw: { cores: -1, mem: 1e9, gpu: 42, load: 'x' } } }));
   assert.equal(bad.fps, undefined); assert.deepEqual([bad.meta.hw.cores, bad.meta.hw.mem, bad.meta.hw.gpu, bad.meta.hw.load], [0, 0, '', 0]);
@@ -287,6 +294,8 @@ test('each visit records its hardware, network, frame rate and load time, within
   const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
   assert.match(client, /requestIdleCallback/, 'the device is read when the browser is idle, not in a frame');
   assert.match(client, /visibilitychange', \(\) => \{\s*prevT = 0/, 'time spent hidden is not counted as a freeze');
+  assert.match(client, /const late = [^;]*full && !fullSent[^;]*hw && !hwSent[^]*?!events\.length && seq > 0 && !late\)\) return/, 'a pending load time or device goes out even with nothing else new');
+  assert.match(client, /head < stallFrom\) stall\.textContent = ''/, 'a replay note stays up from its event until it times out');
 });
 
 test('a 3D crash is stored with where it happened, counted per visit, and sent the moment it happens', async () => {

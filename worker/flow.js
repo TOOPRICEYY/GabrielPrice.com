@@ -99,6 +99,7 @@ export function checkBatch(b) {
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
   if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) { out.fps = Math.round(b.fps * 10) / 10; if (num(b.fms) && b.fms > 0 && b.fms <= 3600000) out.fms = Math.round(b.fms); }
   if (num(b.full) && b.full > 0 && b.full <= 3600000) out.full = Math.round(b.full);
+  if (b.seq > 0) { const hw = checkHw(b.hw); if (hw) out.hw = hw; }   // the device, when the first batch left before it was read
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
     out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true, fg: m.fg === true,
@@ -188,12 +189,12 @@ export function summarise(c) {
   if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
   const gl = c.events.filter((e) => e[1] === 'g').length;
   if (gl) m.gl = String(gl);   // times the 3D view crashed (the browser dropped its WebGL context)
+  const h = c.meta ? c.meta.hw : c.hw;
+  if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(Math.max(h.full, c.full || 0)) });
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
     m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || ''; m.isp = c.meta.isp || '';
-    const h = c.meta.hw;
-    if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(h.full) });
     m.size = c.meta.w + 'x' + c.meta.h; m.dpr = String(c.meta.dpr); m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
   return m;
@@ -289,12 +290,14 @@ export async function listSessions(env, days) {
       v.err = (v.err || 0) + (Number(m.err) || 0);
       // weighted by the visible time each batch's frame rate covers (older batches: their sample span)
       if (m.full) v.full = Math.max(v.full || 0, Number(m.full) || 0);
+      // the device's details, from the first batch or, when that left before they were read, a later one
+      if (m.scr) { v.scr = m.scr; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; }
       if (m.fps) { const w = Math.max(1, Number(m.fms) || (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
       if (m.gl) v.gl = (v.gl || 0) + (Number(m.gl) || 0);
       if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.scr = m.scr || ''; v.dpr = m.dpr || ''; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; v.full = Math.max(v.full || 0, Number(m.full) || 0); v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.dpr = m.dpr || ''; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }

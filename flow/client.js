@@ -44,7 +44,7 @@
   const sid = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
-  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, ready = 0, full = 0, fullSent = false;
+  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
   // frame rate: frames and visible time since the last batch (a gap over 1 s is a hidden tab or a stall, not counted)
   let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
@@ -139,17 +139,21 @@
 
   function flush() {
     lastFlush = performance.now();
-    if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0)) return;
+    // a batch with nothing new still goes out to deliver a full-load time or device details that missed the first batch
+    const late = seq > 0 && ((full && !fullSent) || (hw && !hwSent));
+    if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0 && !late)) return;
     const o = { sid, seq, day, samples, events };
     if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
     if (frameMs > 0) { o.fps = Math.round(frames * 10000 / frameMs) / 10; o.fms = Math.round(frameMs); }   // fms: the visible time it covers
     // every build loaded only after the first batch went out (a slow phone or connection): send it once, now
     if (seq > 0 && full && !fullSent) { o.full = full; fullSent = true; }
+    // the first batch left before the scene was up (the tab hidden while it loaded): the device goes in the next one
+    if (seq > 0 && hw && !hwSent) { o.hw = { ...hw, load: Math.round(ready), full }; hwSent = true; }
     frames = 0; frameMs = 0; stalls = 0;
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
       fg: true, lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
       v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}), ...(hw ? { hw: { ...hw, load: Math.round(ready), full } } : {}) };
-    if (o.meta && o.meta.hw && full) fullSent = true;
+    if (o.meta && o.meta.hw) { hwSent = true; if (full) fullSent = true; }
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing
@@ -249,7 +253,7 @@
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
-    let stallUntil = 0;
+    let stallFrom = 0, stallUntil = 0;
     let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9;
     const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
@@ -290,11 +294,11 @@
       while (ei < E.length && E[ei][0] <= head) {
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
-        else if (E[ei][1] === 'l' && E[ei][2] >= 400) { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallUntil = E[ei][0] + 2500; }
-        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view crashed here'; stallUntil = E[ei][0] + 4000; }
+        else if (E[ei][1] === 'l' && E[ei][2] >= 400) { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
+        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view crashed here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
         ei++;
       }
-      if (head > stallUntil || head < stallUntil - 3000) stall.textContent = '';
+      if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);
     }
