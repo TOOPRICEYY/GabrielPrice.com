@@ -118,6 +118,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:08:32.216Z"
     },
+    "s13.div1.h21": {
+      "fp": "A couch that drives sideways.",
+      "html": "The Not So Lazy Boy",
+      "key": "s13.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "A couch that drives sideways.",
+      "sec": 13,
+      "section": "14 Not So Lazy Boy",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:08:50.025Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
