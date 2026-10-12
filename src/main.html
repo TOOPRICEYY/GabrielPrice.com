@@ -1405,8 +1405,8 @@ function frame(now) {
   requestAnimationFrame(frame);   // first, so one bad frame can't stop the loop for good
   if (galleryOpen()) return;      // a project page covers the stage: its blurred backdrop can hold still, and the phone renders one scene, not two
   adapt(now);
-  try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
   if (warmQ.length) try { warmStep(); } catch (e) { warmQ.length = 0; console.warn(e); }
+  try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
 }
 function frameBody() {
   rigs.onDrive = returnToPath;   // driving the couch or the scooter hands the camera back to the chase view (rigs.js loads after this script's top)
@@ -1562,29 +1562,52 @@ function warmShaders() {
   const lit = new Set(), hearth = new Set();   // whatever hides a light now, and the materials under it
   scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) lit.add(p); });
   for (const g of lit) g.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) hearth.add(m); });
-  const faded = [...draws.keys()].filter((m) => m.transparent);
-  for (const [m, o] of draws) warmQ.push([o, false, false]);
-  for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push([o, false, true]);
-  for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push([o, true, true]);   // the hearth fades in, then the fire lights
-  // compile one mesh in one state, then put back the program three had picked for every material already drawn: the compiles only fill
-  // the cache, and each material still switches programs exactly when it would have without them
-  const mats = [...draws.keys()];
-  warmShaders.one = ([o, solid, fire]) => {
-    const was = faded.map((m) => m.transparent), kept = mats.map((m) => renderer.properties.get(m)).filter((p) => p.currentProgram).map((p) => [p, { ...p }]);
+  const all = [...draws.keys()], faded = all.filter((m) => m.transparent);
+  // run fn, then put back the program three had picked for every material: the warm-up only fills the cache, and each material still
+  // switches programs exactly when it would have without it
+  const quietly = (fn) => {
+    const props = all.map((m) => renderer.properties.get(m)), kept = props.map((p) => p.currentProgram && { ...p });
+    const was = faded.map((m) => m.transparent), seen = [...lit].map((g) => g.visible);
+    try { return fn(); } finally {
+      props.forEach((p, i) => { if (kept[i]) Object.assign(p, kept[i]); else p.__version = undefined; });
+      faded.forEach((m, i) => { m.transparent = was[i]; });
+      [...lit].forEach((g, i) => { g.visible = seen[i]; });
+    }
+  };
+  const compile = (o, solid, fire) => () => quietly(() => {
     if (solid) for (const m of faded) m.transparent = false;
     if (fire) for (const g of lit) g.visible = true;
-    const ready = renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
-    for (const [p, v] of kept) Object.assign(p, v);
-    faded.forEach((m, i) => { m.transparent = was[i]; });
-    if (fire) for (const g of lit) g.visible = false;
-    return ready;
-  };
-  if (renderer.extensions.has('KHR_parallel_shader_compile')) { const all = warmQ.splice(0).map(warmShaders.one); Promise.all(all).catch(() => {}); }
+    return renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
+  });
+  // the brace's materials clip against a plane, which renderer.compile can't key right (three sets clipping up only when it draws), so
+  // draw the figure wearing it into one pixel, fading in (its reveal) and solid with and without the fire (the closing shot); this runs
+  // before the frame is drawn, which then covers it
+  const fireTops = new Set([...lit].map((g) => { while (g.parent !== scene) g = g.parent; return g; }));
+  const brace = (solid, fire) => Object.assign(() => quietly(() => {
+    const off = scene.children.filter((o) => o.visible && o !== figure && !o.isLight && !(fire && fireTops.has(o)));
+    for (const o of off) o.visible = false;
+    kicker.unslim.visible = true;
+    for (const m of Object.values(mats)) { m.transparent = !solid; m.opacity = solid ? 1 : .5; }
+    if (fire) for (const g of lit) g.visible = true;
+    renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true);
+    try { renderer.render(scene, camera); } finally { renderer.setScissorTest(false); for (const o of off) o.visible = true; }
+  }), { draw: true });
+  if (kicker.ready) warmQ.push(brace(false, false), brace(true, false));
+  if (kicker.ready && lit.size) warmQ.push(brace(true, true));
+  for (const [m, o] of draws) warmQ.push(compile(o, false, false));
+  for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
+  for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
+  // where the GPU compiles in parallel, every compile goes now; the brace draws wait on theirs, so they still go one per frame
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+    const now = warmQ.filter((f) => !f.draw);
+    warmQ.splice(0, warmQ.length, ...warmQ.filter((f) => f.draw));
+    Promise.all(now.map((f) => f())).catch(() => {});
+  }
 }
-function warmStep() {   // from the frame loop: until a new program is created, at rest only
+function warmStep() {   // from the frame loop, before the frame is drawn: until a new program is created, at rest only
   if (Math.abs(sTarget - sNow) > .01 || free.on) return;
   const n = renderer.info.programs.length;
-  for (let i = 0; i < 40 && warmQ.length && renderer.info.programs.length === n; i++) warmShaders.one(warmQ.shift()).catch(() => {});
+  for (let i = 0; i < 40 && warmQ.length && renderer.info.programs.length === n; i++) Promise.resolve(warmQ.shift()()).catch(() => {});
 }
 resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
