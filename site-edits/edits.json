@@ -118,6 +118,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T02:59:21.644Z"
     },
+    "s4.div1.div2.span5": {
+      "fp": "Shoe cup",
+      "html": "foot",
+      "key": "s4.div1.div2.span5",
+      "kind": "text",
+      "name": "Chain step",
+      "origHtml": "Shoe cup",
+      "sec": 4,
+      "section": "05 Drive train",
+      "tag": "span",
+      "updatedAt": "2026-10-12T03:00:14.707Z"
+    },
     "s4.div1.h21": {
       "fp": "Motor to ankle, in four steps.",
       "html": "Motor to ankle, in four conversions.",
