@@ -286,7 +286,7 @@
         const x = a[3] * innerWidth, y = a[4] * innerHeight;
         rig.ui.ptr = { x, y }; rig.ui.ptrT = performance.now();
         dot.style.display = 'block'; dot.style.left = x + 'px'; dot.style.top = y + 'px';
-      } else dot.style.display = 'none';
+      } else { dot.style.display = 'none'; rig.ui.ptr = null; }   // lifted or idle: the laser and the cat stop following it too
       for (const set of [rig.rigs.couch && rig.rigs.couch.keys, rig.rigs.scooter && rig.rigs.scooter.keys]) {
         if (!set) continue; set.clear();
         KEYS.forEach((key, j) => { if (a[5] & (1 << j)) set.add(key); });
@@ -294,7 +294,7 @@
       while (ei < E.length && E[ei][0] <= head) {
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
-        else if (E[ei][1] === 'l' && E[ei][2] >= 400) { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
+        else if (E[ei][1] === 'l') { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view crashed here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
         ei++;
       }
