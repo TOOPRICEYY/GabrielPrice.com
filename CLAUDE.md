@@ -8,6 +8,7 @@ Gabriel Price's portfolio: a scroll-driven three.js page with his builds worn or
 - `photos/`, `holdfast/`, `mittenmade/`: files the page loads by relative path. A new folder of these must be added to `STATIC_DIRS` in `scripts/build.mjs`; `test/build.test.mjs` fails if a referenced file is missing from `dist/`.
 - `scripts/build.mjs`: runs `src/build.sh`, then swaps the full editor for its core plus the baked `site-edits/edits.json`, writes `dist/`, and writes the editor UI to `worker/editor-ui.gen.js`.
 - `worker/`: the Cloudflare Worker. It serves `dist/` and handles `/admin` (Access login check, the edits PR, notes as issues). Each `/admin` route is one branch in `admin()` in `index.js`.
+- `flow/client.js`: visitor flow capture and the `#replay=` player. `scripts/build.mjs` inlines it into the hosted page only (not the artifact), so it is repo-only: copying the fork's `src/` over doesn't touch it. It reads `window.__rig` (`s`, `camera`, `free`, `ui.ptr`, `rigs.couch.keys`/`rigs.scooter.keys`), so renaming any of those in main.html or rigs.js breaks capture. `worker/flow.js` handles `POST /api/flow` and `/admin/flow`; batches live in the R2 bucket bound as `FLOW`, never in GitHub. `flow/README.md` has the details.
 - `site-edits/edits.json`: edits made in the live editor. It reaches `main` only when the "Site edits from the editor" PR merges: Gabriel presses Publish in the editor (the Worker squash-merges it, `POST /admin/api/edits/publish`) or merges it on GitHub.
 
 ## Commands
