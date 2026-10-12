@@ -10,9 +10,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 // model: key in GAL_MAN. names: Fusion body name prefix -> part name (first match wins). explode: name prefix -> [x, y, z] cm, else radial.
 // ph: built-in placeholder visual for projects with no model yet. soon: blurred card, does not open.
 const PROJECTS = [
-  { id: 'sidetable', title: 'Bedside Table', kind: 'Furniture', model: 'sidetable',
+  { id: 'sidetable', title: 'Slide Table', kind: 'Furniture', model: 'sidetable',
     blurb: 'Pine plates doubled into each side, a top board under a marble slab, and a latched box shelf between them.',
-    names: [['Component10', 'Marble top'], ['Component9', 'Top board'], ['Component7', 'Top rail'], ['Component8', 'Top rail'], ['Component17', 'Steel rail plate'],
+    names: [['Component10', 'Marble top'], ['Component9', 'Top board'], ['Component7', 'Top rail'], ['Component8', 'Top rail'], ['Component17', 'Drawer slide'],
             ['Shelf:1 Body1', 'Shelf floor'], ['Shelf:1 Body2', 'Shelf front'], ['Shelf:1 Body3', 'Shelf back'],
             ['Component13', 'Side plate, outer'], ['Component15', 'Side plate, outer'], ['Component14', 'Side plate, inner'], ['Component12', 'Side plate, inner'],
             ['Latch v5:1+Component1', 'Latch'], ['Latch v5:1+Component2', 'Latch pin']],
@@ -21,13 +21,15 @@ const PROJECTS = [
               ['Component15', [0, 0, -30]], ['Component12', [0, 0, -16]], ['Shelf:1 Body1', [0, -10, 0]], ['Shelf:1 Body2', [-22, 0, 0]],
               ['Shelf:1 Body3', [20, 0, 0]], ['Latch v5:1+Component1', [-14, 26, 0]], ['Latch v5:1+Component2', [-20, 30, 0]]],
     mat: (k, m) => m.startsWith('Pine') ? 'pine' : m.startsWith('Marble') ? 'marble' : 'steel',
-    slide: { parts: ['Component9', 'Component10'], by: [0, 0, 34] },      // the top board and slab run along the rails to open the box
+    // the top (board, slab, its rails and the latch) runs sideways on the two drawer slides (Component17 + mirror, along Fusion x);
+    // the latch pin hangs outside the -x wall, so it can only open towards +x. The slides' middle members go half as far.
+    slide: { parts: ['Component9', 'Component10', 'Component7', 'Component8', 'Latch'], by: [22, 0, 0], half: ['Component17'] },
     props: sideTableProps, anim: () => sideTableProps.anim?.(),
     text: {
-      open: ['Slide the top.', 'The top board and its marble slab slide along the rails and open the box underneath, where the books and odds and ends live. The tea rides along on top.'],
+      open: ['Slide the top.', 'Lift the latch and the top board, marble slab and all, runs sideways on a pair of drawer slides, opening the box underneath where the books and odds and ends live. The tea rides along on top.'],
       hero: ['A bedside table, cut from flat stock.', 'Each side is two pine plates laminated together. A pine top board carries a white marble slab, and a box shelf with a latched front sits between the sides.'],
-      explode: ['Fifteen parts.', 'Pulled apart along the way they stack: the slab and top lift off, the rails and their steel plates rise, and the four side plates spread out.'],
-      build: ['How it goes together.', 'Keep scrolling and the parts go back in, bottom first: the side plates, the shelf, the rails and their plates, the latch, the top board, and the marble slab last.'],
+      explode: ['Fifteen parts.', 'Pulled apart along the way they stack: the slab and top lift off, the rails and their drawer slides rise, and the four side plates spread out.'],
+      build: ['How it goes together.', 'Keep scrolling and the parts go back in, bottom first: the side plates, the shelf, the rails and their drawer slides, the latch, the top board, and the marble slab last.'],
       specs: ['Bedside Table Rev.2', 'Description, photos and build notes still to come.'] } },
   { id: 'holdfast', title: 'Holdfast', kind: 'Software', ph: 'holdfast',
     blurb: 'A Screen Time controller for iPhone, Mac and Windows. Changing a rule, or buying more time, means typing a passage first.',
@@ -230,7 +232,7 @@ function model(P) {
   const base = new THREE.Vector3(-C.x, -box.min.y, -C.z);  // stand it on the floor, centred
   for (const p of parts) {
     p.base = base.clone(); p.mesh.position.copy(base); p.mesh.material = Array.isArray(p.mesh.material) ? p.mesh.material.map(m => m.clone()) : p.mesh.material.clone(); grp.add(p.mesh);
-    const sl = P.slide?.parts.some(x => p.k.startsWith(x)); if (sl) p.slide = new THREE.Vector3(...P.slide.by);
+    const sl = P.slide?.parts.some(x => p.k.startsWith(x)) ? 1 : P.slide?.half?.some(x => p.k.startsWith(x)) ? .5 : 0; if (sl) p.slide = new THREE.Vector3(...P.slide.by).multiplyScalar(sl);
     const ex = pick(P.explode, p.k);
     p.ex = ex ? new THREE.Vector3(...ex) : p.c.clone().sub(C).multiplyScalar(.8).add(p.c.clone().sub(C).normalize().multiplyScalar(R * .3));
   }
@@ -261,16 +263,16 @@ function sideTableProps(parts) {
     if (i === cols.length - 1) g.rotation.x = -.22;                              // the last one leans
     floor.add(g); z += th + .15;
   });
-  [[0x9e3d4f, 15, 2.2], [0x2f5d62, 14, 1.8], [0xcfc2a8, 13, 2.6]].reduce((y, [c, w, th]) => {
-    const g = new THREE.Group(); g.position.set(5.4, y, -8.5); g.rotation.y = (y * 7 % 5 - 2) * .05;
+  [[0x9e3d4f, 13, 2.2], [0x2f5d62, 12, 1.8], [0xcfc2a8, 11.5, 2.6]].reduce((y, [c, w, th]) => {
+    const g = new THREE.Group(); g.position.set(5.4, y, -11); g.rotation.y = (y * 7 % 5 - 2) * .05;
     g.add(box(w * .7, th, w, std(c), 0, th / 2, 0), box(w * .7 - .4, th - .3, w - .5, paper, .2, th / 2, 0)); floor.add(g); return y + th;
   }, fy);
-  const glasses = new THREE.Group(); glasses.position.set(5.5, fy + 6.6 + .4, -8.5); glasses.rotation.y = .5;          // reading glasses on the stack
+  const glasses = new THREE.Group(); glasses.position.set(5.5, fy + 6.6 + .4, -11); glasses.rotation.y = .5;          // reading glasses on the stack
   const rim = std(0x1d1b22, { metalness: .4, roughness: .4 });
   for (const sx of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(2.1, .18, 8, 32), rim); r.rotation.x = Math.PI / 2; r.position.x = sx * 2.5; glasses.add(r); }
   glasses.add(box(1.2, .2, .3, rim, 0, 0, 0)); floor.add(glasses);
-  const candle = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 6, 32), std(0xefe3cf, { roughness: .95 })); candle.position.set(6, fy + 3, -24); floor.add(candle);
-  const tin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, .25, 32), std(0xb8945a, { metalness: .8, roughness: .3 })); tin.position.set(6, fy + 6.1, -24); floor.add(tin);
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 5, 32), std(0xefe3cf, { roughness: .95 })); candle.position.set(9.5, fy + 2.5, -4.5); floor.add(candle);   // a candle tin in the corner
+  const tin = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, .25, 32), std(0xb8945a, { metalness: .8, roughness: .3 })); tin.position.set(9.5, fy + 5.1, -4.5); floor.add(tin);
   // a cup of tea on the marble, with steam
   const cup = new THREE.Group(); cup.position.set(9, 42.2, -16);
   const china = std(0xfbfaf6, { roughness: .25 });
@@ -320,7 +322,7 @@ function placeholder(P) {
 
 // ---------- chapters ----------
 // cam: [azimuth deg, elevation deg, distance in model radii]; side: which side the card sits on (the model pans the other way)
-const CH_MODEL = [{ key: 'hero', cam: [35, 16, 3.4], spin: 1 }, { key: 'open', cam: [-62, 42, 3.1], side: 'right' }, { key: 'explode', cam: [55, 26, 4.6], side: 'right' }, { key: 'build', cam: [20, 22, 3.8] },
+const CH_MODEL = [{ key: 'hero', cam: [35, 16, 3.4], spin: 1 }, { key: 'open', cam: [-112, 66, 3.3], side: 'right' }, { key: 'explode', cam: [55, 26, 4.6], side: 'right' }, { key: 'build', cam: [20, 22, 3.8] },
   { key: 'cut', cam: [88, 10, 3.3], side: 'right' }, { key: 'specs', cam: [-30, 16, 3.5], spin: 1 }];
 const CH_PH = [{ key: 'hero', cam: [25, 14, 4.2], spin: 1 }, { key: 'demo', cam: [0, 6, 3.6], side: 'right' }, { key: 'specs', cam: [-35, 18, 4.4], spin: 1 }];
 const sm = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -335,7 +337,7 @@ function chapterHTML(P, c, i) {
     <div class="gx-app"><iframe title="Holdfast interface in demo mode" data-src="holdfast/index.html?preview=1"></iframe></div></div>`;
   if (c.key === 'passage') extra = `<div class="gx-pass"><div class="gx-ladder">${['1 hour · 1×', '2nd · 2×', '3rd · 4×', '4th · 8×'].map((x, j) => `<span${j ? '' : ' class="on"'}>${x}</span>`).join('')}</div>
     <div class="gx-pass-exp">${PASSAGE}</div><div class="gx-pass-box" aria-live="off"></div><div class="gx-pass-res"></div></div>`;
-  if (P[c.key] && c.key !== 'specs') extra = P[c.key];
+  if (typeof P[c.key] === 'string' && c.key !== 'specs') extra = P[c.key];   // per-chapter html (products)
   if (c.key === 'specs' && P.specs) extra = P.specs;
   else if (c.key === 'specs') {
     const s = M.size, doc = P.model ? window.GAL_MAN[P.model].doc : null;
