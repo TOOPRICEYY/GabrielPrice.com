@@ -20,6 +20,7 @@ function fakeR2() {
     m,
     async put(key, body, o = {}) { m.set(key, { body: String(body), customMetadata: o.customMetadata || {}, uploaded: new Date() }); },
     async head(key) { return m.has(key) ? {} : null; },
+    async delete(keys) { for (const k of [].concat(keys)) m.delete(k); },
     async get(key) { const v = m.get(key); return v ? { json: async () => JSON.parse(v.body) } : null; },
     async list({ prefix = '', include = [] } = {}) {
       const objects = [...m.keys()].filter((k) => k.startsWith(prefix)).sort().map((key) => {
@@ -183,6 +184,31 @@ test('replays open in a frame sized to the visit, and the dashboard links there'
   assert.match(html, /__flowReplay/); assert.match(html, /Math\.min\(4096/, 'recorded sizes are clamped before they size the frame'); assert.match(html, /<iframe|createElement\('iframe'\)/);
   assert.match(fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8'), /\/admin\/flow\/replay\?key=/);
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /__flowReplay/, 'the player looks for the frame host');
+});
+
+test('ticked visits can be deleted from the dashboard, every batch of each, by the owner only', async () => {
+  const [a, b, c] = ['aaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaa2', 'aaaaaaaaaaaaaaa3'];
+  for (const sid of [a, b, c]) { await post(batch({ sid })); await post(batch({ sid, seq: 1, meta: undefined })); }
+  const del = (body, { auth = token, headers = { 'x-editor': '1', origin: ORIGIN }, method = 'POST' } = {}) => worker.fetch(new Request(ORIGIN + '/admin/api/flow/delete', {
+    method, body: method === 'GET' ? undefined : JSON.stringify(body), headers: { 'content-type': 'application/json', ...headers, ...(auth ? { 'cf-access-jwt-assertion': auth } : {}) } }), env);
+  const keys = [`${DAY}/${a}`, `${DAY}/${b}`];
+  assert.equal((await del({ keys }, { auth: null })).status, 403, 'needs the login');
+  assert.equal((await del({ keys }, { headers: {} })).status, 403, 'needs the page\'s own header');
+  assert.equal((await del({ keys }, { headers: { 'x-editor': '1', origin: 'https://evil.example' } })).status, 403, 'refuses other sites');
+  assert.equal((await del(null, { method: 'GET' })).status, 405);
+  assert.equal((await del({ keys: [`${DAY}/${a}/../x`] })).status, 400);
+  assert.equal((await del({ keys: ['../flow'] })).status, 400);
+  assert.equal((await del({ keys: [] })).status, 400);
+  assert.equal(env.FLOW.m.size > 0 && [...env.FLOW.m.keys()].filter((k) => k.includes(a)).length, 2, 'nothing deleted by the refused requests');
+  const r = await del({ keys });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { deleted: 2, batches: 4 });
+  assert.equal([...env.FLOW.m.keys()].filter((k) => k.includes(a) || k.includes(b)).length, 0, 'every batch of both visits is gone');
+  const left = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.map((v) => v.key);
+  assert.ok(left.includes(`${DAY}/${c}`) && !left.includes(`${DAY}/${a}`) && !left.includes(`${DAY}/${b}`), 'only the untouched visit is listed');
+  assert.equal((await get('/admin/api/flow/session?key=' + DAY + '/' + a)).status, 404);
+  const dash = fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8');
+  assert.match(dash, /type="checkbox"/); assert.match(dash, /\/admin\/api\/flow\/delete/); assert.match(dash, /'x-editor': '1'/);
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {

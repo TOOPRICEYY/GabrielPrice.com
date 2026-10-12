@@ -1,4 +1,5 @@
 // The owner's analytics page, served by worker/flow.js at /admin/flow (behind the Access login). Self-contained HTML.
+// Visits can be ticked (shift-click for a run) and deleted from the bucket with "Delete selected".
 // Opening it also sets localStorage "flow-off" so the owner's own visits to the site aren't recorded.
 export default `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
@@ -20,6 +21,9 @@ select,button{font:inherit;padding:5px 10px;border:1px solid var(--line);border-
 .bars>div:hover .fill,.track:hover .fill{background:var(--bar2)}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{color:var(--ink2);font-weight:600}td.n{text-align:right;font-variant-numeric:tabular-nums}a{color:var(--bar)}
+td.ck,th.ck{width:1%;padding-right:0}input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:middle;accent-color:var(--bar)}
+tr.on td{background:color-mix(in srgb,var(--bar) 10%,transparent)}.head{display:flex;align-items:center;gap:10px;margin-bottom:12px}.head h2{margin:0;flex:1}
+button.del{border-color:#d9534f;color:#c9302c}button.del:disabled{opacity:.45;border-color:var(--line);color:var(--muted)}@media (prefers-color-scheme:dark){button.del{color:#ff8a85}}
 .scroll{overflow-x:auto}.old{color:var(--muted)}.warn{color:#b26a00}@media (prefers-color-scheme:dark){.warn{color:#ffc46b}}.empty{color:var(--muted);padding:12px 0}
 </style></head><body><main>
 <h1>Site flow</h1><p class="sub">How visitors move through gabrielprice.com. Your own visits from this browser are not recorded.</p>
@@ -29,13 +33,14 @@ th{color:var(--ink2);font-weight:600}td.n{text-align:right;font-variant-numeric:
 <div class="tiles" id="tiles"></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
-<div class="card"><h2>Visits</h2><div class="scroll"><table><thead><tr><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </main><script>
 try { localStorage.setItem('flow-off', '1'); } catch (e) {}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
-let data = null;
+let data = null, shown = [], last = -1;
+const picked = new Set();   // keys of the ticked visits
 async function load() {
   $('status').textContent = 'Loading…';
   const r = await fetch('/admin/api/flow/sessions?days=' + $('days').value, { credentials: 'same-origin' });
@@ -62,7 +67,9 @@ function draw() {
   if (older) tiles.push([older, 'on an older version']);
   if (errs) tiles.push(['<span class="warn">' + errs + '</span>', 'stopped recording early (the page changed what the recorder reads)']);
   $('tiles').innerHTML = tiles.map(([b, s]) => '<div class="tile"><b>' + b + '</b><span>' + s + '</span></div>').join('');
-  if (!N) { $('funnel').innerHTML = $('dwell').innerHTML = '<div class="empty">No visits in this range yet.</div>'; $('rows').innerHTML = ''; return; }
+  shown = V.slice(0, 300).map((s) => s.key);
+  for (const k of [...picked]) if (!shown.includes(k)) picked.delete(k);   // only rows on screen stay ticked
+  if (!N) { $('funnel').innerHTML = $('dwell').innerHTML = '<div class="empty">No visits in this range yet.</div>'; $('rows').innerHTML = ''; ticks(); return; }
   const reached = curKeys.map(() => 0), dwell = curKeys.map(() => 0);
   for (const s of V) {
     const list = L(s), keys = list.map((_, i) => key(list, i));
@@ -74,9 +81,47 @@ function draw() {
   bars($('dwell'), cur.map((_, i) => ({ l: name(cur, i), v: dwell[i] / N })), 's');
   $('rows').innerHTML = V.slice(0, 300).map((s) => {
     const isOld = s.layout !== data.current.layout;
-    return '<tr><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
+    const on = picked.has(s.key);
+    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
   }).join('');
+  ticks();
 }
-$('days').onchange = load; $('dev').onchange = () => data && draw();
+// the button and the select-all box follow the ticks
+function ticks() {
+  const n = picked.size, all = $('all');
+  $('del').disabled = !n; $('del').textContent = n ? 'Delete selected (' + n + ')' : 'Delete selected';
+  all.checked = n > 0 && n === shown.length; all.indeterminate = n > 0 && n < shown.length; all.disabled = !shown.length;
+}
+function tick(key, on) {
+  if (on) picked.add(key); else picked.delete(key);
+  const box = $('rows').querySelector('input[data-key="' + CSS.escape(key) + '"]');
+  if (box) { box.checked = on; box.closest('tr').classList.toggle('on', on); }
+}
+$('rows').addEventListener('click', (e) => {
+  const box = e.target.closest('input[data-key]'); if (!box) return;
+  const i = shown.indexOf(box.dataset.key);
+  // shift-click ticks (or unticks) the whole run from the last box clicked
+  if (e.shiftKey && last >= 0 && i >= 0) for (let j = Math.min(i, last); j <= Math.max(i, last); j++) tick(shown[j], box.checked);
+  else tick(box.dataset.key, box.checked);
+  last = i; ticks();
+});
+$('all').onchange = () => { const on = $('all').checked; for (const k of shown) tick(k, on); last = -1; ticks(); };
+$('del').onclick = async () => {
+  const keys = [...picked], n = keys.length;
+  if (!n || !confirm('Delete ' + (n === 1 ? 'this visit' : 'these ' + n + ' visits') + ' for good? Their replays go too.')) return;
+  $('del').disabled = true; $('status').textContent = 'Deleting…';
+  let r = null, j = {};
+  try {
+    r = await fetch('/admin/api/flow/delete', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-editor': '1' }, body: JSON.stringify({ keys }) });
+    j = await r.json().catch(() => ({}));
+  } catch (e) {}
+  if (!r || !r.ok) { $('status').textContent = 'Could not delete: ' + (j.error || (r ? 'error ' + r.status : 'offline')); ticks(); return; }
+  const gone = new Set(keys);
+  data.sessions = data.sessions.filter((s) => !gone.has(s.key));
+  picked.clear(); last = -1;
+  $('status').textContent = 'Deleted ' + j.deleted + (j.deleted === 1 ? ' visit.' : ' visits.');
+  draw();
+};
+$('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = () => { last = -1; if (data) draw(); };
 load();
 </script></body></html>`;
