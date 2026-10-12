@@ -216,7 +216,7 @@
     },
     "s2.div1.p1": {
       "fp": "A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.",
-      "html": "A powered ankle exoskeleton with knee extension to offload as much calf or Achilles force as is programmed",
+      "html": "A 2HP bio-adaptive ankle exoskeleton",
       "key": "s2.div1.p1",
       "kind": "text",
       "name": "Paragraph",
@@ -224,11 +224,11 @@
       "sec": 2,
       "section": "03 Project · Anti-thetis",
       "tag": "p",
-      "updatedAt": "2026-10-12T02:58:46.321Z"
+      "updatedAt": "2026-10-12T03:18:54.265Z"
     },
     "s3.div1.h21": {
       "fp": "Built around one leg.",
-      "html": "Molded precisely",
+      "html": "Like a Glove",
       "key": "s3.div1.h21",
       "kind": "text",
       "name": "Heading",
@@ -236,7 +236,7 @@
       "sec": 3,
       "section": "04 Fit",
       "tag": "h2",
-      "updatedAt": "2026-10-12T02:59:21.644Z"
+      "updatedAt": "2026-10-12T03:17:20.705Z"
     },
     "s4.div1.div2.span5": {
       "fp": "Shoe cup",
@@ -252,7 +252,7 @@
     },
     "s4.div1.h21": {
       "fp": "Motor to ankle, in four steps.",
-      "html": "Motor to ankle, in four conversions.",
+      "html": "Four stage mechanical transmission",
       "key": "s4.div1.h21",
       "kind": "text",
       "name": "Heading",
@@ -260,7 +260,7 @@
       "sec": 4,
       "section": "05 Drive train",
       "tag": "h2",
-      "updatedAt": "2026-10-12T03:00:07.652Z"
+      "updatedAt": "2026-10-12T03:16:54.177Z"
     },
     "s5.div1.h21": {
       "fp": "Every part, apart.",
