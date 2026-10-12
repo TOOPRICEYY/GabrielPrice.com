@@ -368,7 +368,12 @@ test('visits older than 90 days are deleted each day; layouts and leaderboards s
   const day = (n) => new Date(now - n * 864e5).toISOString().slice(0, 10);
   for (const k of [`flow/${day(91)}/aaaaaaaaaaaaaaa1/000.json`, `flow/${day(91)}/aaaaaaaaaaaaaaa1/001.json`, `flow/${day(200)}/aaaaaaaaaaaaaaa2/000.json`,
     `flow/${day(90)}/aaaaaaaaaaaaaaa5/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, `flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, 'layout/0123456789ab.json', 'lb/board.json']) await R.put(k, '{}');
-  assert.equal(await prune({ FLOW: R }, now), 4, 'the cutoff day goes too');
+  for (const [k, v] of R.m) v.uploaded = new Date(Math.min(now, Date.parse((k.split('/')[1] || '') + 'T12:00:00Z') || now));   // midday of their day
+  // the cutoff day (90 days back by date) goes only as far as its uploads are past 90 days: one a minute past, one a minute short
+  R.m.get(`flow/${day(90)}/aaaaaaaaaaaaaaa5/000.json`).uploaded = new Date(now - 90 * 864e5 - 60e3);
+  await R.put(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`, '{}'); R.m.get(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`).uploaded = new Date(now - 90 * 864e5 + 60e3);
+  assert.equal(await prune({ FLOW: R }, now), 4);
+  assert.ok(R.m.has(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`), 'not yet 90 days old'); R.m.delete(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`);
   assert.deepEqual([...R.m.keys()].sort(), [`flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, 'layout/0123456789ab.json', 'lb/board.json'].sort());
   assert.equal(KEEP_DAYS, 90);
   assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /kept for 90 days, then deleted/, 'the privacy page states the same');
