@@ -1557,6 +1557,24 @@ function scooterFrame(s, dt, w) {
       b.quaternion.premultiply(dq.setFromAxisAngle(ax.clone().applyQuaternion(pq.invert()), a * S.duck * w)); b.updateMatrixWorld(true);
     }
   }
+  // hurt: the more damage the run has taken, the more he hunches over the bars, leans toward the side that took the hits and
+  // lets his head hang after a knock to it. Subtler than the mini body's crippled limbs; eases in, and out again on a new run
+  {
+    const G = S.game, d = G.dmg || {}, on = G.on && G.ragT == null && manual, k = 1 - Math.pow(.08, dt);
+    const tH = on ? clamp01((GAME.hp - G.hp) / GAME.hp) : 0, tS = on ? Math.max(-1, Math.min(1, (d.armL || 0) + (d.legL || 0) - (d.armR || 0) - (d.legR || 0))) : 0, tN = on ? Math.min(1, d.head || 0) : 0;
+    S.hurtH = (S.hurtH || 0) + (tH - (S.hurtH || 0)) * k; S.hurtS = (S.hurtS || 0) + (tS - (S.hurtS || 0)) * k; S.hurtN = (S.hurtN || 0) + (tN - (S.hurtN || 0)) * k;
+    if (w > 0 && (S.hurtH > .005 || Math.abs(S.hurtS) > .005 || S.hurtN > .005)) {
+      const side = new THREE.Vector3(Math.cos(S.psi), 0, -Math.sin(S.psi)), fwd = new THREE.Vector3(Math.sin(S.psi), 0, Math.cos(S.psi)), pq = new THREE.Quaternion(), dq = new THREE.Quaternion();
+      // [bone, fold forward per unit of hunch, lean per unit of side (+ = toward the rider's left), head droop per unit of head knocks]
+      for (const [bn, h, l, n] of [['spine', .16, -.07, 0], ['spine1', .2, -.08, 0], ['spine2', .14, -.04, 0], ['neck', -.22, -.03, .16], ['head', 0, 0, .1]]) {
+        const b = bones[bn]; if (!b || !b.parent) continue; b.parent.getWorldQuaternion(pq); pq.invert();
+        b.quaternion.premultiply(dq.setFromAxisAngle(side.clone().applyQuaternion(pq), (h * S.hurtH + n * S.hurtN) * w));
+        if (l) b.quaternion.premultiply(dq.setFromAxisAngle(fwd.clone().applyQuaternion(pq), l * S.hurtS * w));
+        if (bn === 'neck' && S.hurtN > .005) b.quaternion.premultiply(dq.setFromAxisAngle(fwd.clone().applyQuaternion(pq), -.18 * S.hurtN * w));   // head lolls to one side
+        b.updateMatrixWorld(true);
+      }
+    }
+  }
   // hands close on the grips (index fingers toward the stem, palms behind and over the bar); they let go while it is apart
   const gw = w * (1 - e);
   if (gw > 0) {
