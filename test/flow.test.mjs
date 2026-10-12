@@ -241,6 +241,16 @@ test('each visit records its device type, model, OS and browser', async () => {
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /getHighEntropyValues\(\['model', 'platformVersion'\]\)/);
 });
 
+test('headless browsers and crawlers are accepted quietly but never stored', async () => {
+  const before = env.FLOW.m.size;
+  for (const ua of ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/129.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse']) {
+    assert.equal((await post(batch({ sid: 'abababababababab' }), { ua })).status, 204);
+  }
+  assert.equal(env.FLOW.m.size, before);
+  assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /navigator\.webdriver\) return/, 'automated browsers are skipped in the page');
+});
+
 test('each visit records its hardware, network, frame rate and load time, within the summary\'s size limit', async () => {
   const sid = 'eeeeeeeeeeeeeeee';
   const hw = { sw: 390, sh: 844, orient: 'portrait-primary', cores: 6, mem: 4, tp: 5, gpu: 'Apple GPU', net: '4g', down: 9.5, rtt: 50, save: false,

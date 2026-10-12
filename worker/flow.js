@@ -54,6 +54,8 @@ export async function flowIngest(request, env, ctx, url) {
   try { b = JSON.parse(text); } catch { return empty(400); }
   const clean = checkBatch(b);
   if (!clean) return empty(400);
+  // test rigs and crawlers: the page already skips automated browsers (navigator.webdriver); this catches the ones that hide it
+  if (/HeadlessChrome|Lighthouse|PageSpeed|bot\b|crawl|spider|slurp/i.test(request.headers.get('user-agent') || '')) return empty(204);
   if (!env.FLOW) return empty(204);
   if (clean.meta) {
     // where the visit came from, as Cloudflare sees it at the edge: country, region, city and the connecting IP
