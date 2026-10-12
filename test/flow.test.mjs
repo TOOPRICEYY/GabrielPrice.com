@@ -73,7 +73,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   const html = fs.readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
   const rig = /window\.__rig = \{([\s\S]*?)\};/.exec(html);
   assert.ok(rig, 'window.__rig is defined');
-  for (const name of ['THREE', 'rigs', 'camera', 'ui', 'free', 'setS(', 'get s()']) assert.ok(rig[1].includes(name), `__rig exposes ${name}`);
+  for (const name of ['THREE', 'rigs', 'camera', 'ui', 'free', 'renderer', 'setS(', 'get s()']) assert.ok(rig[1].includes(name), `__rig exposes ${name}`);
   assert.match(html, /ui\.ptr = \{ x: e\.clientX, y: e\.clientY \}; ui\.ptrT = performance\.now\(\)/, 'pointer kept in ui.ptr / ui.ptrT');
   assert.match(html, /rigs\.couch = \{[^\n]*keys: new Set\(\)/, 'couch keys are a Set');
   assert.match(html, /keys: new Set\(\), last: -1e9, knock/, 'scooter keys are a Set');
