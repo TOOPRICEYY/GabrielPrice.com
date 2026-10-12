@@ -162,7 +162,8 @@ section.gallery { display: block; min-height: 100vh; max-width: 1280px; margin-i
 .gx-pass-res { font-family: var(--f-mono); font-size: 11px; color: var(--graphite-2); min-height: 1.4em; }
 .gx-gal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .gx-gal figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.gx-gal img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border: 1px solid var(--rule); }
+.gx-gal img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border: 1px solid var(--rule); cursor: zoom-in; }
+.gx-hf img, .gx-vid video { cursor: zoom-in; }
 .gx-gal.two { grid-template-columns: repeat(2, 1fr); }
 .gx-vid { margin: 12px 0 0; }
 .gx-vid video { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; border: 1px solid var(--rule); background: var(--vellum-2); }

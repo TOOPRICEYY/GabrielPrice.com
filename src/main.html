@@ -1474,17 +1474,18 @@ const keycaps = e => document.querySelectorAll(`.keys kbd[data-k="${KEYCAP[e.key
 addEventListener('keydown', e => keycaps(e).forEach(b => b.classList.add('on')));
 addEventListener('keyup', e => keycaps(e).forEach(b => b.classList.remove('on')));   // only the key let go
 addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
-// build log lightbox: tap a photo or clip in a .log row to see it large; tap again or Esc to close
+// lightbox: tap a photo or clip (build log rows, card leads, gallery project pages) to see it large; tap again or Esc to close
 (() => {
   const lb = document.createElement('div'); lb.id = 'lb'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', 'Build photo'); document.body.appendChild(lb);
   const close = () => { lb.classList.remove('on'); lb.innerHTML = ''; };
-  lb.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') close(); }); addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  lb.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') close(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && lb.classList.contains('on')) { close(); e.stopImmediatePropagation(); } }, true);   // Esc shuts the viewer, not the project page under it
   document.addEventListener('click', e => {
-    const m = e.target.closest('.log img, .log video, .lead img, .lead video'); if (!m) return;
-    const cap = m.closest('figure').querySelector('figcaption'), fig = document.createElement('figure'); fig.style.margin = 0;
+    const m = e.target.closest('.log img, .log video, .lead img, .lead video, .gx-gal img, .gx-hf img, .gx-vid video'); if (!m) return;
+    const cap = m.closest('figure')?.querySelector('figcaption'), fig = document.createElement('figure'); fig.style.margin = 0;
     let el;
     if (m.tagName === 'IMG') { el = new Image(); el.src = m.dataset.full || m.src; el.alt = m.alt; }
-    else { el = document.createElement('video'); Object.assign(el, { src: m.dataset.src, muted: true, loop: true, playsInline: true, autoplay: true, controls: true }); }
+    else { el = document.createElement('video'); Object.assign(el, { src: m.dataset.src || m.currentSrc || m.src, poster: m.poster, muted: true, loop: true, playsInline: true, autoplay: true, controls: true }); }
     fig.append(el); if (cap) { const p = document.createElement('p'), b = cap.querySelector('b'); p.textContent = (b ? b.textContent + '  ' : '') + [...cap.childNodes].filter(n => n !== b).map(n => n.textContent).join(''); fig.append(p); }
     lb.innerHTML = ''; lb.append(fig); lb.classList.add('on');
   });
