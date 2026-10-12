@@ -9,6 +9,7 @@
     "deploy": "node scripts/build.mjs && wrangler deploy"
   },
   "devDependencies": {
+    "three": "0.160.0",
     "wrangler": "4.146.0"
   },
   "engines": {

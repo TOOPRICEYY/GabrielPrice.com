@@ -14,7 +14,7 @@ Gabriel Price's portfolio: a scroll-driven three.js page with his builds worn or
 
 ## Commands
 
-`npm ci`, `npm run build`, `npm test`. The tests need no network. For a headless browser check of the page, note that cloud containers can't reach jsdelivr: route `cdn.jsdelivr.net/npm/three@0.160.0/**` to a local `npm install three@0.160.0`, and stub fonts.googleapis.com.
+`npm ci`, `npm run build`, `npm test`. The tests need no network. For a headless browser check, `dist/index.html` loads three.js from `dist/vendor/three/` (the build copies it from `node_modules`, so the hosted site never depends on jsdelivr), but the artifact and `index.html` at the repo root still import from jsdelivr, which cloud containers can't reach: route `cdn.jsdelivr.net/npm/three@0.160.0/**` to `node_modules/three`, and stub fonts.googleapis.com.
 
 ## editor.js has two parts
 
