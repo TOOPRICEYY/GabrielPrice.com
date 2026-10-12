@@ -417,7 +417,7 @@ function chapterHTML(P, c, i) {
   if (c.key === 'explode') extra = `<ol class="bom">${M.groups.map((g, j) => `<li><span class="n">${j + 1}</span><span>${g}</span><span class="q">×${M.parts.filter(q => q.name === g).length}</span></li>`).join('')}</ol>`;
   if (c.key === 'try') return `<div class="gx-ch wide"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2>${p ? `<p>${p}</p>` : ''}</div>
     <div class="gx-app"><iframe title="Holdfast interface in demo mode" data-src="holdfast/index.html?preview=1"></iframe></div></div>`;
-  if (c.key === 'passage') extra = `<div class="gx-pass"><div class="gx-ladder">${['1 hour · 1×', '2nd · 2×', '3rd · 4×', '4th · 8×'].map((x, j) => `<span${j ? '' : ' class="on"'}>${x}</span>`).join('')}</div>
+  if (c.key === 'passage') extra = `<div class="gx-pass"><div class="gx-ladder">${['1st · 1×', '2nd · 2×', '3rd · 4×', '4th · 8×'].map((x, j) => `<span${j ? '' : ' class="on"'}>${x}</span>`).join('')}</div>
     <div class="gx-pass-exp">${PASSAGE}</div><div class="gx-pass-box" aria-live="off"></div><div class="gx-pass-res"></div></div>`;
   if (typeof P[c.key] === 'string' && c.key !== 'specs') extra = P[c.key];   // per-chapter html (products)
   if (c.key === 'specs' && P.specs) extra = P.specs;
