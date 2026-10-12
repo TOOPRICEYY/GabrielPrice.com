@@ -166,6 +166,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:11:11.973Z"
     },
+    "s16.div1.h21": {
+      "fp": "CatZoom, at play.",
+      "html": "Up close",
+      "key": "s16.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "CatZoom, at play.",
+      "sec": 16,
+      "section": "16 Up close",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:12:10.325Z"
+    },
     "s16.div1.p1": {
       "fp": "The base stays put while the head darts and flicks the dot.",
       "html": "2 axis gimbal",
