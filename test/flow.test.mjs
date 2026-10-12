@@ -248,6 +248,11 @@ test('headless browsers and crawlers are accepted quietly but never stored', asy
     assert.equal((await post(batch({ sid: 'abababababababab' }), { ua })).status, 204);
   }
   assert.equal(env.FLOW.m.size, before);
+  // a phone whose model contains "bot" is a visitor, not a crawler
+  const cubot = 'Mozilla/5.0 (Linux; Android 12; CUBOT X30) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+  await post(batch({ sid: 'acacacacacacacac' }), { ua: cubot });
+  assert.equal(env.FLOW.m.size, before + 1, 'CUBOT phones are recorded');
+  assert.equal(device(cubot, null, true).browser, 'Chrome 129');
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /navigator\.webdriver\) return/, 'automated browsers are skipped in the page');
 });
 
@@ -262,6 +267,13 @@ test('each visit records its hardware, network, frame rate and load time, within
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
   assert.deepEqual([v.scr, v.dpr, v.cores, v.mem, v.gpu, v.net, v.tz, v.load, v.full, v.isp], ['390x844', '2', 6, 4, 'Apple GPU', '4g', 'America/Detroit', 2140, 6310, 'Comcast Cable']);
   assert.ok(v.fps > 30.1 && v.fps < 58.7, 'frame rate averages the batches by their length'); assert.equal(v.fpsSum, undefined);
+  // weighted by the visible time each frame rate covers, and a full load that came after the first batch still counts
+  const sid2 = 'efefefefefefefef';
+  await post(batch({ sid: sid2, fps: 60, fms: 29000, samples: [sample(0, 0)], meta: { ...batch().meta, hw: { ...hw, full: 0 } } }));
+  await post(batch({ sid: sid2, seq: 1, meta: undefined, fps: 20, fms: 1000, full: 41000, samples: [sample(30000, 1), sample(59000, 2)] }));
+  const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));
+  assert.equal(v2.fps, 58.7, 'the 29 s batch outweighs the 1 s one, however many samples each kept');
+  assert.equal(v2.full, 41000);
   // junk is dropped, not stored
   const bad = checkBatch(batch({ fps: 'fast', meta: { ...batch().meta, hw: { cores: -1, mem: 1e9, gpu: 42, load: 'x' } } }));
   assert.equal(bad.fps, undefined); assert.deepEqual([bad.meta.hw.cores, bad.meta.hw.mem, bad.meta.hw.gpu, bad.meta.hw.load], [0, 0, '', 0]);
@@ -274,6 +286,7 @@ test('each visit records its hardware, network, frame rate and load time, within
   assert.ok(bytes < 2048, `summary is ${bytes} bytes`);
   const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
   assert.match(client, /requestIdleCallback/, 'the device is read when the browser is idle, not in a frame');
+  assert.match(client, /visibilitychange', \(\) => \{\s*prevT = 0/, 'time spent hidden is not counted as a freeze');
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {

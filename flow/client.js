@@ -44,7 +44,7 @@
   const sid = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
-  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, ready = 0, full = 0;
+  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, ready = 0, full = 0, fullSent = false;
   // frame rate: frames and visible time since the last batch (a gap over 1 s is a hidden tab or a stall, not counted)
   let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
@@ -123,7 +123,10 @@
     if (rzT < 0) rzT = now();
     clearTimeout(rz); rz = setTimeout(() => { events.push([rzT, 'z', innerWidth, innerHeight]); rzT = -1; }, 500);
   }, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); } });
+  document.addEventListener('visibilitychange', () => {
+    prevT = 0;   // frames stop while hidden: the gap until the first frame back is not a freeze
+    if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); }
+  });
   addEventListener('pagehide', flush);
 
   function flush() {
@@ -131,11 +134,14 @@
     if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0)) return;
     const o = { sid, seq, day, samples, events };
     if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
-    if (frameMs > 0) o.fps = Math.round(frames * 10000 / frameMs) / 10;
+    if (frameMs > 0) { o.fps = Math.round(frames * 10000 / frameMs) / 10; o.fms = Math.round(frameMs); }   // fms: the visible time it covers
+    // every build loaded only after the first batch went out (a slow phone or connection): send it once, now
+    if (seq > 0 && full && !fullSent) { o.full = full; fullSent = true; }
     frames = 0; frameMs = 0; stalls = 0;
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
       fg: true, lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
       v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}), ...(hw ? { hw: { ...hw, load: Math.round(ready), full } } : {}) };
+    if (o.meta && o.meta.hw && full) fullSent = true;
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing

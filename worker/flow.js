@@ -18,6 +18,9 @@ import dashboard from './flow-dashboard.js';
 import replayPage from './flow-replay.js';
 
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
+// crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
+// models such as the CUBOT X30 contain
+const BOT = /HeadlessChrome|Lighthouse|PageSpeed|[a-z]bot\/|\bbot\b|crawler|spider|slurp/i;
 const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
 // layouts live before visits carried one, by when they went live: PR #6's 18 sections, then from #7 (deployed 02:24:13Z) the
 // couch drive section at 14. An unversioned visit is read against the one live when its first batch arrived.
@@ -55,7 +58,7 @@ export async function flowIngest(request, env, ctx, url) {
   const clean = checkBatch(b);
   if (!clean) return empty(400);
   // test rigs and crawlers: the page already skips automated browsers (navigator.webdriver); this catches the ones that hide it
-  if (/HeadlessChrome|Lighthouse|PageSpeed|bot\b|crawl|spider|slurp/i.test(request.headers.get('user-agent') || '')) return empty(204);
+  if (BOT.test(request.headers.get('user-agent') || '')) return empty(204);
   if (!env.FLOW) return empty(204);
   if (clean.meta) {
     // where the visit came from, as Cloudflare sees it at the edge: country, region, city and the connecting IP
@@ -94,7 +97,8 @@ export function checkBatch(b) {
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
-  if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) out.fps = Math.round(b.fps * 10) / 10;
+  if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) { out.fps = Math.round(b.fps * 10) / 10; if (num(b.fms) && b.fms > 0 && b.fms <= 3600000) out.fms = Math.round(b.fms); }
+  if (num(b.full) && b.full > 0 && b.full <= 3600000) out.full = Math.round(b.full);
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
     out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true, fg: m.fg === true,
@@ -151,7 +155,7 @@ export function device(ua, ch, touch) {
   else if (/Linux/.test(ua)) { os = 'Linux'; model = 'PC'; }
   if (!dev) dev = /Mobi/.test(ua) ? 'phone' : touch && !model ? 'tablet' : 'desktop';
   const b = (name, re) => { const x = v(re); return x !== '' ? name + ' ' + major(x) : null; };
-  const browser = (/bot|crawl|spider|slurp|preview/i.test(ua) ? 'bot' : null)
+  const browser = (BOT.test(ua) ? 'bot' : null)
     || (/Instagram/.test(ua) ? 'Instagram app' : null) || (/FBAN|FBAV/.test(ua) ? 'Facebook app' : null) || (/LinkedInApp/.test(ua) ? 'LinkedIn app' : null)
     || (/; wv\)/.test(ua) ? 'in-app browser' : null)
     || b('Edge', /Edg(?:e|A|iOS)?\/(\d+)/) || b('Opera', /(?:OPR|OPT)\/(\d+)/) || b('Samsung Internet', /SamsungBrowser\/(\d+)/)
@@ -179,7 +183,7 @@ export function summarise(c) {
   const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(S.length ? S[S.length - 1][0] : 0),
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
     dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
-    err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}) };
+    err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}), ...(num(c.fms) ? { fms: String(c.fms) } : {}), ...(num(c.full) ? { full: String(c.full) } : {}) };
   const st = c.events.filter((e) => e[1] === 'l' && num(e[2]));
   if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
   if (c.meta) {
@@ -281,11 +285,13 @@ export async function listSessions(env, days) {
       v.ms = Math.max(v.ms, Number(m.t1) || 0);
       v.maxS = Math.max(v.maxS, Number(m.maxS) || 0);
       v.err = (v.err || 0) + (Number(m.err) || 0);
-      if (m.fps) { const w = Math.max(1, (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
+      // weighted by the visible time each batch's frame rate covers (older batches: their sample span)
+      if (m.full) v.full = Math.max(v.full || 0, Number(m.full) || 0);
+      if (m.fps) { const w = Math.max(1, Number(m.fms) || (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
       if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.scr = m.scr || ''; v.dpr = m.dpr || ''; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; v.full = Number(m.full) || 0; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.scr = m.scr || ''; v.dpr = m.dpr || ''; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; v.full = Math.max(v.full || 0, Number(m.full) || 0); v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }
