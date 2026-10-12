@@ -54,7 +54,10 @@ export async function flowIngest(request, env, ctx, url) {
   if (!clean) return empty(400);
   if (!env.FLOW) return empty(204);
   if (clean.meta) {
-    clean.meta.cc = str(request.cf && request.cf.country, 2);
+    // where the visit came from, as Cloudflare sees it at the edge: country, region, city and the connecting IP
+    const cf = request.cf || {};
+    clean.meta.cc = str(cf.country, 2); clean.meta.region = str(cf.region, 40); clean.meta.city = str(cf.city, 40);
+    clean.meta.ip = str(request.headers.get('cf-connecting-ip'), 45);
     clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(request.headers.get('user-agent') || '');
   }
   const key = `flow/${clean.day}/${clean.sid}/${String(clean.seq).padStart(3, '0')}.json`;
@@ -116,7 +119,7 @@ export function summarise(c) {
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop';
-    m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
+    m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
   return m;
 }
@@ -182,7 +185,7 @@ export async function listSessions(env, days) {
       v.err = (v.err || 0) + (Number(m.err) || 0);
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }

@@ -38,9 +38,12 @@ const batch = (o = {}) => ({ sid: SID, seq: 0, day: DAY, samples: [sample(0, 0),
 // like the runtime, finish the background writes (ctx.waitUntil) before the next step looks at the bucket
 async function post(body, { origin = ORIGIN, e = env } = {}) {
   const pending = [];
-  const r = await worker.fetch(new Request(ORIGIN + '/api/flow', {
-    method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'content-type': 'text/plain', ...(origin ? { origin } : {}) },
-  }), e, { waitUntil: (p) => pending.push(p) });
+  const req = new Request(ORIGIN + '/api/flow', {
+    method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
+    headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}) },
+  });
+  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit' } });   // what Cloudflare's edge attaches
+  const r = await worker.fetch(req, e, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   return r;
 }
@@ -90,6 +93,8 @@ test('a valid batch is stored under flow/<day>/<sid>/<seq> with a summary, unkno
   assert.equal(v.customMetadata.maxS, '1.20');
   assert.equal(v.customMetadata.clicks, '1');
   assert.equal(v.customMetadata.v, 'abc1234');
+  assert.equal(v.customMetadata.ip, '203.0.113.7');
+  assert.equal(v.customMetadata.city, 'Detroit'); assert.equal(v.customMetadata.region, 'Michigan'); assert.equal(v.customMetadata.cc, 'US');
   assert.equal(v.customMetadata.layout, LAYOUT);
   assert.deepEqual(JSON.parse(env.FLOW.m.get(`layout/${LAYOUT}.json`).body), SECTIONS, 'the layout is kept for later');
 });
@@ -148,6 +153,7 @@ test('the owner routes need the login, then list visits and merge a visit for re
   assert.equal(v.key, `${DAY}/${SID}`); assert.equal(v.batches, 2); assert.equal(v.maxS, 3); assert.equal(v.ms, 30000);
   assert.ok(list.current.sections.length > 10);
   assert.equal(v.layout, LAYOUT); assert.equal(v.v, 'abc1234');
+  assert.equal(v.ip, '203.0.113.7'); assert.equal(v.city, 'Detroit');
   assert.deepEqual(list.layouts[LAYOUT], SECTIONS, 'older layouts come back with the list');
   assert.equal(list.layouts['legacy-18'].length, 18);
   // a visit from before versions: read against the layout live when it arrived (here: now, which is today's page)

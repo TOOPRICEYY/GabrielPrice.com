@@ -66,7 +66,7 @@ The site records how visitors move through it: how far they scroll, the time the
 3. Recommended: in the bucket, open **Settings → Object lifecycle rules → Add rule**. Set the prefix to `flow/` and delete objects 90 days after upload, so old visits clean themselves up.
 4. After the next deploy, open **gabrielprice.com/admin/flow**. Access asks you to sign in, the same way as for the editor. The page shows the share of visits that reached each section, the average time on each section, and a list of visits. Each visit has a **Replay** link that plays it back in the live 3D scene. Opening `/admin/flow` also marks that browser so your own visits aren't recorded. Open it once on each device you browse the site from.
 
-Visitors with Global Privacy Control or Do Not Track turned on are never recorded. The page sets no cookies. The Worker stores a visitor's country, screen size, language, the site they came from, and whether they're on a phone; it never stores IP addresses. Whether you need a privacy notice for this depends on where your visitors are.
+Visitors with Global Privacy Control or Do Not Track turned on are never recorded. The page sets no cookies. The Worker stores a visitor's IP address and approximate location (country, region and city, from Cloudflare), screen size, language, the site they came from, and whether they're on a phone. An IP address counts as personal data in the EU and UK, so if visitors come from there you likely need a short privacy notice; the 90-day lifecycle rule in step 3 limits how long it's kept.
 
 ## Day to day
 

@@ -29,7 +29,7 @@ th{color:var(--ink2);font-weight:600}td.n{text-align:right;font-variant-numeric:
 <div class="tiles" id="tiles"></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
-<div class="card"><h2>Visits</h2><div class="scroll"><table><thead><tr><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>Size</th><th>From</th><th>Country</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card"><h2>Visits</h2><div class="scroll"><table><thead><tr><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </main><script>
 try { localStorage.setItem('flow-off', '1'); } catch (e) {}
 const $ = (id) => document.getElementById(id);
@@ -74,7 +74,7 @@ function draw() {
   bars($('dwell'), cur.map((_, i) => ({ l: name(cur, i), v: dwell[i] / N })), 's');
   $('rows').innerHTML = V.slice(0, 300).map((s) => {
     const isOld = s.layout !== data.current.layout;
-    return '<tr><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc(s.cc || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/#replay=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
+    return '<tr><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/#replay=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
   }).join('');
 }
 $('days').onchange = load; $('dev').onchange = () => data && draw();
