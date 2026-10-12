@@ -48,7 +48,11 @@ const str = (x, n) => (typeof x === 'string' ? x.slice(0, n) : '');
 // ---------- ingest ----------
 // Where a returning-visitor id needs the visitor's consent before the page stores it: the EU, the rest of the EEA, the UK
 // and Switzerland. An unknown country asks too: none, Tor (T1), XX (Cloudflare couldn't tell) or EU (just the region).
-const CONSENT = new Set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH XX EU'.split(' '));
+// EU-27, EEA and the UK and Switzerland; then the parts of them with their own country code (Åland, the French
+// overseas regions, Saint-Martin, Canaries, Ceuta and Melilla) and the territories with GDPR-style law (Gibraltar,
+// the Channel Islands, Isle of Man); XX and EU are what Cloudflare reports when it can't tell
+const CONSENT = new Set(('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH '
+  + 'AX GF GP MQ RE YT MF IC EA GI GG JE IM XX EU').split(' '));
 export const mustAsk = (cc) => !/^[A-Z]{2}$/.test(cc || '') || CONSENT.has(cc);
 
 export async function flowIngest(request, env, ctx, url) {
