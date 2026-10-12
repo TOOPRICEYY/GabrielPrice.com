@@ -72,7 +72,7 @@
     },
     "s1.div1.p1": {
       "fp": "I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scoote",
-      "html": "My body has always been held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ ligament laxities which set a ceiling on my life.",
+      "html": "My body has always been held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ ligament sprains which set a ceiling on my life. I don't like ceilings",
       "key": "s1.div1.p1",
       "kind": "text",
       "name": "Paragraph",
@@ -80,7 +80,7 @@
       "sec": 1,
       "section": "02 About",
       "tag": "p",
-      "updatedAt": "2026-10-12T02:56:49.090Z"
+      "updatedAt": "2026-10-12T02:57:36.352Z"
     }
   }
 }
