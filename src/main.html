@@ -1579,30 +1579,27 @@ function warmShaders() {
     if (fire) for (const g of lit) g.visible = true;
     return renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
   });
-  // the brace's materials clip against a plane, which renderer.compile can't key right (three sets clipping up only when it draws), so
-  // draw the figure wearing it into one pixel, fading in (its reveal) and solid with and without the fire (the closing shot); this runs
-  // before the frame is drawn, which then covers it
-  const fireTops = new Set([...lit].map((g) => { while (g.parent !== scene) g = g.parent; return g; }));
-  const brace = (solid, fire) => Object.assign(() => quietly(() => {
-    const off = scene.children.filter((o) => o.visible && o !== figure && !o.isLight && !(fire && fireTops.has(o)));
-    for (const o of off) o.visible = false;
-    kicker.unslim.visible = true;
-    for (const m of Object.values(mats)) { m.transparent = !solid; m.opacity = solid ? 1 : .5; }
-    if (fire) for (const g of lit) g.visible = true;
+  // the brace's materials clip against a plane, and renderer.compile keys clipping on whatever three drew last (it sets clipping up only
+  // when it draws). So first draw a speck with one clip plane into one pixel, before a frame (which then covers it), and right after
+  // compile the brace fading in (its reveal) and solid with and without the fire (the closing shot)
+  const speck = new THREE.Scene(), dot = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ clippingPlanes: [new THREE.Plane()] }));
+  dot.frustumCulled = false; speck.add(dot);
+  const brace = () => {
     renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true);
-    try { renderer.render(scene, camera); } finally { renderer.setScissorTest(false); for (const o of off) o.visible = true; }
-  }), { draw: true });
-  if (kicker.ready) warmQ.push(brace(false, false), brace(true, false));
-  if (kicker.ready && lit.size) warmQ.push(brace(true, true));
+    try { renderer.render(speck, camera); } finally { renderer.setScissorTest(false); }
+    for (const [solid, fire] of [[false, false], [true, false], [true, true]]) quietly(() => {
+      for (const m of Object.values(mats)) m.transparent = !solid;
+      if (fire) for (const g of lit) g.visible = true;
+      renderer.compile(kicker.unslim, camera, scene);
+    });
+    dot.geometry.dispose(); dot.material.dispose();
+  };
+  if (kicker.ready) warmQ.push(brace);
   for (const [m, o] of draws) warmQ.push(compile(o, false, false));
   for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
   for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
-  // where the GPU compiles in parallel, every compile goes now; the brace draws wait on theirs, so they still go one per frame
-  if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-    const now = warmQ.filter((f) => !f.draw);
-    warmQ.splice(0, warmQ.length, ...warmQ.filter((f) => f.draw));
-    Promise.all(now.map((f) => f())).catch(() => {});
-  }
+  // where the GPU compiles in parallel, everything goes now
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) Promise.all(warmQ.splice(0).map((f) => f())).catch(() => {});
 }
 function warmStep() {   // from the frame loop, before the frame is drawn: until a new program is created, at rest only
   if (Math.abs(sTarget - sNow) > .01 || free.on) return;
