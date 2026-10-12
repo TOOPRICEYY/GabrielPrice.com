@@ -1,22 +1,6 @@
 {
   "v": 1,
   "edits": {
-    "gallery.div1.div2.button4": {
-      "fp": "3D printingTensile TesterA three-part printed gauge from the Printers Printing Printers project, with a dogbone keyed into its post.",
-      "key": "gallery.div1.div2.button4",
-      "kind": "block",
-      "layout": {
-        "phone": {
-          "x": -1,
-          "y": -24
-        }
-      },
-      "name": "Gallery card",
-      "sec": "gallery",
-      "section": "Gallery Smaller builds and works in progress",
-      "tag": "button",
-      "updatedAt": "2026-10-11T22:33:46.032Z"
-    },
     "s1.div1.p1": {
       "fp": "My body has always been held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ ligament sprains which",
       "html": "My body is held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ligament sprains which set a ceiling on my life. I don't like ceilings.",
