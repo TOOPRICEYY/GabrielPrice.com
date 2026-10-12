@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy · Gabriel Price</title>
+<meta name="description" content="What gabrielprice.com records about a visit, and how to turn it off.">
+<style>
+:root{--bg:#f6f4ff;--ink:#1b1830;--ink2:#5b5674;--link:#3b4cff;--rule:rgba(27,24,48,.12);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#110e1c;--ink:#ece8ff;--ink2:#a9a3c4;--link:#b18cff;--rule:rgba(177,140,255,.2);color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Atkinson Hyperlegible","Helvetica Neue",Arial,sans-serif}
+main{max-width:640px;margin:0 auto;padding:48px 16px 64px}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px}h2{font-size:17px;margin:32px 0 6px}
+p,li{color:var(--ink2)}a{color:var(--link)}ul{padding-left:20px}
+.small{font-size:13px}
+button{font:inherit;font-size:14px;padding:6px 12px;border-radius:8px;border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer}
+#done{margin-left:8px;font-size:14px}
+</style></head><body><main>
+<h1>Privacy</h1>
+<p>This site records how visitors move through it, so I can see which parts people read, where they stop, and where the page is slow on their device. Nothing is sold or shared, there are no ads, and no other company's trackers run here. <a href="/">Back to the site</a></p>
+
+<h2>What a visit records</h2>
+<ul>
+<li>Where you scroll, where the camera points, where the pointer or finger is, what you click, and the arrow or WASD keys while you drive a build. Nothing you type anywhere else.</li>
+<li>Your device as the browser reports it: type, model where offered, operating system, browser, screen and window size, CPU cores, memory, graphics chip, connection type, time zone, languages, and dark-mode and reduced-motion settings.</li>
+<li>How the page ran: frame rate, freezes, 3D crashes and load time.</li>
+<li>From the connection, as Cloudflare sees it: your IP address, network provider, and approximate location (country, region and city).</li>
+</ul>
+
+<h2>Returning visits</h2>
+<p>If you agree, or outside the EU, EEA, UK and Switzerland where the page doesn't need to ask, your browser keeps a random id (in local storage, not a cookie) for 13 months, so a second visit shows up as the same visitor. It identifies the device, not you, and it is never renewed. If you say no, or let the question fade, the page remembers that answer for the same time and doesn't ask again.</p>
+
+<h2>Where it goes and for how long</h2>
+<p>Visits are stored in this site's own storage at Cloudflare, which hosts it, and only I can see them. Each visit is deleted 90 days after it was recorded.</p>
+
+<h2>Turning it off</h2>
+<p>Browsers that send Global Privacy Control or Do Not Track are never recorded. You can also stop recording in this browser here, which also forgets its returning-visitor id:</p>
+<p><button type="button" id="off">Don't record my visits</button><span id="done" role="status"></span></p>
+<p class="small">The legal basis for the visit records is my legitimate interest in understanding and fixing the site; for the returning-visitor id outside the regions above it is the same, and inside them it is your consent. You can ask to see or delete what was recorded about you, or object to it, and you can complain to your data protection authority.</p>
+<p class="small" id="contact">Questions or requests: <!--CONTACT--></p>
+</main>
+<script>
+(() => {
+  const btn = document.getElementById('off'), done = document.getElementById('done');
+  const off = () => { try { return localStorage.getItem('flow-off') === '1'; } catch { return false; } };
+  const show = () => { if (off()) { btn.disabled = true; done.textContent = 'Visits from this browser are not recorded.'; } };
+  btn.onclick = () => { try { localStorage.setItem('flow-off', '1'); localStorage.removeItem('gp.vid'); } catch {} show(); };
+  show();
+})();
+</script>
+</body></html>

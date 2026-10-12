@@ -46,7 +46,14 @@ const num = (x) => typeof x === 'number' && Number.isFinite(x);
 const str = (x, n) => (typeof x === 'string' ? x.slice(0, n) : '');
 
 // ---------- ingest ----------
+// Where a returning-visitor id needs the visitor's consent before the page stores it: the EU, the rest of the EEA, the UK
+// and Switzerland. An unknown country (no country, Tor) asks too.
+const CONSENT = new Set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH'.split(' '));
+export const mustAsk = (cc) => !/^[A-Z]{2}$/.test(cc || '') || CONSENT.has(cc);
+
 export async function flowIngest(request, env, ctx, url) {
+  // the page asks once, before it would keep a visitor id, whether it has to ask the visitor first
+  if (request.method === 'GET') return new Response(JSON.stringify({ ask: mustAsk((request.cf || {}).country) }), { headers: { ...NO_STORE, 'content-type': 'application/json' } });
   if (request.method !== 'POST') return empty(405);
   // only this site's own pages: browsers always send Origin on a POST, and a page elsewhere can't fake it
   if (request.headers.get('origin') !== url.origin) return empty(403);
@@ -60,6 +67,9 @@ export async function flowIngest(request, env, ctx, url) {
   // test rigs and crawlers: the page already skips automated browsers (navigator.webdriver); this catches the ones that hide it
   if (BOT.test(request.headers.get('user-agent') || '')) return empty(204);
   if (!env.FLOW) return empty(204);
+  // an id kept without a yes, arriving from where a yes is needed (a visitor who travelled): don't link this visit
+  if (clean.vid && !clean.vc && mustAsk((request.cf || {}).country)) { delete clean.vid; delete clean.vn; }
+  delete clean.vc;
   if (clean.meta) {
     // where the visit came from, as Cloudflare sees it at the edge: country, region, city and the connecting IP
     const cf = request.cf || {};
@@ -99,6 +109,7 @@ export function checkBatch(b) {
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
   if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) { out.fps = Math.round(b.fps * 10) / 10; if (num(b.fms) && b.fms > 0 && b.fms <= 3600000) out.fms = Math.round(b.fms); }
   if (num(b.full) && b.full > 0 && b.full <= 3600000) out.full = Math.round(b.full);
+  if (/^[0-9a-f]{16}$/.test(b.vid)) { out.vid = b.vid; out.vn = Number.isInteger(b.vn) && b.vn > 0 && b.vn < 1e6 ? b.vn : 0; if (b.vc === 1) out.vc = 1; }   // returning visitor
   if (b.seq > 0) { const hw = checkHw(b.hw); if (hw) out.hw = hw; }   // the device, when the first batch left before it was read
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
@@ -191,6 +202,7 @@ export function summarise(c) {
   // batches (the loss is sent at once), so a batch can count -1 and the visit's sum is what matters
   const gl = c.events.filter((e) => e[1] === 'g').length - c.events.filter((e) => e[1] === 'r').length;
   if (gl) m.gl = String(gl);
+  if (c.vid) { m.vid = c.vid; m.vn = String(c.vn || 0); }
   const h = c.meta ? c.meta.hw : c.hw;
   if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(Math.max(h.full, c.full || 0)) });
   if (c.meta) {
@@ -276,6 +288,28 @@ async function listAll(env, prefix, meta, cap = 20) {
   return out;
 }
 
+// Visits are kept 90 days (the privacy page says so): a daily cron drops each day's folder once it is older than that.
+// Day folders only, so section layouts (layout/) and the leaderboards (lb/) stay.
+export const KEEP_DAYS = 90;
+export async function prune(env, now = Date.now()) {
+  if (!env.FLOW) return 0;
+  const cut = new Date(now - KEEP_DAYS * 864e5).toISOString().slice(0, 10);
+  let n = 0, cursor;
+  for (let i = 0; i < 20; i++) {
+    const r = await env.FLOW.list({ prefix: 'flow/', delimiter: '/', cursor });
+    for (const pre of r.delimitedPrefixes || []) {
+      const day = pre.slice(5, -1);
+      if (!DAY.test(day) || day >= cut) continue;
+      const objs = (await listAll(env, pre, false, 100)).map((o) => o.key);
+      for (let j = 0; j < objs.length; j += 1000) await env.FLOW.delete(objs.slice(j, j + 1000));
+      n += objs.length;
+    }
+    if (!r.truncated) break;
+    cursor = r.cursor;
+  }
+  return n;
+}
+
 export async function listSessions(env, days) {
   const today = Date.now(), byId = new Map();
   const dayList = Array.from({ length: days }, (_, i) => new Date(today - i * 864e5).toISOString().slice(0, 10));
@@ -296,6 +330,7 @@ export async function listSessions(env, days) {
       if (m.scr) { v.scr = m.scr; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; }
       if (m.fps) { const w = Math.max(1, Number(m.fms) || (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
       if (m.gl) v.gl = (v.gl || 0) + (Number(m.gl) || 0);
+      if (m.vid) { v.vid = m.vid; v.vn = Math.max(v.vn || 0, Number(m.vn) || 0); }
       if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
