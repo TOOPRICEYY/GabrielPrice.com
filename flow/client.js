@@ -22,7 +22,7 @@
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
 //          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
 //          orientation, CPU cores, memory, GPU, network, time zone, languages, reduced motion, and how long the 3D scene took
-//          to appear (load) and to finish loading every build (full). All of it is read once, in the first batch; each batch adds only its average frame rate (fps).
+//          to appear (load) and until the page's load event, when every file it asks for up front has arrived (full). All of it is read once, in the first batch; each batch adds only its average frame rate (fps).
 (() => {
   const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
@@ -49,6 +49,10 @@
   // saw); hidden time doesn't, since visibilitychange resets prevT
   let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
+  // the page's load event: every file it asks for up front has arrived (photos and clips load later, as they scroll in).
+  // The builds themselves are made in code when the scene comes up, so the scene's own time is `ready`.
+  if (document.readyState === 'complete') { try { full = Math.round(performance.getEntriesByType('navigation')[0].loadEventEnd) || 1; } catch { full = 1; } }
+  else addEventListener('load', () => { full = Math.round(performance.now()); }, { once: true });
   // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
   // but answered long before the first batch goes out
   let hints = null;
@@ -73,7 +77,6 @@
     function sample(t) {
       if (t - lastT >= 1000 / HZ) {
         lastT = t;
-        if (!full && rig.rigs.ready) full = Math.round(performance.now());   // every build's model loaded
         const cam = rig.camera, p = cam.position, ui = rig.ui;
         cam.getWorldDirection(dir);
         // a mouse stays where it was left; a finger is only there while it touches (the page keeps the last touch point

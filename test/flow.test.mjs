@@ -81,7 +81,6 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /const free = \{ on: false/, 'free.on flag');
   assert.match(html, /section[^>]*data-s="0"/, 'sections carry data-s');
   assert.match(html, /<canvas id="stage"/, 'the WebGL canvas the recorder reads the GPU name from');
-  assert.match(html, /rigs\.ready = true/, 'rigs.ready, for the full load time');
 });
 
 test('a valid batch is stored under flow/<day>/<sid>/<seq> with a summary, unknown fields dropped', async () => {
