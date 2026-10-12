@@ -106,6 +106,22 @@ test('edits: saved to one PR, merged, then a fresh PR starts from what is live',
   assert.deepEqual(JSON.parse(F.file('site-edits', 'site-edits/edits.json')).edits, e3);
 });
 
+test('edits: Publish merges the open PR, and does nothing without one', async () => {
+  const e = { 's4.div1.h21': { key: 's4.div1.h21', tag: 'h2', fp: 'x', html: 'Published' } };
+  let r = await json(await call('/admin/api/edits', { method: 'PUT', body: { edits: e } }));
+  const n = r.body.pr.number;
+  assert.equal((await call('/admin/api/edits/publish')).status, 405, 'GET is refused');
+  assert.equal((await call('/admin/api/edits/publish', { method: 'POST', headers: { 'x-editor': '' } })).status, 403, 'cross-site is refused');
+  r = await json(await call('/admin/api/edits/publish', { method: 'POST' }));
+  assert.equal(r.status, 200); assert.equal(r.body.published, true); assert.equal(r.body.number, n);
+  assert.ok(F.issues.get(n).merged); assert.match(F.issues.get(n).mergeTitle, /^Publish site edits/);
+  assert.deepEqual(JSON.parse(F.file('main', 'site-edits/edits.json')).edits, e, 'the edits are on main');
+  r = await json(await call('/admin/api/edits'));
+  assert.equal(r.body.pr, null); assert.deepEqual(r.body.edits, e);
+  r = await json(await call('/admin/api/edits/publish', { method: 'POST' }));
+  assert.deepEqual(r.body, { published: false, pr: null }, 'nothing open, nothing merged');
+});
+
 test('edits: bad input is refused', async () => {
   for (const edits of [null, [], { 'bad id!': {} }, { ok: 'string' }]) {
     const r = await call('/admin/api/edits', { method: 'PUT', body: { edits } });

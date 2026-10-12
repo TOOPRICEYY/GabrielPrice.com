@@ -68,6 +68,12 @@ export async function startFakes({ owner = 'o', repo = 'r' } = {}) {
       const n = ++num, i = { number: n, pr: true, head: body.head, base: body.base, title: body.title, body: body.body, state: 'open', labels: [], comments: 0, html_url: `https://github.com/${full}/pull/${n}`, pull_request: {} };
       issues.set(n, i); return out(201, i);
     }
+    if ((mm = /^\/pulls\/(\d+)\/merge$/.exec(r)) && m === 'PUT') {
+      const i = issues.get(+mm[1]); if (!i || !i.pr) return out(404, { message: 'Not Found' });
+      if (i.state !== 'open') return out(405, { message: 'Pull Request is not mergeable' });
+      const c = newSha(); commits.set(c, new Map(filesOf(i.head))); refs.set(i.base, c); i.state = 'closed'; i.merged = true; i.mergeTitle = body.commit_title;
+      return out(200, { merged: true, sha: c });
+    }
     if (r === '/labels' && m === 'POST') { if (labels.has(body.name)) return out(422, { message: 'already_exists' }); labels.add(body.name); return out(201, { name: body.name }); }
     if (r === '/issues' && m === 'POST') {
       const n = ++num, i = { number: n, title: body.title, body: body.body, labels: body.labels || [], state: 'open', state_reason: null, comments: 0, html_url: `https://github.com/${full}/issues/${n}` };

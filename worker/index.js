@@ -7,11 +7,12 @@
 //   /admin/session          200 when signed in; the page's hidden door asks this before loading the editor
 //   /admin/editor-ui.js     the editor panel
 //   /admin/api/edits        GET / PUT the edits file (site-edits/edits.json on the site-edits PR)
+//   /admin/api/edits/publish  POST: merge that PR, which puts the edits on the live site after Cloudflare rebuilds
 //   /admin/api/notes        GET all, POST one (files a GitHub issue); PATCH /admin/api/notes/<issue> to edit, finish or remove
 //   /admin/api/shots/<id>   a note's snapshot
 
 import { accessEmail } from './access.js';
-import { getEdits, putEdits, checkEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
+import { getEdits, putEdits, checkEdits, publishEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
 import editorUi from './editor-ui.gen.js';
 
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
@@ -52,6 +53,10 @@ async function admin(request, env, url) {
       return send(await putEdits(env, b.edits, email.split('@')[0]));
     }
     return fail(405, 'GET or PUT');
+  }
+  if (p === '/admin/api/edits/publish') {
+    if (m !== 'POST') return fail(405, 'POST');
+    return send(await publishEdits(env, email.split('@')[0]));
   }
   if (p === '/admin/api/notes') {
     if (m === 'GET') return send(await listNotes(env));
