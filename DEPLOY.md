@@ -11,7 +11,7 @@ The site runs on Cloudflare as a Worker with static assets: the built page and p
 
 ## One-time setup
 
-You need four things: Cloudflare in charge of the domain, a deploy key for GitHub Actions, a login gate for `/admin`, and a GitHub token for the Worker.
+You need four things: Cloudflare in charge of the domain, a deploy key for GitHub Actions, a login gate for `/admin`, and a GitHub token for the Worker. Visitor analytics (section 6) adds one storage bucket.
 
 ### 1. Move gabrielprice.com to Cloudflare
 
@@ -55,8 +55,22 @@ If you have already connected the repo to Cloudflare's **Workers Builds** (Worke
 
 Open gabrielprice.com and click the top-left corner three times, quickly. Access asks for your email, then you land back on the page with the editor open. Retype a heading: within a couple of seconds "Saved, not published" shows, and a pull request appears in the repo. Press Publish, and the change is on the live site about a minute later. Pin a note: an issue labelled `site-note` appears.
 
+### 6. Turn on visitor analytics (R2 bucket)
+
+The site records how visitors move through it: how far they scroll, the time they spend on each section, and whether they drive the couch or the scooter. The page sends one small batch to `/api/flow` every 30 seconds and when the visitor leaves. The Worker stores the batches in a Cloudflare R2 bucket. Nothing goes to GitHub, because the repo is public. `flow/README.md` explains what is recorded and why it doesn't slow the page down.
+
+**Do steps 1 and 2 before the analytics pull request merges.** `wrangler.jsonc` binds the bucket `gabrielprice-flow`, and a deploy fails while that bucket doesn't exist. If a deploy has already failed, the previous version stays live: create the bucket, then re-run the deploy (Actions → Deploy → Run workflow, or **Retry build** in Workers Builds).
+
+1. In the Cloudflare dashboard, open **R2 Object Storage**. The first time, Cloudflare asks you to turn R2 on and add a payment card. The free tier (10 GB stored, 1 million writes a month) is far more than this site needs, so nothing is charged at normal traffic.
+2. Choose **Create bucket**, name it exactly `gabrielprice-flow`, leave the location on Automatic, and create it.
+3. Recommended: in the bucket, open **Settings → Object lifecycle rules → Add rule**. Set the prefix to `flow/` and delete objects 90 days after upload, so old visits clean themselves up.
+4. After the next deploy, open **gabrielprice.com/admin/flow**. Access asks you to sign in, the same way as for the editor. The page shows the share of visits that reached each section, the average time on each section, and a list of visits. Each visit has a **Replay** link that plays it back in the live 3D scene. Opening `/admin/flow` also marks that browser so your own visits aren't recorded. Open it once on each device you browse the site from.
+
+Visitors with Global Privacy Control or Do Not Track turned on are never recorded. The page sets no cookies. The Worker stores a visitor's country, screen size, language, the site they came from, and whether they're on a phone; it never stores IP addresses. Whether you need a privacy notice for this depends on where your visitors are.
+
 ## Day to day
 
 - `npm ci`, then `npm run build` writes `dist/` and the editor bundle, and `npm test` checks the build and the Worker against a fake GitHub and a fake Access.
 - `npm run dev` serves the site locally with wrangler. To use the editor locally without Access, create a `.dev.vars` file containing `DEV_NO_AUTH=1` plus a `GITHUB_TOKEN`. The bypass only works on localhost.
+- Analytics: `/admin/flow` reads straight from the bucket, so nothing needs maintaining. Locally, `npm run dev` uses a local, empty stand-in bucket.
 - Rotating the GitHub token or adding an editor only means changing a Worker secret. No deploy is needed.

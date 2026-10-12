@@ -16,6 +16,7 @@ dist/
 /index.html
 /artifact.html
 worker/editor-ui.gen.js
+worker/sections.gen.js
 
 # Raw Fusion 360 exports and their archives: inputs to src/pack*.py, kept on this Mac, not needed to build the site.
 # Delete a line here if you want that folder versioned too.

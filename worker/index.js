@@ -10,10 +10,13 @@
 //   /admin/api/edits/publish  POST: merge that PR, which puts the edits on the live site after Cloudflare rebuilds
 //   /admin/api/notes        GET all, POST one (files a GitHub issue); PATCH /admin/api/notes/<issue> to edit, finish or remove
 //   /admin/api/shots/<id>   a note's snapshot
+//   /admin/flow, /admin/api/flow/*   visitor flow dashboard and replays (worker/flow.js)
+//   /api/flow               public: visitors' pages post flow batches here (worker/flow.js)
 
 import { accessEmail } from './access.js';
 import { getEdits, putEdits, checkEdits, publishEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
 import editorUi from './editor-ui.gen.js';
+import { flowIngest, flowAdmin } from './flow.js';
 
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
@@ -43,6 +46,7 @@ async function admin(request, env, url) {
     return new Response(null, { status: 302, headers: { ...NO_STORE, location: safe + '#edit' } });
   }
   if (p === '/admin/session') return send({ ok: true, email });
+  if (p === '/admin/flow' || p === '/admin/flow/' || p.startsWith('/admin/api/flow/')) return flowAdmin(request, env, url);
   if (p === '/admin/editor-ui.js') return new Response(editorUi, { headers: { ...NO_STORE, 'content-type': 'text/javascript; charset=utf-8' } });
 
   if (p === '/admin/api/edits') {
@@ -84,7 +88,7 @@ async function admin(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.hostname.startsWith('www.')) return Response.redirect(url.protocol + '//' + url.hostname.slice(4) + url.pathname + url.search, 301);
     if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
@@ -95,6 +99,9 @@ export default {
         if (status >= 500) console.error(e);
         return fail(status === 401 || status === 403 ? 502 : status, e.message || 'error');   // a GitHub 401/403 means the token, not the visitor
       }
+    }
+    if (url.pathname === '/api/flow') {
+      try { return await flowIngest(request, env, ctx, url); } catch (e) { console.error(e); return new Response(null, { status: 500 }); }
     }
     return env.ASSETS.fetch(request);
   },

@@ -10,7 +10,7 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/admin", "/admin/*"]
+    "run_worker_first": ["/admin", "/admin/*", "/api/*"]
   },
   // the live domain; both need gabrielprice.com's nameservers moved to Cloudflare first
   "routes": [
@@ -20,6 +20,10 @@
   // every pull request gets a preview link at a workers.dev address; the editor stays locked there (no Access login)
   "workers_dev": true,
   "preview_urls": true,
+  // visitor flow analytics (worker/flow.js). Create the bucket before deploying: DEPLOY.md, section 6.
+  "r2_buckets": [
+    { "binding": "FLOW", "bucket_name": "gabrielprice-flow" }
+  ],
   "vars": {
     "GITHUB_REPO": "TOOPRICEYY/GabrielPrice.com"
   },
