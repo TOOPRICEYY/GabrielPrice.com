@@ -64,7 +64,7 @@
       if (prevT && t - prevT < 1000) { frames++; frameMs += t - prevT; }
       // a stall: the page drew nothing for a quarter second or more while visible. The phone kept scrolling (it scrolls
       // off the main thread) but no sample could be taken, so the replay holds still there; this marks why.
-      if (prevT && t - prevT >= 250 && t - prevT < 10000 && stalls < 40 && document.visibilityState === 'visible') { stalls++; events.push([now(), 'l', Math.round(t - prevT)]); }
+      if (prevT && t - prevT >= 250 && stalls < 40 && document.visibilityState === 'visible') { stalls++; events.push([now(), 'l', Math.min(600000, Math.round(t - prevT))]); }
       prevT = t;
       try { sample(t); } catch (err) { fail(err); return; }
       requestAnimationFrame(tick);
