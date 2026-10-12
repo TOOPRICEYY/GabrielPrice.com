@@ -43,7 +43,7 @@ async function post(body, { origin = ORIGIN, e = env, ua = '' } = {}) {
     method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
     headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}), ...(ua ? { 'user-agent': ua } : {}) },
   });
-  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit' } });   // what Cloudflare's edge attaches
+  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit', asOrganization: 'Comcast Cable' } });   // what Cloudflare's edge attaches
   const r = await worker.fetch(req, e, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   return r;
@@ -80,6 +80,8 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /Array\.isArray\(window\.__cam\)/, 'window.__cam camera override');
   assert.match(html, /const free = \{ on: false/, 'free.on flag');
   assert.match(html, /section[^>]*data-s="0"/, 'sections carry data-s');
+  assert.match(html, /<canvas id="stage"/, 'the WebGL canvas the recorder reads the GPU name from');
+  assert.match(html, /rigs\.ready = true/, 'rigs.ready, for the full load time');
 });
 
 test('a valid batch is stored under flow/<day>/<sid>/<seq> with a summary, unknown fields dropped', async () => {
@@ -237,6 +239,31 @@ test('each visit records its device type, model, OS and browser', async () => {
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
   assert.deepEqual([v.dev, v.model, v.os, v.browser], ['phone', 'Pixel 8', 'Android 14', 'Chrome 129']);
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /getHighEntropyValues\(\['model', 'platformVersion'\]\)/);
+});
+
+test('each visit records its hardware, network, frame rate and load time, within the summary\'s size limit', async () => {
+  const sid = 'eeeeeeeeeeeeeeee';
+  const hw = { sw: 390, sh: 844, orient: 'portrait-primary', cores: 6, mem: 4, tp: 5, gpu: 'Apple GPU', net: '4g', down: 9.5, rtt: 50, save: false,
+    tz: 'America/Detroit', langs: 'en-US,en', motion: false, load: 2140, full: 6310, extra: 'dropped' };
+  await post(batch({ sid, fps: 58.7, meta: { ...batch().meta, hw } }));
+  await post(batch({ sid, seq: 1, meta: undefined, fps: 30.1, samples: [sample(30000, 2), sample(60000, 3)] }));
+  const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
+  assert.equal(st.fps, 58.7); assert.equal(st.meta.hw.gpu, 'Apple GPU'); assert.equal(st.meta.hw.extra, undefined); assert.equal(st.meta.isp, 'Comcast Cable');
+  const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  assert.deepEqual([v.scr, v.dpr, v.cores, v.mem, v.gpu, v.net, v.tz, v.load, v.full, v.isp], ['390x844', '2', 6, 4, 'Apple GPU', '4g', 'America/Detroit', 2140, 6310, 'Comcast Cable']);
+  assert.ok(v.fps > 30.1 && v.fps < 58.7, 'frame rate averages the batches by their length'); assert.equal(v.fpsSum, undefined);
+  // junk is dropped, not stored
+  const bad = checkBatch(batch({ fps: 'fast', meta: { ...batch().meta, hw: { cores: -1, mem: 1e9, gpu: 42, load: 'x' } } }));
+  assert.equal(bad.fps, undefined); assert.deepEqual([bad.meta.hw.cores, bad.meta.hw.mem, bad.meta.hw.gpu, bad.meta.hw.load], [0, 0, '', 0]);
+  // every string at its longest still fits R2's 2 KB of custom metadata
+  const long = (n) => 'x'.repeat(n);
+  const max = checkBatch(batch({ fps: 59.9, samples: Array.from({ length: 40 }, (_, i) => sample(i * 2000, i)), meta: { ...batch().meta, ref: long(200), lang: long(20),
+    hw: { ...hw, gpu: long(300), tz: long(100), net: long(20), langs: long(200) } } }));
+  Object.assign(max.meta, { cc: 'US', region: long(40), city: long(40), ip: long(45), isp: long(60), os: long(40), browser: long(40), model: long(40), dev: 'desktop' });
+  const bytes = Object.entries(summarise(max)).reduce((a, [k, x]) => a + Buffer.byteLength(k) + Buffer.byteLength(x), 0);
+  assert.ok(bytes < 2048, `summary is ${bytes} bytes`);
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /requestIdleCallback/, 'the device is read when the browser is idle, not in a frame');
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {

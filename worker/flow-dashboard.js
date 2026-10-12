@@ -34,7 +34,7 @@ button.del{border-color:#d9534f;color:#c9302c}button.del:disabled{opacity:.45;bo
 <div class="tiles" id="tiles"></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
-<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>OS</th><th>Browser</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>OS</th><th>Browser</th><th>Size</th><th>Hardware</th><th>GPU</th><th>Network</th><th class="n">FPS</th><th class="n">Load (s)</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </main><script>
 try { localStorage.setItem('flow-off', '1'); } catch (e) {}
 const $ = (id) => document.getElementById(id);
@@ -42,6 +42,9 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': 
 const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
 let data = null, shown = [], last = -1;
 const fam = (s) => String(s.os || '').split(' ')[0];
+// "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)" -> "NVIDIA GeForce RTX 3060"
+const gpuName = (g) => { const m = /^ANGLE \\([^,]*, (?:ANGLE Metal Renderer: )?(.+?)(?: \\(0x[0-9a-f]+\\))?(?: Direct3D.*?)?(?: OpenGL.*?)?(?:, [^,]*)?\\)$/i.exec(g || ''); return m ? m[1] : g || ''; };
+const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
 const picked = new Set();   // keys of the ticked visits
 async function load() {
   $('status').textContent = 'Loading…';
@@ -70,6 +73,9 @@ function draw() {
   const end = V.filter((s) => s.maxS >= L(s).length - 1.5).length, errs = V.filter((s) => s.err > 0).length;
   const older = V.filter((s) => s.layout !== data.current.layout).length;
   const tiles = [[N, 'visits'], [N ? fmt(total / N) : '0:00', 'average length'], [N ? Math.round(100 * end / N) + '%' : '–', 'reached the end'], [N ? Math.round(100 * drove / N) + '%' : '–', 'drove the couch or scooter']];
+  const fps = median(V.map((s) => s.fps || 0)), load = median(V.map((s) => s.load || 0));
+  if (fps) tiles.push([(fps < 30 ? '<span class="warn">' + fps.toFixed(0) + '</span>' : fps.toFixed(0)) + ' fps', 'median frame rate']);
+  if (load) tiles.push([(load / 1000).toFixed(1) + ' s', 'median time until the 3D scene is up']);
   if (older) tiles.push([older, 'on an older version']);
   if (errs) tiles.push(['<span class="warn">' + errs + '</span>', 'stopped recording early (the page changed what the recorder reads)']);
   $('tiles').innerHTML = tiles.map(([b, s]) => '<div class="tile"><b>' + b + '</b><span>' + s + '</span></div>').join('');
@@ -88,7 +94,7 @@ function draw() {
   $('rows').innerHTML = V.slice(0, 300).map((s) => {
     const isOld = s.layout !== data.current.layout;
     const on = picked.has(s.key);
-    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : '') + '</td><td>' + esc(s.os || '') + '</td><td>' + esc(s.browser || '') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
+    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : '') + '</td><td>' + esc(s.os || '') + '</td><td>' + esc(s.browser || '') + '</td><td title="' + esc(s.scr ? 'Screen ' + s.scr + (s.dpr ? ' at ' + s.dpr + 'x' : '') : '') + '">' + esc(s.size || '') + '</td><td>' + esc([s.cores ? s.cores + ' cores' : '', s.mem ? s.mem + ' GB' : ''].filter(Boolean).join(' · ')) + '</td><td title="' + esc(s.gpu || '') + '" style="max-width:14em;overflow:hidden;text-overflow:ellipsis">' + esc(gpuName(s.gpu)) + '</td><td title="' + esc(s.tz || '') + '">' + esc([s.net, s.isp].filter(Boolean).join(' · ')) + '</td><td class="n">' + (s.fps ? (s.fps < 30 ? '<span class="warn">' + s.fps.toFixed(0) + '</span>' : s.fps.toFixed(0)) : '') + '</td><td class="n" title="' + (s.full ? 'Every build loaded at ' + (s.full / 1000).toFixed(1) + ' s' : '') + '">' + (s.load ? (s.load / 1000).toFixed(1) : '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
   }).join('');
   ticks();
 }

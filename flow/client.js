@@ -19,7 +19,9 @@
 //          h tab hidden, z resize (w, h), e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
-//          the Worker reads the device type, OS and browser from the user agent itself.
+//          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
+//          orientation, CPU cores, memory, GPU, network, time zone, languages, reduced motion, and how long the 3D scene took
+//          to appear (load) and to finish loading every build (full). All of it is read once, in the first batch; each batch adds only its average frame rate (fps).
 (() => {
   const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
@@ -41,7 +43,9 @@
   const sid = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
-  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false;
+  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, ready = 0, full = 0;
+  // frame rate: frames and visible time since the last batch (a gap over 1 s is a hidden tab or a stall, not counted)
+  let frames = 0, frameMs = 0, prevT = 0;
   const now = () => Math.round(performance.now() - t0);
   // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
   // but answered long before the first batch goes out
@@ -50,14 +54,21 @@
 
   waitRig((rig) => {
     const dir = new rig.THREE.Vector3();
+    // read when the browser is idle, so it never lands in a frame
+    ready = performance.now();
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 2000));
+    idle(() => { try { hw = device(); } catch {} }, { timeout: 5000 });
     function tick(t) {
       if (stopped) return;
+      if (prevT && t - prevT < 1000) { frames++; frameMs += t - prevT; }
+      prevT = t;
       try { sample(t); } catch (err) { fail(err); return; }
       requestAnimationFrame(tick);
     }
     function sample(t) {
       if (t - lastT >= 1000 / HZ) {
         lastT = t;
+        if (!full && rig.rigs.ready) full = Math.round(performance.now());   // every build's model loaded
         const cam = rig.camera, p = cam.position, ui = rig.ui;
         cam.getWorldDirection(dir);
         const live = ui.ptr && performance.now() - ui.ptrT < 4000;
@@ -108,14 +119,33 @@
     lastFlush = performance.now();
     if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0)) return;
     const o = { sid, seq, day, samples, events };
+    if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
+    if (frameMs > 0) o.fps = Math.round(frames * 10000 / frameMs) / 10;
+    frames = 0; frameMs = 0;
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
       lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
-      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}) };
+      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}), ...(hw ? { hw: { ...hw, load: Math.round(ready), full } } : {}) };
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing
     const blob = new Blob([body], { type: 'text/plain' });
     if (!(navigator.sendBeacon && navigator.sendBeacon('/api/flow', blob))) fetch('/api/flow', { method: 'POST', body: blob, keepalive: true }).catch(() => {});
+  }
+  // the visitor's device, read once when the scene is up: plain property reads, no new contexts or requests. The GPU name
+  // comes from the page's own WebGL canvas (#stage), whose context already exists, so asking for it creates nothing.
+  function device() {
+    const n = navigator, c = n.connection || {}, sc = screen || {};
+    let gpu = '';
+    try {
+      const cv = document.getElementById('stage'), gl = cv && (cv.getContext('webgl2') || cv.getContext('webgl'));
+      // Firefox logs a deprecation warning for the extension, and its plain RENDERER already names the GPU
+      if (gl) { const x = /Firefox/.test(n.userAgent) ? null : gl.getExtension('WEBGL_debug_renderer_info'); gpu = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || ''); }
+    } catch {}
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+    return { sw: sc.width || 0, sh: sc.height || 0, orient: (sc.orientation && sc.orientation.type) || '', cores: n.hardwareConcurrency || 0,
+      mem: n.deviceMemory || 0, tp: n.maxTouchPoints || 0, gpu: gpu.slice(0, 100), net: c.effectiveType || '', down: c.downlink || 0, rtt: c.rtt || 0,
+      save: c.saveData === true, tz, langs: (n.languages || []).slice(0, 4).join(','), motion: matchMedia('(prefers-reduced-motion: reduce)').matches };
   }
   function refHost() { try { const u = new URL(document.referrer); return u.host === location.host ? '' : u.host.slice(0, 80); } catch { return ''; } }
 

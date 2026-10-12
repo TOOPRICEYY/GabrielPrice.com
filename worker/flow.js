@@ -60,6 +60,7 @@ export async function flowIngest(request, env, ctx, url) {
     const cf = request.cf || {};
     clean.meta.cc = str(cf.country, 2); clean.meta.region = str(cf.region, 40); clean.meta.city = str(cf.city, 40);
     clean.meta.ip = str(request.headers.get('cf-connecting-ip'), 45);
+    clean.meta.isp = str(cf.asOrganization, 60);   // the network: a mobile carrier, a home ISP, a university
     const ua = request.headers.get('user-agent') || '';
     clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(ua);
     Object.assign(clean.meta, device(ua, clean.meta.ch, clean.meta.touch));
@@ -91,15 +92,26 @@ export function checkBatch(b) {
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
+  if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) out.fps = Math.round(b.fps * 10) / 10;
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
     out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true,
       lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true,
       v: /^\w{1,12}$/.test(m.v) ? m.v : '', layout: LAYOUT.test(m.layout) ? m.layout : '' };
+    const hw = checkHw(m.hw); if (hw) out.meta.hw = hw;
     if (m.ch && typeof m.ch === 'object') out.meta.ch = { model: str(m.ch.model, 40), pv: str(m.ch.pv, 20) };
     if (out.meta.layout && Array.isArray(m.sections) && m.sections.length <= 80 && m.sections.every((x) => typeof x === 'string' && x.length <= 80)) out.meta.sections = m.sections;
   }
   return out;
+}
+
+// the device details the page reads once (flow/client.js device()): known fields only, numbers in range, strings trimmed
+function checkHw(h) {
+  if (!h || typeof h !== 'object') return null;
+  const n = (x, max) => (num(x) && x >= 0 && x <= max ? Math.round(x * 100) / 100 : 0);
+  return { sw: n(h.sw, 20000), sh: n(h.sh, 20000), orient: str(h.orient, 20), cores: n(h.cores, 1024), mem: n(h.mem, 1024), tp: n(h.tp, 64),
+    gpu: str(h.gpu, 100), net: str(h.net, 8), down: n(h.down, 10000), rtt: n(h.rtt, 60000), save: h.save === true, tz: str(h.tz, 40),
+    langs: str(h.langs, 60), motion: h.motion === true, load: n(h.load, 600000), full: n(h.full, 3600000) };
 }
 
 // What the visitor was on, from the user agent plus the page's client hints (ch: model and OS version, Chromium only):
@@ -165,12 +177,14 @@ export function summarise(c) {
   const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(S.length ? S[S.length - 1][0] : 0),
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
     dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
-    err: String(c.events.filter((e) => e[1] === 'e').length) };
+    err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}) };
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
-    m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || '';
-    m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
+    m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || ''; m.isp = c.meta.isp || '';
+    const h = c.meta.hw;
+    if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(h.full) });
+    m.size = c.meta.w + 'x' + c.meta.h; m.dpr = String(c.meta.dpr); m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
   return m;
 }
@@ -263,13 +277,14 @@ export async function listSessions(env, days) {
       v.ms = Math.max(v.ms, Number(m.t1) || 0);
       v.maxS = Math.max(v.maxS, Number(m.maxS) || 0);
       v.err = (v.err || 0) + (Number(m.err) || 0);
+      if (m.fps) { const w = Math.max(1, (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.scr = m.scr || ''; v.dpr = m.dpr || ''; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; v.full = Number(m.full) || 0; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }
-  return [...byId.values()].sort((a, b) => String(b.start || b.day).localeCompare(String(a.start || a.day)));
+  return [...byId.values()].map(({ fpsSum, fpsW, ...v }) => v).sort((a, b) => String(b.start || b.day).localeCompare(String(a.start || a.day)));
 }
 
 // store a layout's section titles once, only if they hash to the name the page gave them
