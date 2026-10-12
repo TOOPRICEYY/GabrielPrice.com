@@ -1144,7 +1144,7 @@ function tipFrame(Co, dt, show, hud) {
     document.body.appendChild(el); el.tipN = -1;
   }
   el.style.opacity = show ? 1 : 0; if (!show) return;
-  el.style.left = (innerWidth >= 720 ? 460 + (innerWidth - 460) / 2 : innerWidth / 2) + 'px';
+  el.style.left = (innerWidth > 720 ? 460 + (innerWidth - 460) / 2 : innerWidth / 2) + 'px';
   Co.tutT += dt;
   if (Co.tut < TIPS.length && TIPS[Co.tut][1](Co, Co.tutT)) { Co.tut++; Co.tutT = 0; }
   if (el.tipN !== Co.tut) { el.tipN = Co.tut; el.firstChild.innerHTML = Co.tut < TIPS.length ? TIPS[Co.tut][0] : ''; el.firstChild.style.display = Co.tut < TIPS.length ? '' : 'none'; }
@@ -1241,7 +1241,7 @@ function couchFrame(s, dt, w) {
     // shake while sliding hard, from a few sines so it reads as rumble rather than jitter
     const sh = clamp01((Math.abs(Co.slip) - 6 * RD) / (30 * RD)) * spd01 * 6, Tc = clock.elapsedTime;
     C.p.x += sh * Math.sin(Tc * 37.1) * Math.cos(Tc * 13.3); C.p.y += sh * .7 * Math.sin(Tc * 41.7 + 1); C.t.y += sh * .4 * Math.sin(Tc * 29.3 + 2);
-    if (innerWidth >= 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
+    if (innerWidth > 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
   { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); tipFrame(Co, dt, wc > .5, driftHud(Co, dt) + courseFrame(Co, dt, wc)); }

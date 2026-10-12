@@ -1014,8 +1014,8 @@ const _sh = new THREE.Vector3(), _p1 = new THREE.Vector3(), _p2 = new THREE.Vect
 function keyWorld(k, P, T) {
   P.set(...k[1]); T.set(...k[2]); if (k[3]) { P.add(devAnchor); T.add(devAnchor); }
   // k[4]: sideways pan in cm on wide screens, so the subject clears the card (positive = subject right of centre)
-  if (k[4] && innerWidth >= 720) { const f = _sh.copy(T).sub(P); f.set(-f.z, 0, f.x).normalize().multiplyScalar(-k[4]); P.add(f); T.add(f); }
-  else if (innerWidth < 720 && (k[4] || k[3])) {
+  if (k[4] && innerWidth > 720) { const f = _sh.copy(T).sub(P); f.set(-f.z, 0, f.x).normalize().multiplyScalar(-k[4]); P.add(f); T.add(f); }
+  else if (innerWidth <= 720 && (k[4] || k[3])) {
     // phones: the view is ~2.4x narrower than on a laptop, so back off (close-ups more), and drop the device close-ups' sideways
     // card-clearing offset (the card is at the bottom); the view offset in the frame loop lifts the subject above the docked card
     if (k[3]) { P.z -= k[2][2]; T.z -= k[2][2]; }
@@ -1082,7 +1082,7 @@ function readScroll() {
 // phones: a docked card fades out as it scrolls up off its dock, so it never sits over the 3D view for long
 const sheets = [...document.querySelectorAll('main > section:not(.hero):not(.drive):not(.gallery) > .card')];
 function fadeSheets() {
-  const ph = innerWidth < 720, H = innerHeight;
+  const ph = innerWidth <= 720, H = innerHeight;
   for (const c of sheets) {
     if (!ph) { if (c.style.opacity) { c.style.opacity = ''; c.style.pointerEvents = ''; } continue; }
     const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - 14 - r.height - r.top) / (H * .28)));
@@ -1096,7 +1096,7 @@ function resize() {
   camVO = -1;
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
-  camera.fov = w < 720 ? 42 : 30; camera.updateProjectionMatrix();
+  camera.fov = w <= 720 ? 42 : 30; camera.updateProjectionMatrix();
 }
 addEventListener('resize', () => { resize(); readScroll(); fadeSheets(); });
 
@@ -1135,9 +1135,9 @@ function frame() {
   if (kicker.ready) { figure.updateMatrixWorld(true); kicker.parts.housing.m.localToWorld(devAnchor.copy(kicker.parts.housing.c)); }
   applyCam(s);
   if (rigs.chase && rigs.chase.w > 0) { camPos.lerp(rigs.chase.p, rigs.chase.w); camTgt.lerp(rigs.chase.t, rigs.chase.w); }   // third-person drive (couch)
-  { const fv = (innerWidth < 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
+  { const fv = (innerWidth <= 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
   { // phones: the card docks over the bottom half, so shift the picture up: the subject sits ~28% down the screen (none in the hero or the drive)
-    const vo = innerWidth < 720 ? .25 * smooth(seg(s, .5, 1)) * (1 - (rigs.chase ? rigs.chase.w : 0)) : 0;
+    const vo = innerWidth <= 720 ? .25 * smooth(seg(s, .5, 1)) * (1 - (rigs.chase ? rigs.chase.w : 0)) : 0;
     if (Math.abs(vo - camVO) > 1e-4) { camVO = vo; if (vo) camera.setViewOffset(innerWidth, innerHeight, 0, vo * innerHeight, innerWidth, innerHeight); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
   }
   if (free.on && !free.back) {

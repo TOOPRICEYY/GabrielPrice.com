@@ -400,7 +400,7 @@ scroller.addEventListener('scroll', () => {
   let t = 0; if (mid > cs[0]) { t = cs.length - 1; for (let i = 0; i < cs.length - 1; i++) if (mid <= cs[i + 1]) { t = i + (mid - cs[i]) / (cs[i + 1] - cs[i]); break; } }
   tT = t; if (userCam) { userCam = false; fromCamera(); }   // scrolling eases the camera back onto the path
 }, { passive: true });
-function resize() { if (!renderer) return; const w = ov.clientWidth, h = ov.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < 720 ? 40 : 30; camera.updateProjectionMatrix(); }
+function resize() { if (!renderer) return; const w = ov.clientWidth, h = ov.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w <= 720 ? 40 : 30; camera.updateProjectionMatrix(); }
 addEventListener('resize', () => open && resize());
 
 // camera path: key per chapter, lerped by scroll, and eased so a jump in scroll is not a jump in view
@@ -415,7 +415,7 @@ function fromCamera() {
   cur.az = THREE.MathUtils.radToDeg(Math.atan2(v.x, v.z)) - spinAz; cur.el = THREE.MathUtils.radToDeg(Math.asin(v.y / v.length())); cur.d = v.length() / (M.R + (M.Rx - M.R) * M.ex);
 }
 function placeCam(k, dt) {
-  const narrow = ov.clientWidth < 720, e = 1 - Math.pow(.02, dt);
+  const narrow = ov.clientWidth <= 720, e = 1 - Math.pow(.02, dt);
   let daz = k.az - cur.az; daz = ((daz + 540) % 360) - 180;
   cur.az += daz * e; cur.el += (k.el - cur.el) * e; cur.d += (k.d * (narrow ? 1.3 : 1) - cur.d) * e; cur.pan += (k.pan - cur.pan) * e;
   spinAz += k.spin * dt * 12;
