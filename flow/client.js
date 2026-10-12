@@ -5,6 +5,7 @@
 // pointer, drive keys) and keep a sample when anything changed. Batches go to POST /api/flow every 30 s and when the tab
 // is hidden or closed. No listeners on scroll or pointer (the page tracks both already), no DOM observation, no cookies.
 // Measured cost: about 4 µs per sample, so well under 0.001 ms per frame (see flow/README.md).
+// The only listeners are a click, a video play, resizes, tab hiding, and a finger counter on touch start and end.
 // Skipped for Global Privacy Control / Do Not Track, automated browsers, and the owner (opening /admin/flow sets
 // localStorage "flow-off").
 //
@@ -16,7 +17,7 @@
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h), e capture error (message). The first batch's meta carries the site version and its
+//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
 //          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
@@ -45,7 +46,7 @@
   const t0 = performance.now();
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, ready = 0, full = 0;
   // frame rate: frames and visible time since the last batch (a gap over 1 s is a hidden tab or a stall, not counted)
-  let frames = 0, frameMs = 0, prevT = 0;
+  let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
   // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
   // but answered long before the first batch goes out
@@ -61,6 +62,9 @@
     function tick(t) {
       if (stopped) return;
       if (prevT && t - prevT < 1000) { frames++; frameMs += t - prevT; }
+      // a stall: the page drew nothing for a quarter second or more while visible. The phone kept scrolling (it scrolls
+      // off the main thread) but no sample could be taken, so the replay holds still there; this marks why.
+      if (prevT && t - prevT >= 250 && t - prevT < 10000 && stalls < 40 && document.visibilityState === 'visible') { stalls++; events.push([now(), 'l', Math.round(t - prevT)]); }
       prevT = t;
       try { sample(t); } catch (err) { fail(err); return; }
       requestAnimationFrame(tick);
@@ -71,7 +75,9 @@
         if (!full && rig.rigs.ready) full = Math.round(performance.now());   // every build's model loaded
         const cam = rig.camera, p = cam.position, ui = rig.ui;
         cam.getWorldDirection(dir);
-        const live = ui.ptr && performance.now() - ui.ptrT < 4000;
+        // a mouse stays where it was left; a finger is only there while it touches (the page keeps the last touch point
+        // for 4 s for its laser, which would read as a tap that never lifted)
+        const live = ui.ptr && performance.now() - ui.ptrT < 4000 && (fingers > 0 || !touchOnly);
         let keys = 0;
         const held = [rig.rigs.couch && rig.rigs.couch.keys, rig.rigs.scooter && rig.rigs.scooter.keys];
         for (let i = 0; i < KEYS.length; i++) if (held.some((k) => k && k.has(KEYS[i]))) keys |= 1 << i;
@@ -95,6 +101,11 @@
     flush();
   }
 
+  // fingers on the screen: one counter on touch start and end, nothing per move
+  let fingers = 0;
+  const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+  const fingersNow = (e) => { fingers = e.touches.length; };
+  for (const t of ['touchstart', 'touchend', 'touchcancel']) document.addEventListener(t, fingersNow, { capture: true, passive: true });
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element ? e.target : null;
     const hit = el && el.closest('button, a, summary, figure, [role=button], input, label');
@@ -121,9 +132,9 @@
     const o = { sid, seq, day, samples, events };
     if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
     if (frameMs > 0) o.fps = Math.round(frames * 10000 / frameMs) / 10;
-    frames = 0; frameMs = 0;
+    frames = 0; frameMs = 0; stalls = 0;
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
-      lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
+      fg: true, lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
       v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}), ...(hw ? { hw: { ...hw, load: Math.round(ready), full } } : {}) };
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
@@ -219,19 +230,21 @@
       + 'box-shadow:0 0 0 3px rgba(255,61,127,.35);pointer-events:none;display:none';
     document.body.appendChild(dot);
     hud.innerHTML = '<button type="button" data-a="play">Pause</button><button type="button" data-a="speed">1×</button>'
-      + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span>'
+      + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span><span data-a="stall" style="color:#ffd27d"></span>'
       + '<span style="opacity:.7">' + (rec.meta ? [rec.meta.model, rec.meta.os, rec.meta.browser].filter(Boolean).map((x) => String(x).replace(/[&<>"]/g, '')).concat((rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h).join(' · ') : '') + '</span>'
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
-    const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]');
-    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0;
+    const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
+    let stallUntil = 0;
+    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9;
+    const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
-    let C = centers(); addEventListener('resize', () => { C = centers(); });
+    let C = centers();
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
     const lerp = (a, b, k) => a + (b - a) * k;
     function step(t) {
@@ -243,12 +256,15 @@
       // hold a until then and move only over that last tick (a fling after a pause is a jump, not a slow drift)
       const a = S[i], b = S[Math.min(i + 1, S.length - 1)], ta = Math.max(a[0], b[0] - 1000 / HZ);
       const k = b[0] > ta ? Math.max(0, Math.min(1, (head - ta) / (b[0] - ta))) : 0;
+      C = centers();   // photos and clips loading move the sections; the page measures them on every scroll too
       const s = mapS(lerp(a[1], b[1], k)), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
       rig.setS(s);
       window.__cam = [[lerp(a[6], b[6], k), lerp(a[7], b[7], k), lerp(a[8], b[8], k)], [lerp(a[9], b[9], k), lerp(a[10], b[10], k), lerp(a[11], b[11], k)]];
-      if (a[3] >= 0) {
+      // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
+      if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }
+      if (a[3] >= 0 && (!touch || fg || head - lastPT < 600)) {
         const x = a[3] * innerWidth, y = a[4] * innerHeight;
         rig.ui.ptr = { x, y }; rig.ui.ptrT = performance.now();
         dot.style.display = 'block'; dot.style.left = x + 'px'; dot.style.top = y + 'px';
@@ -260,8 +276,10 @@
       while (ei < E.length && E[ei][0] <= head) {
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
+        else if (E[ei][1] === 'l' && E[ei][2] >= 400) { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallUntil = E[ei][0] + 2500; }
         ei++;
       }
+      if (head > stallUntil || head < stallUntil - 3000) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);
     }

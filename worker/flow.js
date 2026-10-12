@@ -88,14 +88,14 @@ export function checkBatch(b) {
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l'].includes(e[1])) return null;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
   if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) out.fps = Math.round(b.fps * 10) / 10;
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
-    out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true,
+    out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true, fg: m.fg === true,
       lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true,
       v: /^\w{1,12}$/.test(m.v) ? m.v : '', layout: LAYOUT.test(m.layout) ? m.layout : '' };
     const hw = checkHw(m.hw); if (hw) out.meta.hw = hw;
@@ -178,6 +178,8 @@ export function summarise(c) {
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
     dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
     err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}) };
+  const st = c.events.filter((e) => e[1] === 'l' && num(e[2]));
+  if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
@@ -278,6 +280,7 @@ export async function listSessions(env, days) {
       v.maxS = Math.max(v.maxS, Number(m.maxS) || 0);
       v.err = (v.err || 0) + (Number(m.err) || 0);
       if (m.fps) { const w = Math.max(1, (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
+      if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
       if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.scr = m.scr || ''; v.dpr = m.dpr || ''; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; v.full = Number(m.full) || 0; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
