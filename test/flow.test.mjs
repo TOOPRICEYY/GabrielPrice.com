@@ -187,6 +187,7 @@ test('replays open in a frame sized to the visit, and the dashboard links there'
   const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
   assert.match(client, /__flowReplay/, 'the player looks for the frame host');
   assert.match(html, /get scale\(\)/, 'the host tells the frame how far it shrinks the visit');
+  assert.match(html, /e\[1\] === 'z'/, 'at the largest size the visit reaches, since the page reads the scale once');
   assert.match(client, /fewerPixels\(host\.scale\)/, 'a shrunk replay renders at a lower pixel ratio, so a desktop visit fits in a phone tab');
   assert.match(client, /defineProperty\(window, 'devicePixelRatio'/);
 });
