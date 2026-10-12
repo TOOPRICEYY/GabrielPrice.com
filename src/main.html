@@ -192,20 +192,6 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #tpad .tp-act { width: 88px; height: 88px; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
 #tpad .tp-drift { width: 72px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
 #tpad button[hidden] { display: none; }
-/* the couch on phones: the throttle lever on the left (with Drift under it), steering on the right */
-#tpad.couch { flex-direction: row-reverse; } #tpad.couch .tp-col { display: none; } #tpad.couch .tp-drift { width: 88px; height: 72px; }
-#tslide { position: fixed; z-index: 25; left: 14px; top: calc(max(34vh, 250px) + env(safe-area-inset-top, 0px)); bottom: calc(108px + env(safe-area-inset-bottom, 0px)); width: 76px;
-  border-radius: 38px; border: 1px solid color-mix(in srgb, var(--cobalt) 30%, transparent); background: color-mix(in srgb, var(--vellum) 22%, transparent);
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; opacity: .55; transition: opacity .2s; }
-#tslide[hidden] { display: none; } #tslide.on { opacity: .85; }
-#tslide .tk { position: absolute; left: 0; right: 0; text-align: center; font: 600 9px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); pointer-events: none; }
-#tslide .f { top: 8px; } #tslide .r { bottom: 8px; } #tslide .n { top: 50%; transform: translateY(-50%); left: auto; right: 4px; width: auto; font-size: 8px; }
-#tslide::after { content: ''; position: absolute; left: 14px; right: 18px; top: 50%; border-top: 1px dashed color-mix(in srgb, var(--graphite) 35%, transparent); pointer-events: none; }
-#tslide .fill { position: absolute; left: 33px; width: 10px; top: 50%; bottom: 50%; border-radius: 5px; background: linear-gradient(var(--neon), var(--cobalt)); opacity: .8; pointer-events: none; }
-#tslide.rev .fill { background: var(--sun); }
-#tslide .knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 44px; margin: -22px 0 0 -29px; border-radius: 22px; pointer-events: none;
-  background: color-mix(in srgb, var(--vellum) 70%, transparent); border: 2px solid var(--cobalt); box-shadow: 0 2px 10px color-mix(in srgb, var(--cobalt) 35%, transparent); }
-#tslide.rev .knob { border-color: var(--sun); }
 #tpad button.on { background: var(--cobalt); color: var(--vellum); transform: scale(.94); }
 @media (hover: none), (pointer: coarse) { section[data-s="12"] { padding-bottom: calc(8vh + 160px); } section.drive { padding-bottom: calc(12vh + 160px); padding-right: 16px; } }   /* the cards sit above the pad */
 /* lead clip: the card's main story, full card width */
@@ -594,7 +580,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
     <div class="card">
       <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars.</h2>
-      <p class="touchonly">Tap Play and it rides itself. Swipe left or right to change lanes, down to duck, tap to jump (again in the air for a double jump). Outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
+      <p class="touchonly">Tap Play and it rides itself. Swipe left or right to change lanes, down to duck, tap or swipe up to jump (again in the air for a double jump). Outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
       <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>D</kbd> to ride, <kbd>S</kbd> to duck, <kbd>Space</kbd> to hop, again in the air to double jump. Take over to play: outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
       <div class="jsonly" hidden><div class="readout" id="scRead"></div><div class="ctl">
         <label class="kbonly">Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
@@ -629,7 +615,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
       <div class="krow"><kbd class="wide" data-k=" ">Space</kbd><span>boost</span></div>
     </div>
     <p class="keyhint">Take the wheel. Drifting fills the boost bar. Or keep scrolling.</p>
-    <p class="keyhint touchonly">Slide the lever on the left for speed, steer with ◀ ▶. Drifting fills the boost bar; double-tap to fire it. Or keep scrolling.</p>
+    <p class="keyhint touchonly">Drive with the pad below. Drifting fills the boost bar; double-tap to fire it. Or keep scrolling.</p>
   </section>
 
   <section class="right" data-s="15">

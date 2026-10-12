@@ -863,7 +863,7 @@ function rigUI() {
   // a double tap (phones) or double click anywhere on the scene fires the couch's boost; buttons, cards and the board keep their clicks
   { let tp = null;
     addEventListener('pointerdown', (e) => {
-      if (!rigs.couchOn || (e.target.closest && e.target.closest('button, input, a, label, .card, #tpad, #tslide, #lboard, .viewbar, kbd'))) return;
+      if (!rigs.couchOn || (e.target.closest && e.target.closest('button, input, a, label, .card, #tpad, #lboard, .viewbar, kbd'))) return;
       const now = performance.now();
       if (tp && now - tp.t < 320 && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) < 50) { tp = null; if (couchBoost()) e.preventDefault(); }
       else tp = { t: now, x: e.clientX, y: e.clientY };
@@ -886,7 +886,7 @@ function rigUI() {
     const keys = (b) => b.dataset.k === ' ' ? [' '] : b.dataset.k.split(' ');
     const play = pad.querySelector('.tp-play');
     play.addEventListener('click', () => { const S = rigs.scooter; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
-    // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap to jump
+    // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap or swipe up to jump
     const sw = document.createElement('div'); sw.id = 'swipe'; sw.hidden = true; document.body.appendChild(sw); let t0 = null;
     sw.addEventListener('pointerdown', (e) => { e.preventDefault(); t0 = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, done: false }; sw.setPointerCapture?.(e.pointerId); });
     sw.addEventListener('pointermove', (e) => {
@@ -895,6 +895,7 @@ function rigUI() {
       t0.done = true; S.last = clock.elapsedTime;
       if (Math.abs(dx) > Math.abs(dy)) S.lane = Math.max(-1, Math.min(1, (S.lane || 0) + (dx < 0 ? 1 : -1)));   // swipe left = rider's left = +x
       else if (dy > 0) S.duckUntil = clock.elapsedTime + .9;
+      else { S.hop = true; S.hopHeld = true; clearTimeout(sw.ht); sw.ht = setTimeout(() => { S.hopHeld = false; }, 260); }   // swipe up: jump, like a tap
     });
     const end = (e) => {
       if (!t0 || e.pointerId !== t0.id) return; const S = rigs.scooter;
@@ -902,26 +903,6 @@ function rigUI() {
       t0 = null;
     };
     sw.addEventListener('pointerup', end); sw.addEventListener('pointercancel', (e) => { t0 = null; });
-    // the couch on phones: a throttle lever down the left edge (full ahead at the top, neutral in the middle, reverse at the
-    // bottom). Gas only while your thumb is on it: let go and it springs back to neutral. Drift, just under it, keeps the gas
-    // on by itself, so the left thumb slides down onto Drift for a slide while the right one steers.
-    const ts = document.createElement('div'); ts.id = 'tslide'; ts.hidden = true;
-    ts.setAttribute('role', 'slider'); ts.setAttribute('aria-label', 'Throttle'); ts.setAttribute('aria-valuemin', '-100'); ts.setAttribute('aria-valuemax', '100');
-    ts.innerHTML = '<span class="tk f">Full</span><span class="tk n">N</span><span class="tk r">R</span><i class="fill"></i><b class="knob"></b>';
-    document.body.appendChild(ts);
-    const tsSet = (v) => {
-      const Co = rigs.couch; v = Math.max(-1, Math.min(1, v)); if (Math.abs(v) < .08) v = 0; else if (Math.abs(v) > .9) v = Math.sign(v);   // clicks into neutral and the ends
-      if (Co.hold && v > .2 && !(Co.thrA > .2)) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); }   // waiting on the line after a lap: push it up to go again
-      Co.thrA = v; Co.last = Co.kLast = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive();
-      const y = (1 - v) / 2 * 100; ts.querySelector('.knob').style.top = y + '%';
-      const f = ts.querySelector('.fill'); f.style.top = Math.min(y, 50) + '%'; f.style.bottom = (100 - Math.max(y, 50)) + '%';
-      ts.classList.toggle('rev', v < 0); ts.setAttribute('aria-valuenow', Math.round(v * 100));
-    };
-    let tsId = null; const tsAt = (e) => { const r = ts.getBoundingClientRect(), pad = 22; return 1 - 2 * (e.clientY - r.top - pad) / (r.height - 2 * pad); };
-    ts.addEventListener('pointerdown', (e) => { e.preventDefault(); tsId = e.pointerId; ts.setPointerCapture?.(e.pointerId); ts.classList.add('on'); tsSet(tsAt(e)); });
-    ts.addEventListener('pointermove', (e) => { if (e.pointerId === tsId) tsSet(tsAt(e)); });
-    const tsUp = (e) => { if (e.pointerId === tsId) { tsId = null; ts.classList.remove('on'); tsSet(0); } };
-    ts.addEventListener('pointerup', tsUp); ts.addEventListener('pointercancel', tsUp); ts.addEventListener('contextmenu', e => e.preventDefault());
     for (const b of pad.querySelectorAll('button[data-k]')) {
       const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); for (const k of keys(b)) send('keydown', k); };
       const up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); for (const k of keys(b)) send('keyup', k); };
@@ -936,8 +917,6 @@ function rigUI() {
       pad.classList.toggle('wait', !on);
       if (on && pad.hidden) pad.hidden = false;
       if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }
-      { const c = !!(on && rigs.couchOn); pad.classList.toggle('couch', !!rigs.couchOn); if (ts.hidden === c) ts.hidden = !c;
-        if (!rigs.couchOn && rigs.couch.thrA) tsSet(0); }   // off the couch: the lever goes back to neutral
       { const S = rigs.scooter, run = !!(rigs.scootOn && S.touchRun); if (!rigs.scootOn && S.touchRun) S.touchRun = false;
         pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; if (sw.hidden !== !run) sw.hidden = !run; }
       requestAnimationFrame(tick);
@@ -1934,7 +1913,7 @@ function couchCues(Co, Tn, drive, st) {
   if (!drive) { if (Co.cue && el) el.className = 'gone'; Co.cue = null; Co.goT = null; return; }
   if (Co.goT == null) { Co.goT = Tn + 2.4; Co.cue = 'count'; Co.cn = 4; Co.turnT = 0; }
   if (Tn < Co.goT) { const n = Math.ceil((Co.goT - Tn) / .8); if (n !== Co.cn) { Co.cn = n; bigCue(String(n), '', true); } return; }
-  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? 'slide up to drive' : 'W to drive'); return; }
+  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? '▲ to drive' : 'W to drive'); return; }
   // after GO the cues follow the course: DRIFT at the roundabout, Keep going while you slide round it, Return to start once the
   // lap is done, and the lap time when you cross gate 1. A slide has to hold .25 s to count and lapse .8 s to end, so they don't flicker.
   const C = rigs.course, n = CC.gates.length, sl = Math.abs(Co.slip) / RD, raw = sl > 10 && Math.abs(Co.sp) > 90;
@@ -1948,7 +1927,7 @@ function couchCues(Co, Tn, drive, st) {
     Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
     return;
   }
-  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? 'slide up to go again' : 'W to go again'); } return; }
+  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
   const P = Co.g.position, near = Math.hypot(P.x - CC.ring[0], P.z - CC.ring[1]) < CC.ringR + 120;   // at the roundabout itself, not just past the last gate
   if (C.i === n && near) {                          // on the roundabout
     if (Co.dOn && Co.cue !== 'keep') { Co.cue = 'keep'; bigCue('Keep drifting', 'all the way round'); }
@@ -1985,7 +1964,7 @@ function couchFrame(s, dt, w) {
   const pk = smooth(seg(s, 10.2, 10.7));             // parking: 0 = free driving, 1 = stopped in front of the hearth
   const wDrive = w * (1 - smooth(seg(s, 10.45, 10.8)));  // hands and feet on the controls until he sits back
   let vx = 0, vz = 0, om = +ui.cwSpin.value;
-  const K = Co.keys, Tn = clock.elapsedTime; if (K.size || Co.thrA) Co.last = Co.kLast = Tn;   // the phone's throttle lever counts as a key held
+  const K = Co.keys, Tn = clock.elapsedTime; if (K.size) Co.last = Co.kLast = Tn;
   const VMAX = 70, WMAX = .8, k = 1 - Math.pow(.02, dt);
   // keys: driven like a car (Ackermann on the front modules, rear fixed) with the back end stepping out in a drift; the camera
   // pulls in behind for a third-person view. Left alone for 3 s, it goes back to showing off what a holonomic base can do.
@@ -1996,7 +1975,7 @@ function couchFrame(s, dt, w) {
   if (drive) {
     const has = (a, b) => K.has(a) || K.has(b);
     const st = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
-    const thr = Co.hold || (Co.goT != null && Tn < Co.goT) ? 0 : ((has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0) || Co.thrA || 0);   // held on the line until GO; phones: the lever, -1 to 1
+    const thr = Co.hold || (Co.goT != null && Tn < Co.goT) ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);   // held on the line until GO
     const hb = false;                                                     // (Space was the handbrake; it fires the boost now)
     Co.df += ((K.has('shift') ? 1 : 0) - Co.df) * (1 - Math.pow(.02, dt));   // Shift: drift mode (oversteer, loose rear); otherwise it grips
     // steering frame: the body stays put while the modules re-aim, so the direction of travel swings with it (with some speed lost)
