@@ -198,11 +198,14 @@
   function visitor(rig) {
     const KEY = 'gp.vid', YEAR = 395 * 864e5, put = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} };
     let k = null; try { k = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
-    if (k && k.exp > Date.now()) {
-      if (/^[0-9a-f]{16}$/.test(k.id)) { vis.id = k.id; vis.n = (k.n | 0) + 1; vis.ok = !!k.ok; put({ ...k, n: vis.n }); }
-      return;
-    }
-    const start = (ok) => { vis.id = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join(''); vis.n = 1; vis.ok = ok; put({ id: vis.id, n: 1, ok, exp: Date.now() + YEAR }); };
+    const live = k && k.exp > Date.now(), had = live && /^[0-9a-f]{16}$/.test(k.id);
+    const use = () => { vis.id = k.id; vis.n = (k.n | 0) + 1; vis.ok = !!k.ok; put({ ...k, n: vis.n }); };
+    if (live && (k.no || k.ok)) { if (had) use(); return; }   // a yes or a no stands until it runs out
+    // a new id, or one kept without asking (somewhere a yes isn't needed): check where the visitor is now
+    const start = (ok) => {
+      if (had) { k.ok = ok; use(); return; }   // the same device saying yes keeps its history
+      vis.id = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join(''); vis.n = 1; vis.ok = ok; put({ id: vis.id, n: 1, ok, exp: Date.now() + YEAR });
+    };
     fetch('/api/flow', { credentials: 'omit' }).then((r) => r.json()).then((w) => {
       if (!w.ask) { start(false); return; }
       // ask once the reader is past the opening, in the corner, and let it fade by itself

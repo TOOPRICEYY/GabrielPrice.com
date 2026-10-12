@@ -299,7 +299,7 @@ export async function prune(env, now = Date.now()) {
     const r = await env.FLOW.list({ prefix: 'flow/', delimiter: '/', cursor });
     for (const pre of r.delimitedPrefixes || []) {
       const day = pre.slice(5, -1);
-      if (!DAY.test(day) || day >= cut) continue;
+      if (!DAY.test(day) || day > cut) continue;   // the cutoff day goes too: no visit outlives 90 days by more than this run's hour
       const objs = (await listAll(env, pre, false, 100)).map((o) => o.key);
       for (let j = 0; j < objs.length; j += 1000) await env.FLOW.delete(objs.slice(j, j + 1000));
       n += objs.length;

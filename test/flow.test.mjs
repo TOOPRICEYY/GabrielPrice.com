@@ -367,11 +367,11 @@ test('visits older than 90 days are deleted each day; layouts and leaderboards s
   const R = fakeR2(), now = Date.parse('2026-10-12T04:17:00Z');
   const day = (n) => new Date(now - n * 864e5).toISOString().slice(0, 10);
   for (const k of [`flow/${day(91)}/aaaaaaaaaaaaaaa1/000.json`, `flow/${day(91)}/aaaaaaaaaaaaaaa1/001.json`, `flow/${day(200)}/aaaaaaaaaaaaaaa2/000.json`,
-    `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, `flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, 'layout/0123456789ab.json', 'lb/board.json']) await R.put(k, '{}');
-  assert.equal(await prune({ FLOW: R }, now), 3);
+    `flow/${day(90)}/aaaaaaaaaaaaaaa5/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, `flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, 'layout/0123456789ab.json', 'lb/board.json']) await R.put(k, '{}');
+  assert.equal(await prune({ FLOW: R }, now), 4, 'the cutoff day goes too');
   assert.deepEqual([...R.m.keys()].sort(), [`flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, 'layout/0123456789ab.json', 'lb/board.json'].sort());
   assert.equal(KEEP_DAYS, 90);
-  assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /deleted 90 days after/, 'the privacy page states the same');
+  assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /kept for 90 days, then deleted/, 'the privacy page states the same');
   assert.match(fs.readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"crons"/);
   assert.match(fs.readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8'), /scheduled\(event, env, ctx\) \{ ctx\.waitUntil\(prune\(env\)/);
 });
