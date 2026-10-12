@@ -247,8 +247,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   .card p { font-size: 13px; line-height: 1.35; }
   .lead.tall video, .lead.tall img { height: 26vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
   .lead video, .lead img { max-height: 21vh; }
-  .log li { width: 52px; } .log li.l { width: 112px; } .log li.q { width: 70px; }
-  .log img, .log video { height: 68px; }
+  .log li { width: 72px; } .log li.l { width: 152px; } .log li.q { width: 96px; }
+  .log img, .log video { height: 96px; }
   .log figcaption { font-size: 9px; }
   .bom { grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 10.5px; }
   .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
@@ -257,22 +257,18 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 }
 @media (max-width: 720px) and (max-height: 720px) {   /* small phones: the docked card must stay under half the screen */
   .card h2 { font-size: 21px; }
-  .card.vid > p { display: none; }
   .lead video, .lead img { max-height: 19vh; }
   .lead.tall video, .lead.tall img { height: 24vh; }
-  .log li { width: 44px; } .log li.l { width: 96px; } .log li.q { width: 60px; }
-  .log img, .log video { height: 56px; }
 }
 /* phones held sideways (short and wide): side cards stay beside the figure, so squeeze them to fit the height */
 @media (max-height: 520px) and (min-width: 721px) {
   .card, .card.vid { width: min(400px, 46vw); padding: 12px; gap: 6px; }
   .card h2 { font-size: 22px; }
   .card p { font-size: 12.5px; line-height: 1.35; }
-  .card.vid > p { display: none; }
   .lead video, .lead img { max-height: 40vh; }
   .lead.tall video, .lead.tall img { height: 50vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
-  .log li { width: 44px; } .log li.l { width: 96px; } .log li.q { width: 60px; }
-  .log img, .log video { height: 54px; }
+  .log li { width: 60px; } .log li.l { width: 128px; } .log li.q { width: 80px; }
+  .log img, .log video { height: 72px; }
   .log figcaption { font-size: 9px; }
   .bom { grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 10px; }
   .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
@@ -1087,13 +1083,13 @@ function readScroll() {
   }
   sTarget = centers.length - 1;
 }
-// phones: a docked card fades out as it scrolls up off its dock, so it never sits over the 3D view for long
+// phones: a docked card scrolls up off its dock with the page, then fades once it has risen about a third of the screen
 const sheets = [...document.querySelectorAll('main > section:not(.hero):not(.drive):not(.gallery) > .card')];
 function fadeSheets() {
   const ph = innerWidth <= 720, H = innerHeight;
   for (const c of sheets) {
     if (!ph) { if (c.style.opacity) { c.style.opacity = ''; c.style.pointerEvents = ''; } continue; }
-    const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - 14 - r.height - r.top) / (H * .28)));
+    const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - 14 - r.height - r.top - H * .3) / (H * .22)));   // rises 30% of the screen off its dock before it starts to fade
     c.style.opacity = o.toFixed(3); c.style.pointerEvents = o < .4 ? 'none' : '';
   }
 }
