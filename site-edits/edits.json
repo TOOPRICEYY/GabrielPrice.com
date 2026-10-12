@@ -57,6 +57,18 @@
       "section": "Portfolio Engineer · Builder",
       "tag": "p",
       "updatedAt": "2026-10-12T02:49:17.609Z"
+    },
+    "s1.div1.p1": {
+      "fp": "I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scoote",
+      "html": "",
+      "key": "s1.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scooter and a couch that drives. Each one starts as a Fusion 360 model and ends up printed, wired and tested on me.",
+      "sec": 1,
+      "section": "02 About",
+      "tag": "p",
+      "updatedAt": "2026-10-12T02:50:40.665Z"
     }
   }
 }
