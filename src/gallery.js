@@ -234,7 +234,11 @@ function mats() {
 // mesh data: positions f32, normals i8x4 (padded), indices u16, all in one base64 blob
 let RAW;
 function geoOf(e) {
-  RAW ||= Uint8Array.from(atob(window.GAL_B64), c => c.charCodeAt(0)).buffer;
+  if (!RAW) {   // a plain loop: Uint8Array.from(atob(…), fn) calls fn per byte and is ~100x slower
+    const t = atob(window.GAL_B64), u = new Uint8Array(t.length);
+    for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i);
+    RAW = u.buffer;
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAW, e.p, e.nv * 3), 3));
   g.setAttribute('normal', new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(new Int8Array(RAW, e.n, e.nv * 4), 4), 3, 0, true));

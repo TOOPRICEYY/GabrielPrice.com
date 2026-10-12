@@ -219,7 +219,7 @@ function fade(group, o) {
   if (!group.visible) return;
   group.traverse(m => { if (m.material && !m.material.userData.own) { const k = m.material.userData.k ?? 1; m.material.opacity = o * k; m.material.transparent = o * k < .999; m.material.depthWrite = o * k > .5; } });
 }
-const wsBin = () => rigs.bin || (rigs.bin = Uint8Array.from(atob(window.WS_B64), c => c.charCodeAt(0)).buffer);
+const wsBin = () => rigs.bin || (rigs.bin = b64(window.WS_B64));
 function wsEntryGeo(e) {
   const bin = wsBin(), g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bin, e.p, e.nv * 3), 3));
