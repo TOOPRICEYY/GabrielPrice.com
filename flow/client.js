@@ -76,8 +76,9 @@
         const cam = rig.camera, p = cam.position, ui = rig.ui;
         cam.getWorldDirection(dir);
         // a mouse stays where it was left; a finger is only there while it touches (the page keeps the last touch point
-        // for 4 s for its laser, which would read as a tap that never lifted)
-        const live = ui.ptr && performance.now() - ui.ptrT < 4000 && (fingers > 0 || !touchOnly);
+        // for 4 s for its laser, which would read as a tap that never lifted). A pointer last moved before the last finger
+        // lifted was that finger; one moved since is a mouse, stylus or trackpad, so hybrid devices get both right.
+        const live = ui.ptr && performance.now() - ui.ptrT < 4000 && (fingers > 0 || ui.ptrT > liftT);
         let keys = 0;
         const held = [rig.rigs.couch && rig.rigs.couch.keys, rig.rigs.scooter && rig.rigs.scooter.keys];
         for (let i = 0; i < KEYS.length; i++) if (held.some((k) => k && k.has(KEYS[i]))) keys |= 1 << i;
@@ -101,10 +102,9 @@
     flush();
   }
 
-  // fingers on the screen: one counter on touch start and end, nothing per move
-  let fingers = 0;
-  const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
-  const fingersNow = (e) => { fingers = e.touches.length; };
+  // fingers on the screen, and when the last one lifted: set on touch start and end, nothing per move
+  let fingers = 0, liftT = -1e9;
+  const fingersNow = (e) => { fingers = e.touches.length; if (!fingers) liftT = performance.now(); };
   for (const t of ['touchstart', 'touchend', 'touchcancel']) document.addEventListener(t, fingersNow, { capture: true, passive: true });
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element ? e.target : null;
