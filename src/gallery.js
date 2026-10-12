@@ -55,7 +55,7 @@ const PROJECTS = [
     specs: `<dl class="spec"><dt>Shop</dt><dd><a href="https://mittenmade.shop" target="_blank" rel="noopener">mittenmade.shop</a></dd><dt>Etsy</dt><dd><a href="https://www.etsy.com/shop/MittenMadeWoodCraft" target="_blank" rel="noopener">MittenMadeWoodCraft</a></dd><dt>Instagram</dt><dd><a href="https://www.instagram.com/mittenmadegr" target="_blank" rel="noopener">@mittenmadegr</a></dd></dl>
       <div class="gx-hf"><img src="mittenmade/face.webp" alt="A carved Michigan standing outdoors in low sun"></div>` },
   { id: 'gauge', title: 'Tensile Tester', kind: '3D printing', model: 'gauge',
-    blurb: 'A three-part printed gauge from the Printers Printing Printers project, with a dogbone keyed into its post.',
+    blurb: 'A three-part printed gauge with a dogbone keyed into its post.',
     names: [['Body1', 'Base and post'], ['Body2', 'Cap and sleeve'], ['Vertical Dogbone', 'Dogbone']],
     explode: [['Body2', [0, 10, 0]], ['Body1', [0, -2, 0]], ['Vertical Dogbone', [-10, 4, 0]]],
     mat: (k) => k.includes('Dogbone') ? 'accent' : 'print',
@@ -64,7 +64,7 @@ const PROJECTS = [
       explode: ['Three parts.', ''],
       build: ['Back together.', ''],
       cut: ['Cut through.', ''],
-      specs: ['GhettoGauge v22', 'Base, cap and dogbone, all printed.'] } },
+      specs: ['Tensile Tester', 'Base, cap and dogbone, all printed.'] } },
   { id: 'desk', title: 'Pedestal Desk', kind: 'Furniture', ph: 'desk',
     blurb: 'A height-adjustable desk from construction lumber: a post on cross feet, and a top on a sleeve that slides along it.',
     chapters: [{ key: 'hero', cam: [32, 14, 3.0], spin: .6 }, { key: 'open', cam: [78, 8, 2.9], side: 'right' }, { key: 'specs', cam: [-28, 16, 3.1], spin: .6 }],
