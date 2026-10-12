@@ -8,11 +8,20 @@
 // Storage is the R2 bucket bound as FLOW (wrangler.jsonc): flow/<day>/<sid>/<seq>.json. Each object's custom metadata holds
 // that batch's summary, so listing a day gives the dashboard everything without reading the traces. Visitor data never goes
 // to GitHub: the repo is public. Without the binding, ingest quietly accepts and drops, and the admin routes say what's missing.
-import SECTIONS from './sections.gen.js';
+//
+// Page versions: each visit's first batch names the site version and its layout, a hash of the page's section titles. The
+// first visit on a new layout also stores that title list at layout/<hash>.json (checked against the hash), so the dashboard
+// can label and count every visit by its own sections, whatever the page looks like now.
+import CURRENT from './sections.gen.js';
 import dashboard from './flow-dashboard.js';
 
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
-const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/;
+const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
+// the layout live before visits carried one (PR #6, 2026-10-12)
+export const LEGACY = { layout: 'legacy', sections: ['Gabriel Price', 'Start from the body.', 'The Kicker', 'Built around one leg.',
+  'Motor to ankle, in four steps.', 'Every part, apart.', 'Then I built it.', 'Then it has to walk.', 'Water, on crutches.',
+  'A knee scooter with a belt drive.', 'Fast motor, slow wheel.', 'Twelve parts, pulled apart.', 'Take the bars.',
+  'A couch that drives sideways.', 'A lamp that plays with the cat.', 'CatZoom, at play.', 'Thirteen parts, seen through.', 'Still on the bench.'] };
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
 const empty = (status) => new Response(null, { status, headers: NO_STORE });
@@ -37,8 +46,10 @@ export async function flowIngest(request, env, ctx, url) {
     clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(request.headers.get('user-agent') || '');
   }
   const key = `flow/${clean.day}/${clean.sid}/${String(clean.seq).padStart(3, '0')}.json`;
-  const put = env.FLOW.put(key, JSON.stringify(clean), { httpMetadata: { contentType: 'application/json' }, customMetadata: summarise(clean) });
-  if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put;
+  const work = [env.FLOW.put(key, JSON.stringify(clean), { httpMetadata: { contentType: 'application/json' }, customMetadata: summarise(clean) })];
+  if (clean.meta && clean.meta.layout && clean.meta.sections) work.push(saveLayout(env, clean.meta.layout, clean.meta.sections));
+  const all = Promise.all(work);
+  if (ctx && ctx.waitUntil) ctx.waitUntil(all); else await all;
   return empty(204);
 }
 
@@ -56,14 +67,16 @@ export function checkBatch(b) {
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e'].includes(e[1])) return null;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
     out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true,
-      lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true };
+      lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true,
+      v: /^\w{1,12}$/.test(m.v) ? m.v : '', layout: LAYOUT.test(m.layout) ? m.layout : '' };
+    if (out.meta.layout && Array.isArray(m.sections) && m.sections.length <= 80 && m.sections.every((x) => typeof x === 'string' && x.length <= 80)) out.meta.sections = m.sections;
   }
   return out;
 }
@@ -86,8 +99,10 @@ export function summarise(c) {
   }
   const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(S.length ? S[S.length - 1][0] : 0),
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
-    dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length) };
+    dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
+    err: String(c.events.filter((e) => e[1] === 'e').length) };
   if (c.meta) {
+    m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop';
     m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
@@ -105,7 +120,8 @@ export async function flowAdmin(request, env, url) {
   if (!env.FLOW) return send({ error: 'The R2 bucket for analytics is not set up yet (DEPLOY.md, section 6).' }, 503);
   if (p === '/admin/api/flow/sessions') {
     const days = Math.max(1, Math.min(90, Number(url.searchParams.get('days')) || 7));
-    return send({ sections: SECTIONS, sessions: await listSessions(env, days) });
+    const sessions = await listSessions(env, days);
+    return send({ current: CURRENT, sessions, layouts: await loadLayouts(env, sessions) });
   }
   if (p === '/admin/api/flow/session') {
     const [day, sid] = String(url.searchParams.get('key') || '').split('/');
@@ -149,11 +165,31 @@ export async function listSessions(env, days) {
       v.batches++; v.bytes += o.size || 0;
       v.ms = Math.max(v.ms, Number(m.t1) || 0);
       v.maxS = Math.max(v.maxS, Number(m.maxS) || 0);
+      v.err = (v.err || 0) + (Number(m.err) || 0);
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || LEGACY.layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }
   return [...byId.values()].sort((a, b) => String(b.start || b.day).localeCompare(String(a.start || a.day)));
+}
+
+// store a layout's section titles once, only if they hash to the name the page gave them
+async function saveLayout(env, layout, sections) {
+  if (!LAYOUT.test(layout)) return;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(sections)));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 12);
+  if (hex !== layout) return;
+  const key = `layout/${layout}.json`;
+  if (await env.FLOW.head(key)) return;
+  await env.FLOW.put(key, JSON.stringify(sections), { httpMetadata: { contentType: 'application/json' } });
+}
+
+// the title list of every layout the listed visits were recorded on
+async function loadLayouts(env, sessions) {
+  const out = { [CURRENT.layout]: CURRENT.sections, [LEGACY.layout]: LEGACY.sections };
+  const want = [...new Set(sessions.map((v) => v.layout).filter((l) => l && !out[l] && LAYOUT.test(l)))];
+  await Promise.all(want.map(async (l) => { const o = await env.FLOW.get(`layout/${l}.json`); if (o) out[l] = await o.json(); }));
+  return out;
 }

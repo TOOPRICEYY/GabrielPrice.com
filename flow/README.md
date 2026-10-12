@@ -20,11 +20,21 @@ Events are `[ms, type, …]`:
 - `c`: a click, with x and y as fractions of the viewport, the section, and the label of the button, link or figure that was clicked;
 - `v`: a video starting;
 - `h`: the tab being hidden;
-- `z`: the window being resized.
+- `z`: the window being resized;
+- `e`: the sampler hit an error and stopped (the message).
 
-Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site and dark mode. The Worker adds the country and whether the device is a phone. No cookies are set and no IP addresses are stored.
+Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, and the page's version and section layout. The Worker adds the country and whether the device is a phone. No cookies are set and no IP addresses are stored.
 
 Batches are sent every 30 s, and when the tab is hidden or closed, through `navigator.sendBeacon` as `text/plain` (no CORS preflight). A visit is capped at 30 minutes and 60 batches. Recording is skipped for Global Privacy Control, Do Not Track, automated browsers, `#edit`, and any browser that has opened `/admin/flow` (that page sets localStorage `flow-off`).
+
+## New versions of the page
+
+A recording holds numbers, not the page, so it is read against whatever version is live when you open it. Two things keep old visits meaningful:
+
+- **Layouts.** `scripts/build.mjs` stamps the page with `window.__flowBuild`: the commit, the section titles (each section's first heading, or its `aria-label`), and `layout`, the first 12 hex digits of the SHA-256 of that title list. Every visit's first batch carries all three. The first visit on a layout also stores its title list at `layout/<hash>.json` in the bucket, but only when the titles really hash to that name. The dashboard counts and labels each visit by its own titles, so a section that moved or got renumbered still lines up. A section that was removed simply stops counting. Visits from before versions existed use the PR #6 layout (`LEGACY` in `worker/flow.js`).
+- **Replays.** When a visit's layout differs from the live page, the player moves each sample to the section with the same title and shows a note that the visit came from an older version. Inside a section the scene is today's: a changed camera key or model shows as it is now.
+
+Capture can also break if the page stops exposing what the sampler reads. `test/flow.test.mjs` checks the built page for each of those hooks, so such a change fails CI instead of silently stopping capture. At runtime the sampler catches any error, records one `e` event and stops. The dashboard then counts and flags those visits.
 
 ## Why not a session-replay service
 

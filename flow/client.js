@@ -13,12 +13,14 @@
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h).
+//          h tab hidden, z resize (w, h), e capture error (message). The first batch's meta carries the site version and its
+//          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 (() => {
   const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
   const r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000;
   const hash = location.hash;
+  const BUILD = window.__flowBuild || { version: 'dev', layout: '', sections: [] };
 
   if (hash.startsWith('#replay=')) { waitRig(() => replay(decodeURIComponent(hash.slice(8)))); return; }
 
@@ -36,6 +38,10 @@
     const dir = new rig.THREE.Vector3();
     function tick(t) {
       if (stopped) return;
+      try { sample(t); } catch (err) { fail(err); return; }
+      requestAnimationFrame(tick);
+    }
+    function sample(t) {
       if (t - lastT >= 1000 / HZ) {
         lastT = t;
         const cam = rig.camera, p = cam.position, ui = rig.ui;
@@ -50,12 +56,19 @@
         for (let i = 1; same && i < x.length; i++) if (x[i] !== last[i]) same = false;
         if (!same) { samples.push(x); last = x; }
         if (t - lastFlush > FLUSH_MS) flush();
-        if (t - t0 > MAX_MS) { flush(); stopped = true; return; }
+        if (t - t0 > MAX_MS) { flush(); stopped = true; }
       }
-      requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-  });
+  }, () => fail(new Error('window.__rig never appeared')));
+
+  // a page change that renames what the sampler reads lands here: report it once so the dashboard shows it, then stop
+  function fail(err) {
+    if (stopped) return;
+    stopped = true;
+    events.push([now(), 'e', String(err && err.message || err).slice(0, 80)]);
+    flush();
+  }
 
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element ? e.target : null;
@@ -78,7 +91,8 @@
     if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0)) return;
     const o = { sid, seq, day, samples, events };
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
-      lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches };
+      lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
+      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections };
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing
@@ -87,9 +101,11 @@
   }
   function refHost() { try { const u = new URL(document.referrer); return u.host === location.host ? '' : u.host.slice(0, 80); } catch { return ''; } }
 
-  function waitRig(cb) {
+  function waitRig(cb, onTimeout) {
     let n = 0;
-    const iv = setInterval(() => { if (window.__rig) { clearInterval(iv); cb(window.__rig); } else if (++n > 240) clearInterval(iv); }, 250);
+    const iv = setInterval(() => {
+      if (window.__rig) { clearInterval(iv); cb(window.__rig); } else if (++n > 240) { clearInterval(iv); if (onTimeout) onTimeout(); }
+    }, 250);
   }
 
   // ---------- replay ----------
@@ -109,13 +125,19 @@
     const rec = await res.json(), S = rec.samples || [], E = rec.events || [];
     if (!S.length) { hud.textContent = 'That visit has no samples.'; return; }
     const rig = window.__rig, dur = S[S.length - 1][0];
+    // recorded on another set of sections: move each sample's section to the section with the same title on this page
+    const old = rec.meta && rec.meta.layout && rec.meta.layout !== BUILD.layout ? rec.meta.sections || [] : null;
+    const remap = old ? old.map((title, i) => { const j = BUILD.sections.indexOf(title); return j >= 0 ? j : Math.min(i, BUILD.sections.length - 1); }) : null;
+    const mapS = (x) => { if (!remap || !remap.length) return x; const i = Math.max(0, Math.min(remap.length - 1, Math.floor(x))); return remap[i] + (x - Math.floor(x)); };
     const dot = document.createElement('div');
     dot.style.cssText = 'position:fixed;z-index:49;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#ff3d7f;'
       + 'box-shadow:0 0 0 3px rgba(255,61,127,.35);pointer-events:none;display:none';
     document.body.appendChild(dot);
     hud.innerHTML = '<button type="button" data-a="play">Pause</button><button type="button" data-a="speed">1×</button>'
       + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span>'
-      + '<span style="opacity:.7">' + (rec.meta ? (rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h : '') + '</span>';
+      + '<span style="opacity:.7">' + (rec.meta ? (rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h : '') + '</span>'
+      + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
+        + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]');
     let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0;
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
@@ -131,7 +153,7 @@
       while (i < S.length - 2 && S[i + 1][0] <= head) i++;
       while (i > 0 && S[i][0] > head) i--;
       const a = S[i], b = S[Math.min(i + 1, S.length - 1)], k = b[0] > a[0] ? Math.max(0, Math.min(1, (head - a[0]) / (b[0] - a[0]))) : 0;
-      const s = lerp(a[1], b[1], k), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
+      const s = mapS(lerp(a[1], b[1], k)), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
       rig.setS(s);
