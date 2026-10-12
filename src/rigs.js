@@ -885,7 +885,10 @@ function rigUI() {
     const send = (type, k) => { held[k] = (held[k] || 0) + (type === 'keydown' ? 1 : -1); if (type === 'keydown' ? held[k] === 1 : held[k] === 0) dispatchEvent(new KeyboardEvent(type, { key: k })); };
     const keys = (b) => b.dataset.k === ' ' ? [' '] : b.dataset.k.split(' ');
     const play = pad.querySelector('.tp-play');
-    play.addEventListener('click', () => { const S = rigs.scooter; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
+    // a small ✕ in the top-left corner leaves a scooter run mid-game: the run ends (its score counts) and the autopilot takes back
+    const gx = document.createElement('button'); gx.id = 'scexit'; gx.hidden = true; gx.textContent = '✕'; gx.setAttribute('aria-label', 'Exit the game'); document.body.appendChild(gx);
+    gx.addEventListener('click', () => { const S = rigs.scooter; S.quit = true; S.touchRun = false; S.keys.clear(); S.hopHeld = false; S.last = -9; });
+    play.addEventListener('click', () => { const S = rigs.scooter; S.quit = false; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
     // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap or swipe up to jump
     const sw = document.createElement('div'); sw.id = 'swipe'; sw.hidden = true; document.body.appendChild(sw); let t0 = null;
     sw.addEventListener('pointerdown', (e) => { e.preventDefault(); t0 = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, done: false }; sw.setPointerCapture?.(e.pointerId); });
@@ -918,7 +921,7 @@ function rigUI() {
       if (on && pad.hidden) pad.hidden = false;
       if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }
       { const S = rigs.scooter, run = !!(rigs.scootOn && S.touchRun); if (!rigs.scootOn && S.touchRun) S.touchRun = false;
-        pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; if (sw.hidden !== !run) sw.hidden = !run; }
+        pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; gx.hidden = !(rigs.scootOn && (run || S.game.on)); if (sw.hidden !== !run) sw.hidden = !run; }
       requestAnimationFrame(tick);
     };
     tick();
@@ -1489,7 +1492,7 @@ function scooterFrame(s, dt, w) {
   ui.scKneeOut.textContent = (kneeH > 0 ? '+' : '') + kneeH + ' cm';
   // driver: keys (or the slider) if touched in the last 3 s, else the autopilot
   const K = S.keys; if (K.size) S.last = T;                    // a held key keeps it yours
-  const manual = rigs.scootOn && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
+  const manual = rigs.scootOn && !S.quit && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
   let vT, dT;
   if (manual) {
     const run = S.touchRun; if (run) S.last = T;
@@ -1857,6 +1860,14 @@ function lbShow(k, a, full) {
   if (LB.mode) lbDraw();
   const o = LB.mode ? 1 : 0; if (LB.a !== o) { LB.a = o; LB.el.classList.toggle('on', !!o); }
 }
+// the key legend leaving the page for its pinned spot (and back): measure both places and animate between them (FLIP), so
+// it shrinks down into the corner instead of jumping there
+function keysPin(K, on) {
+  const a = K.getBoundingClientRect(); K.classList.toggle('pin', on); const b = K.getBoundingClientRect();
+  if (reduced || !a.width || !b.width || !K.animate) return;
+  const s = a.width / b.width, end = on ? 'translateX(-50%)' : 'none', start = `translate(${(a.left - b.left).toFixed(1)}px, ${(a.top - b.top).toFixed(1)}px) ${on ? 'translateX(-50%) ' : ''}scale(${s.toFixed(3)})`;
+  K.animate([{ transform: start, transformOrigin: '0 0' }, { transform: end, transformOrigin: '0 0' }], { duration: 520, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+}
 function couchBest(v) { try { if (v != null) localStorage.setItem('gp.couch.best', v); return +localStorage.getItem('gp.couch.best') || 0; } catch (e) { return v || 0; } }
 // the couch's score panel (top middle) and speed dial (bottom right; top right on touch screens)
 function couchHud(Co, show, live, target) {
@@ -1864,7 +1875,7 @@ function couchHud(Co, show, live, target) {
   if (show || LB.mode === 'lap') lbShow('lap', show ? 1 : 0, !!Co.hold);   // small while you drive, full on the line after a lap
   if (H.playing !== show) { H.playing = show; document.body.classList.toggle('playing', show || !!(ui.schud && ui.schud.playing)); }   // phones hide the orbit hint while you play
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
-  { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K) K.classList.toggle('pin', show); }   // the key legend stays put while you drive
+  { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K && K.classList.contains('pin') !== show) keysPin(K, show); }   // the key legend stays put while you drive
   H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) return;
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
   // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
