@@ -144,7 +144,8 @@
     events.push([now(), 'g', window.__rig ? r3(window.__rig.s) : -1]);
     if (++glLost <= 5) flush();   // every loss is kept; only the first few go out on their own batch
   }, { capture: true, passive: true });
-  document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); } }, { capture: true, passive: true });
+  // a return is sent at once too, so a tab killed in the background still shows the loss was recovered
+  document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); if (glLost <= 5) flush(); } }, { capture: true, passive: true });
 
   function flush() {
     lastFlush = performance.now();
