@@ -279,7 +279,7 @@ test('each visit records its hardware, network, frame rate and load time, within
   assert.equal(bad.fps, undefined); assert.deepEqual([bad.meta.hw.cores, bad.meta.hw.mem, bad.meta.hw.gpu, bad.meta.hw.load], [0, 0, '', 0]);
   // every string at its longest still fits R2's 2 KB of custom metadata
   const long = (n) => 'x'.repeat(n);
-  const max = checkBatch(batch({ fps: 59.9, samples: Array.from({ length: 40 }, (_, i) => sample(i * 2000, i)), meta: { ...batch().meta, ref: long(200), lang: long(20),
+  const max = checkBatch(batch({ fps: 59.9, events: [[1, 'l', 900], [2, 'g', 3]], samples: Array.from({ length: 40 }, (_, i) => sample(i * 2000, i)), meta: { ...batch().meta, ref: long(200), lang: long(20),
     hw: { ...hw, gpu: long(300), tz: long(100), net: long(20), langs: long(200) } } }));
   Object.assign(max.meta, { cc: 'US', region: long(40), city: long(40), ip: long(45), isp: long(60), os: long(40), browser: long(40), model: long(40), dev: 'desktop' });
   const bytes = Object.entries(summarise(max)).reduce((a, [k, x]) => a + Buffer.byteLength(k) + Buffer.byteLength(x), 0);
@@ -287,6 +287,18 @@ test('each visit records its hardware, network, frame rate and load time, within
   const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
   assert.match(client, /requestIdleCallback/, 'the device is read when the browser is idle, not in a frame');
   assert.match(client, /visibilitychange', \(\) => \{\s*prevT = 0/, 'time spent hidden is not counted as a freeze');
+});
+
+test('a 3D crash is stored with where it happened, counted per visit, and sent the moment it happens', async () => {
+  const sid = 'abababababababab';
+  await post(batch({ sid, events: [[4000, 'l', 900], [5200, 'g', 7.25]] }));
+  const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
+  assert.deepEqual(st.events[1], [5200, 'g', 7.25]);
+  const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  assert.equal(v.gl, 1); assert.equal(v.stalls, 1);
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /addEventListener\('webglcontextlost'[^]*?'g'[^]*?flush\(\)/, 'the recorder logs and sends a lost WebGL context');
+  assert.match(fs.readFileSync(new URL('../src/main.html', import.meta.url), 'utf8'), /<canvas id="stage"/, 'the 3D canvas the recorder watches is still #stage');
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {

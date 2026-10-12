@@ -17,7 +17,7 @@
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), e capture error (message). The first batch's meta carries the site version and its
+//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view crashed (s), e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
 //          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
@@ -128,6 +128,14 @@
     if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); }
   });
   addEventListener('pagehide', flush);
+  // the phone dropped the page's WebGL context (out of GPU memory, usually): mark where, and send it now, since the tab
+  // may be killed next. The event doesn't bubble, so it is caught on the way down; nothing runs until it fires.
+  let glLost = 0;
+  document.addEventListener('webglcontextlost', (e) => {
+    if (!(e.target instanceof Element) || e.target.id !== 'stage' || ++glLost > 5) return;
+    events.push([now(), 'g', window.__rig ? r3(window.__rig.s) : -1]);
+    flush();
+  }, { capture: true, passive: true });
 
   function flush() {
     lastFlush = performance.now();
@@ -283,6 +291,7 @@
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
         else if (E[ei][1] === 'l' && E[ei][2] >= 400) { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallUntil = E[ei][0] + 2500; }
+        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view crashed here'; stallUntil = E[ei][0] + 4000; }
         ei++;
       }
       if (head > stallUntil || head < stallUntil - 3000) stall.textContent = '';

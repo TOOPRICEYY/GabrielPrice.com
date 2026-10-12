@@ -93,7 +93,7 @@ export function checkBatch(b) {
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l', 'g'].includes(e[1])) return null;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
@@ -186,6 +186,8 @@ export function summarise(c) {
     err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}), ...(num(c.fms) ? { fms: String(c.fms) } : {}), ...(num(c.full) ? { full: String(c.full) } : {}) };
   const st = c.events.filter((e) => e[1] === 'l' && num(e[2]));
   if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
+  const gl = c.events.filter((e) => e[1] === 'g').length;
+  if (gl) m.gl = String(gl);   // times the 3D view crashed (the browser dropped its WebGL context)
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
@@ -288,6 +290,7 @@ export async function listSessions(env, days) {
       // weighted by the visible time each batch's frame rate covers (older batches: their sample span)
       if (m.full) v.full = Math.max(v.full || 0, Number(m.full) || 0);
       if (m.fps) { const w = Math.max(1, Number(m.fms) || (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
+      if (m.gl) v.gl = (v.gl || 0) + (Number(m.gl) || 0);
       if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }

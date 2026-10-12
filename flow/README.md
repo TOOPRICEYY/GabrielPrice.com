@@ -21,6 +21,8 @@ Events are `[ms, type, …]`:
 - `v`: a video starting;
 - `h`: the tab being hidden;
 - `z`: the window being resized;
+- `l`: a freeze, the ms the page drew nothing while visible (a quarter second or more). Phones keep scrolling off the main thread during one, so the replay holds still and then jumps; the player says so, and the dashboard counts them beside the frame rate;
+- `g`: the browser dropped the 3D view's WebGL context (usually out of GPU memory), with the scroll position. It is sent at once, since the tab may be killed next. The player says so and the dashboard flags the visit;
 - `e`: the sampler hit an error and stopped (the message).
 
 Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, the page's version and section layout, and, in Chromium browsers, the phone model and OS version (`navigator.userAgentData` client hints). The Worker adds the visitor's IP address and the country, region and city Cloudflare places it in. It also reads the device type (phone, tablet or desktop), model, OS and browser from the user agent and those hints (`device()` in `worker/flow.js`), keeps those four and drops the raw hints. Safari and Firefox never name a phone model, so an iPhone shows only as "iPhone". Chrome on Android sends a frozen "Android 10; K", so without the hints the OS shows only as "Android". Visits recorded before this was added have no OS or browser. No cookies are set.
