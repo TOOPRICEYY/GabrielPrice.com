@@ -169,6 +169,7 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 .keys.pin .krow:has(span) { margin-right: -4.2em; }
 @media (min-width: 721px) { .keys.pin { left: calc(230px + 50%); } }
 .krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
+.keyhint { transition: opacity .4s; }
 .touchonly { display: none; }
 @media (hover: none), (pointer: coarse) { section.drive .keys, section.drive .keyhint:not(.touchonly), .kb, .kbonly { display: none; } .touchonly { display: revert; } }   /* keyboard hints mean nothing on touch screens */
 /* on-screen driving pad (touch screens only, built in rigs.js) */
