@@ -189,6 +189,18 @@
       "section": "08 Exoleg · Full leg",
       "tag": "h2",
       "updatedAt": "2026-10-12T03:01:41.832Z"
+    },
+    "s7.div1.p1": {
+      "fp": "The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.",
+      "html": "The calf portion powers my stride and the thigh portion prevents excess torque transmitted through my knee",
+      "key": "s7.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.",
+      "sec": 7,
+      "section": "08 Exoleg · Full leg",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:03:05.653Z"
     }
   }
 }
