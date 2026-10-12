@@ -238,7 +238,8 @@
     }
     const S = rec.samples || [], E = (rec.events || []).slice().sort((x, y) => x[0] - y[0]);
     if (!S.length) { hud.textContent = 'That visit has no samples.'; return; }
-    const rig = window.__rig, dur = S[S.length - 1][0];
+    // to the last sample or event, whichever is later: a page that froze or crashed while still has its note at the end
+    const rig = window.__rig, dur = Math.max(S[S.length - 1][0], E.length ? E[E.length - 1][0] : 0);
     // recorded on another set of sections: move each sample's section to the section with the same title on this page
     const old = rec.meta && rec.meta.layout && rec.meta.layout !== BUILD.layout ? rec.meta.sections || [] : null;
     const remap = old ? old.map((title, i) => { const j = BUILD.sections.indexOf(title); return j >= 0 ? j : Math.min(i, BUILD.sections.length - 1); }) : null;
