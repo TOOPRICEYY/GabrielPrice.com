@@ -86,6 +86,8 @@ fs.writeFileSync(path.join(DIST, 'index.html'), html);
 for (const d of STATIC_DIRS) {
   if (fs.existsSync(path.join(ROOT, d))) fs.cpSync(path.join(ROOT, d), path.join(DIST, d), { recursive: true, filter: (f) => !f.endsWith('.DS_Store') });
 }
+// the privacy page the hosted site links to (flow/client.js adds the link; the artifact has neither)
+fs.copyFileSync(path.join(ROOT, 'flow', 'privacy.html'), path.join(DIST, 'privacy.html'));
 if (vendored) for (const f of threeFiles) {
   fs.mkdirSync(path.dirname(path.join(DIST, 'vendor/three', f)), { recursive: true });
   fs.copyFileSync(path.join(THREE_DIR, f), path.join(DIST, 'vendor/three', f));

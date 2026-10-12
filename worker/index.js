@@ -17,7 +17,7 @@
 import { accessEmail } from './access.js';
 import { getEdits, putEdits, checkEdits, publishEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
 import editorUi from './editor-ui.gen.js';
-import { flowIngest, flowAdmin } from './flow.js';
+import { flowIngest, flowAdmin, prune } from './flow.js';
 import { lb } from './lb.js';
 
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
@@ -90,6 +90,8 @@ async function admin(request, env, url) {
 }
 
 export default {
+  // daily (wrangler.jsonc triggers): delete recorded visits older than 90 days
+  async scheduled(event, env, ctx) { ctx.waitUntil(prune(env).catch((e) => console.error(e))); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.hostname.startsWith('www.')) return Response.redirect(url.protocol + '//' + url.hostname.slice(4) + url.pathname + url.search, 301);

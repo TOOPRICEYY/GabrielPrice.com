@@ -23,6 +23,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 th{color:var(--ink2);font-weight:600}td.n{text-align:right;font-variant-numeric:tabular-nums}a{color:var(--bar)}
 td.ck,th.ck{width:1%;padding-right:0}input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:middle;accent-color:var(--bar)}
 tr.on td{background:color-mix(in srgb,var(--bar) 10%,transparent)}.head{display:flex;align-items:center;gap:10px;margin-bottom:12px}.head h2{margin:0;flex:1}
+button.who{font:inherit;font-size:12px;padding:1px 6px;white-space:nowrap}
 button.del{border-color:#d9534f;color:#c9302c}button.del:disabled{opacity:.45;border-color:var(--line);color:var(--muted)}@media (prefers-color-scheme:dark){button.del{color:#ff8a85}}
 .scroll{overflow-x:auto}.old{color:var(--muted)}.warn{color:#b26a00}@media (prefers-color-scheme:dark){.warn{color:#ffc46b}}.empty{color:var(--muted);padding:12px 0}
 </style></head><body><main>
@@ -30,11 +31,12 @@ button.del{border-color:#d9534f;color:#c9302c}button.del:disabled{opacity:.45;bo
 <div class="row"><label>Range <select id="days"><option value="1">Today</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>
 <label>Device <select id="dev"><option value="">All</option><option>desktop</option><option>phone</option><option>tablet</option></select></label>
 <label>OS <select id="os"><option value="">All</option></select></label>
+<span id="who" hidden>Visits from one device <button type="button" id="whoX">Show all</button></span>
 <span id="status" class="sub" style="margin:0"></span></div>
 <div class="tiles" id="tiles"></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
-<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>OS</th><th>Browser</th><th>Size</th><th>Hardware</th><th>GPU</th><th>Network</th><th class="n">FPS</th><th class="n">Load (s)</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th title="Returning visitors: the device keeps an id (asked first in the EU, EEA, UK and Switzerland)">Visitor</th><th>Length</th><th>Furthest section</th><th>Device</th><th>OS</th><th>Browser</th><th>Size</th><th>Hardware</th><th>GPU</th><th>Network</th><th class="n">FPS</th><th class="n">Load (s)</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </main><script>
 try { localStorage.setItem('flow-off', '1'); } catch (e) {}
 const $ = (id) => document.getElementById(id);
@@ -46,6 +48,7 @@ const fam = (s) => String(s.os || '').split(' ')[0];
 const gpuName = (g) => { const m = /^ANGLE \\([^,]*, (?:ANGLE Metal Renderer: )?(.+?)(?: \\(0x[0-9a-f]+\\))?(?: Direct3D.*?)?(?: OpenGL.*?)?(?:, [^,]*)?\\)$/i.exec(g || ''); return m ? m[1] : g || ''; };
 const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); const h = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
 const picked = new Set();   // keys of the ticked visits
+let who = '';   // a returning visitor's id: show only their visits
 async function load() {
   $('status').textContent = 'Loading…';
   const r = await fetch('/admin/api/flow/sessions?days=' + $('days').value, { credentials: 'same-origin' });
@@ -65,7 +68,8 @@ function bars(el, items, unit) {
 // key(list, i): the title plus how many times it appeared before, so two sections with the same heading stay distinct.
 const key = (list, i) => list[i] + '#' + list.slice(0, i).filter((t) => t === list[i]).length;
 function draw() {
-  const dev = $('dev').value, os = $('os').value, V = data.sessions.filter((s) => (!dev || s.dev === dev) && (!os || fam(s) === os)), N = V.length;
+  const dev = $('dev').value, os = $('os').value, V = data.sessions.filter((s) => (!dev || s.dev === dev) && (!os || fam(s) === os) && (!who || s.vid === who)), N = V.length;
+  $('who').hidden = !who;
   const cur = data.current.sections, L = (s) => data.layouts[s.layout] || cur;
   const curKeys = cur.map((_, i) => key(cur, i));
   const name = (list, i) => (list[i] ? i + '. ' + list[i] : 'Section ' + i);
@@ -78,6 +82,8 @@ function draw() {
   if (load) tiles.push([(load / 1000).toFixed(1) + ' s', 'median time until the 3D scene is up']);
   const gl = V.filter((s) => s.gl > 0).length;
   if (gl) tiles.push(['<span class="warn">' + gl + '</span>', 'had the 3D view crash']);
+  const back = V.filter((s) => s.vn > 1).length;
+  if (back) tiles.push([back, 'by a returning visitor']);
   if (older) tiles.push([older, 'on an older version']);
   if (errs) tiles.push(['<span class="warn">' + errs + '</span>', 'stopped recording early (the page changed what the recorder reads)']);
   $('tiles').innerHTML = tiles.map(([b, s]) => '<div class="tile"><b>' + b + '</b><span>' + s + '</span></div>').join('');
@@ -96,7 +102,7 @@ function draw() {
   $('rows').innerHTML = V.slice(0, 300).map((s) => {
     const isOld = s.layout !== data.current.layout;
     const on = picked.has(s.key);
-    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : '') + '</td><td>' + esc(s.os || '') + '</td><td>' + esc(s.browser || '') + '</td><td title="' + esc(s.scr ? 'Screen ' + s.scr + (s.dpr ? ' at ' + s.dpr + 'x' : '') : '') + '">' + esc(s.size || '') + '</td><td>' + esc([s.cores ? s.cores + ' cores' : '', s.mem ? s.mem + ' GB' : ''].filter(Boolean).join(' · ')) + '</td><td title="' + esc(s.gpu || '') + '" style="max-width:14em;overflow:hidden;text-overflow:ellipsis">' + esc(gpuName(s.gpu)) + '</td><td title="' + esc(s.tz || '') + '">' + esc([s.net, s.isp].filter(Boolean).join(' · ')) + '</td><td class="n" title="' + [s.stalls ? 'Froze ' + s.stalls + (s.stalls === 1 ? ' time, ' : ' times, ') + (s.stallMs / 1000).toFixed(1) + ' s in all' : '', s.gl > 0 ? 'The 3D view crashed' + (s.gl > 1 ? ' ' + s.gl + ' times' : '') : ''].filter(Boolean).join('. ') + '">' + (s.gl > 0 ? '<span class="warn">✕3D</span> ' : '') + (s.stalls ? '<span class="warn">⏸' + s.stalls + '</span> ' : '') + (s.fps ? (s.fps < 30 ? '<span class="warn">' + s.fps.toFixed(0) + '</span>' : s.fps.toFixed(0)) : '') + '</td><td class="n" title="' + (s.full ? 'Page fully loaded at ' + (s.full / 1000).toFixed(1) + ' s' : '') + '">' + (s.load ? (s.load / 1000).toFixed(1) : '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
+    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td>' + (s.vid ? '<button type="button" class="who" data-vid="' + esc(s.vid) + '" title="Show only visits from this device">' + (s.vn > 1 ? 'Visit ' + s.vn : 'First visit') + '</button>' : '') + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : '') + '</td><td>' + esc(s.os || '') + '</td><td>' + esc(s.browser || '') + '</td><td title="' + esc(s.scr ? 'Screen ' + s.scr + (s.dpr ? ' at ' + s.dpr + 'x' : '') : '') + '">' + esc(s.size || '') + '</td><td>' + esc([s.cores ? s.cores + ' cores' : '', s.mem ? s.mem + ' GB' : ''].filter(Boolean).join(' · ')) + '</td><td title="' + esc(s.gpu || '') + '" style="max-width:14em;overflow:hidden;text-overflow:ellipsis">' + esc(gpuName(s.gpu)) + '</td><td title="' + esc(s.tz || '') + '">' + esc([s.net, s.isp].filter(Boolean).join(' · ')) + '</td><td class="n" title="' + [s.stalls ? 'Froze ' + s.stalls + (s.stalls === 1 ? ' time, ' : ' times, ') + (s.stallMs / 1000).toFixed(1) + ' s in all' : '', s.gl > 0 ? 'The 3D view crashed' + (s.gl > 1 ? ' ' + s.gl + ' times' : '') : ''].filter(Boolean).join('. ') + '">' + (s.gl > 0 ? '<span class="warn">✕3D</span> ' : '') + (s.stalls ? '<span class="warn">⏸' + s.stalls + '</span> ' : '') + (s.fps ? (s.fps < 30 ? '<span class="warn">' + s.fps.toFixed(0) + '</span>' : s.fps.toFixed(0)) : '') + '</td><td class="n" title="' + (s.full ? 'Page fully loaded at ' + (s.full / 1000).toFixed(1) + ' s' : '') + '">' + (s.load ? (s.load / 1000).toFixed(1) : '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
   }).join('');
   ticks();
 }
@@ -112,6 +118,7 @@ function tick(key, on) {
   if (box) { box.checked = on; box.closest('tr').classList.toggle('on', on); }
 }
 $('rows').addEventListener('click', (e) => {
+  const w = e.target.closest('button[data-vid]'); if (w) { who = w.dataset.vid; picked.clear(); last = -1; draw(); return; }
   const box = e.target.closest('input[data-key]'); if (!box) return;
   const i = shown.indexOf(box.dataset.key);
   // shift-click ticks (or unticks) the whole run from the last box clicked
@@ -136,6 +143,7 @@ $('del').onclick = async () => {
   $('status').textContent = 'Deleted ' + j.deleted + (j.deleted === 1 ? ' visit.' : ' visits.');
   draw();
 };
+$('whoX').onclick = () => { who = ''; picked.clear(); last = -1; draw(); };
 $('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = $('os').onchange = () => { last = -1; if (data) draw(); };
 load();
 </script></body></html>`;

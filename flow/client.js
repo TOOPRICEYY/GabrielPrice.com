@@ -4,6 +4,7 @@
 // Capture: 10 times a second, read the state the page already computes (window.__rig: scroll position s, camera,
 // pointer, drive keys) and keep a sample when anything changed. Batches go to POST /api/flow every 30 s and when the tab
 // is hidden or closed. No listeners on scroll or pointer (the page tracks both already), no DOM observation, no cookies.
+// One id in localStorage tells a returning visitor's visits apart from new ones, asked for first in the EU/EEA/UK/CH (visitor()).
 // Measured cost: about 4 µs per sample, so well under 0.001 ms per frame (see flow/README.md).
 // The only listeners are a click, a video play, resizes, tab hiding, and a finger counter on touch start and end.
 // Skipped for Global Privacy Control / Do Not Track, automated browsers, and the owner (opening /admin/flow sets
@@ -38,6 +39,7 @@
     return;
   }
 
+  privacyLink();
   let off = false;
   try { off = localStorage.getItem('flow-off') === '1'; } catch {}
   if (off || hash === '#edit' || navigator.globalPrivacyControl || navigator.doNotTrack === '1' || navigator.webdriver) return;
@@ -45,6 +47,8 @@
   const sid = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
+  const vis = { id: '', n: 0, ok: false };   // the returning-visitor id, once known (see visitor())
+  let quit = false;   // opted out while this page was open (see optOut)
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
   // frame rate: frames and visible time since the last batch. A freeze counts as the time it took (it is what the visitor
   // saw); hidden time doesn't, since visibilitychange resets prevT
@@ -65,6 +69,7 @@
     ready = performance.now();
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 2000));
     idle(() => { try { hw = device(); } catch {} }, { timeout: 5000 });
+    idle(() => { try { visitor(rig); } catch {} }, { timeout: 8000 });
     function tick(t) {
       if (stopped) return;
       if (prevT && document.visibilityState === 'visible') { frames++; frameMs += Math.min(60000, t - prevT); }
@@ -106,6 +111,12 @@
     events.push([now(), 'e', String(err && err.message || err).slice(0, 80)]);
     flush();
   }
+
+  // opting out on /privacy (or the owner opening /admin/flow) in another tab, or before this page came back from the
+  // back-forward cache: stop here too, drop what hasn't gone out, and keep no id
+  const optOut = () => { quit = stopped = true; samples = []; events = []; vis.id = ''; };
+  addEventListener('storage', (e) => { if (e.key === 'flow-off' && e.newValue === '1') optOut(); });
+  addEventListener('pageshow', (e) => { if (e.persisted) try { if (localStorage.getItem('flow-off') === '1') optOut(); } catch {} });
 
   // fingers on the screen, and when the last one lifted: set on touch start and end, nothing per move
   let fingers = 0, liftT = -1e9;
@@ -149,11 +160,12 @@
   document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); if (glLost <= 5) flush(); } }, { capture: true, passive: true });
 
   function flush() {
+    if (quit) return;
     lastFlush = performance.now();
     // a batch with nothing new still goes out to deliver a full-load time or device details that missed the first batch
     const late = seq > 0 && ((full && !fullSent) || (hw && !hwSent));
     if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0 && !late)) return;
-    const o = { sid, seq, day, samples, events };
+    const o = { sid, seq, day, samples, events, ...(vis.id ? { vid: vis.id, vn: vis.n, ...(vis.ok ? { vc: 1 } : {}) } : {}) };
     if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
     if (frameMs > 0) { o.fps = Math.round(frames * 10000 / frameMs) / 10; o.fms = Math.round(frameMs); }   // fms: the visible time it covers
     // every build loaded only after the first batch went out (a slow phone or connection): send it once, now
@@ -186,6 +198,58 @@
     return { sw: sc.width || 0, sh: sc.height || 0, orient: (sc.orientation && sc.orientation.type) || '', cores: n.hardwareConcurrency || 0,
       mem: n.deviceMemory || 0, tp: n.maxTouchPoints || 0, gpu: gpu.slice(0, 100), net: c.effectiveType || '', down: c.downlink || 0, rtt: c.rtt || 0,
       save: c.saveData === true, tz, langs: (n.languages || []).slice(0, 4).join(','), motion: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  }
+  // Returning visitors: a random id kept on this device (localStorage "gp.vid", 13 months, never renewed) so the dashboard
+  // can tell a second visit from a first. Where the law asks for consent before storing it (the EU, EEA, UK and
+  // Switzerland: GET /api/flow answers from the visitor's country), nothing is stored until the visitor says yes to a small
+  // note; no, or letting the note fade, is remembered for the same time so it never asks twice.
+  function visitor(rig) {
+    const KEY = 'gp.vid', YEAR = 395 * 864e5, put = (v) => { if (!quit) try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} };
+    const get = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } };
+    let k = get();
+    const live = k && k.exp > Date.now(), had = live && /^[0-9a-f]{16}$/.test(k.id);
+    const use = () => { vis.id = k.id; vis.n = (k.n | 0) + 1; vis.ok = !!k.ok; put({ ...k, n: vis.n }); };
+    if (live && (k.no || k.ok)) { if (had) use(); return; }   // a yes or a no stands until it runs out
+    // a new id, or one kept without asking (somewhere a yes isn't needed): check where the visitor is now
+    const start = (ok) => {
+      if (quit) return;
+      // another tab may have stored or counted an id while this one waited for the answer: build on that, not on k
+      const now = get();
+      if (now && now.exp > Date.now() && /^[0-9a-f]{16}$/.test(now.id)) { k = { ...now, ok: ok || !!now.ok }; use(); return; }
+      if (had) { k.ok = ok; use(); return; }   // the same device saying yes keeps its history
+      vis.id = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join(''); vis.n = 1; vis.ok = ok; put({ id: vis.id, n: 1, ok, exp: Date.now() + YEAR });
+    };
+    fetch('/api/flow', { credentials: 'omit' }).then((r) => r.json()).then((w) => {
+      if (!w.ask) { start(false); return; }
+      // ask once the reader is past the opening, in the corner, and let it fade by itself
+      const iv = setInterval(() => { if (stopped) clearInterval(iv); else if (rig.s >= 0.6 && !document.hidden) { clearInterval(iv); note((yes) => (yes ? start(true) : put({ no: 1, exp: Date.now() + YEAR }))); } }, 1000);
+    }, () => {});
+  }
+  function note(done) {
+    const d = document.createElement('div');
+    d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Remember this device');
+    d.style.cssText = 'position:fixed;z-index:5;left:calc(12px + env(safe-area-inset-left, 0px));bottom:calc(12px + env(safe-area-inset-bottom, 0px));max-width:calc(100vw - 24px);'
+      + 'display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;padding:5px 6px 5px 10px;border-radius:8px;background:var(--sheet, rgba(255,255,255,.85));border:1px solid var(--rule, rgba(0,0,0,.1));'
+      + 'font:11px/1.4 var(--f-mono, ui-monospace, monospace);color:var(--graphite-2, #555);opacity:0;transition:opacity .6s';
+    const b = 'font:inherit;color:var(--cobalt, #3355ff);background:none;border:0;padding:2px 4px;cursor:pointer;text-decoration:underline';
+    d.innerHTML = '<span>Remember this device for my visit stats?</span><button type="button" style="' + b + '">Yes</button><button type="button" style="' + b + '">No</button>'
+      + '<a href="/privacy" style="' + b + ';opacity:.8">Privacy</a>';
+    let over = false;
+    const end = (yes) => { if (over) return; over = true; done(yes); d.style.opacity = '0'; setTimeout(() => d.remove(), 700); };
+    const [y, n] = d.querySelectorAll('button');
+    y.onclick = () => end(true); n.onclick = () => end(false);
+    document.body.appendChild(d);
+    requestAnimationFrame(() => { d.style.opacity = '1'; });
+    setTimeout(() => end(false), 20000);
+  }
+  // a quiet link to /privacy at the very end of the page (the hosted site only: the artifact has no such page)
+  function privacyLink() {
+    if (hash.startsWith('#replay=')) return;
+    const at = () => { const g = document.querySelector('#gallery .gal-wrap') || document.querySelector('main'); if (!g || g.querySelector('a[href="/privacy"]')) return;
+      const a = document.createElement('a'); a.href = '/privacy'; a.textContent = 'Privacy';
+      a.style.cssText = 'display:inline-block;margin-top:32px;font:11px/1.4 var(--f-mono, ui-monospace, monospace);color:var(--graphite-2, #777);opacity:.7';
+      g.appendChild(a); };
+    if (document.readyState === 'loading') addEventListener('DOMContentLoaded', at, { once: true }); else at();
   }
   function refHost() { try { const u = new URL(document.referrer); return u.host === location.host ? '' : u.host.slice(0, 80); } catch { return ''; } }
 

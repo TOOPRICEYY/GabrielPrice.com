@@ -22,7 +22,11 @@ function fakeR2() {
     async head(key) { return m.has(key) ? {} : null; },
     async delete(keys) { for (const k of [].concat(keys)) m.delete(k); },
     async get(key) { const v = m.get(key); return v ? { json: async () => JSON.parse(v.body) } : null; },
-    async list({ prefix = '', include = [] } = {}) {
+    async list({ prefix = '', include = [], delimiter } = {}) {
+      if (delimiter) {   // folders right under the prefix, like R2's delimitedPrefixes
+        const pre = [...new Set([...m.keys()].filter((k) => k.startsWith(prefix) && k.slice(prefix.length).includes(delimiter)).map((k) => prefix + k.slice(prefix.length).split(delimiter)[0] + delimiter))].sort();
+        return { objects: [], delimitedPrefixes: pre, truncated: false };
+      }
       const objects = [...m.keys()].filter((k) => k.startsWith(prefix)).sort().map((key) => {
         const v = m.get(key);
         return { key, size: v.body.length, uploaded: v.uploaded, ...(include.includes('customMetadata') ? { customMetadata: v.customMetadata } : {}) };
@@ -37,13 +41,13 @@ const LAYOUT = createHash('sha256').update(JSON.stringify(SECTIONS)).digest('hex
 const batch = (o = {}) => ({ sid: SID, seq: 0, day: DAY, samples: [sample(0, 0), sample(100, 0.4), sample(200, 1.2, 1)], events: [[150, 'c', 0.1, 0.2, 1, 'Reset view']],
   meta: { w: 1280, h: 800, dpr: 2, touch: false, lang: 'en-US', ref: 'news.ycombinator.com', dark: false, extra: 'dropped', v: 'abc1234', layout: LAYOUT, sections: SECTIONS }, ...o });
 // like the runtime, finish the background writes (ctx.waitUntil) before the next step looks at the bucket
-async function post(body, { origin = ORIGIN, e = env, ua = '' } = {}) {
+async function post(body, { origin = ORIGIN, e = env, ua = '', country = 'US' } = {}) {
   const pending = [];
   const req = new Request(ORIGIN + '/api/flow', {
     method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
     headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}), ...(ua ? { 'user-agent': ua } : {}) },
   });
-  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit', asOrganization: 'Comcast Cable' } });   // what Cloudflare's edge attaches
+  Object.defineProperty(req, 'cf', { value: { country, region: 'Michigan', city: 'Detroit', asOrganization: 'Comcast Cable' } });   // what Cloudflare's edge attaches
   const r = await worker.fetch(req, e, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   return r;
@@ -126,7 +130,7 @@ test('ingest refuses other origins, junk and oversize bodies, and accepts quietl
   assert.equal((await post(batch({ samples: [[1, 2, 3]] }))).status, 400, 'short sample');
   assert.equal((await post(batch({ events: [[1, 'x']] }))).status, 400, 'unknown event');
   assert.equal((await post('x'.repeat(70000))).status, 413);
-  assert.equal((await worker.fetch(new Request(ORIGIN + '/api/flow'), env)).status, 405);
+  assert.equal((await worker.fetch(new Request(ORIGIN + '/api/flow', { method: 'PUT' }), env)).status, 405);
   const noBucket = { ...env, FLOW: undefined };
   assert.equal((await post(batch(), { e: noBucket })).status, 204);
 });
@@ -325,4 +329,64 @@ test('unversioned visits are read against the layout live when they arrived', ()
   assert.equal(legacyFor('2026-10-12T02:10:00Z').layout, 'legacy-18');
   assert.equal(legacyFor('2026-10-12T02:10:00Z').sections[14], 'A lamp that plays with the cat.');
   assert.equal(legacyFor('2026-10-12T02:30:00Z').sections[14], 'Drive the couch');
+});
+
+test('the page asks before keeping a visitor id only where the law needs a yes', async () => {
+  const where = async (country) => {
+    const req = new Request(ORIGIN + '/api/flow');
+    if (country !== undefined) Object.defineProperty(req, 'cf', { value: { country } });
+    const r = await worker.fetch(req, env);
+    assert.equal(r.status, 200); assert.match(r.headers.get('cache-control'), /no-store/);
+    return (await r.json()).ask;
+  };
+  assert.equal(await where('US'), false);
+  for (const cc of ['DE', 'FR', 'GB', 'NO', 'CH', 'AX', 'RE', 'GI', 'JE', 'T1', 'XX', 'EU', undefined]) assert.equal(await where(cc), true, cc + ' asks');
+});
+
+test('a returning visitor is linked across visits, and only with a yes where one is needed', async () => {
+  const VID = '0123456789abcdef';
+  await post(batch({ sid: 'b0b0b0b0b0b0b0b1', vid: VID, vn: 1 }));
+  await post(batch({ sid: 'b0b0b0b0b0b0b0b2', vid: VID, vn: 2 }));
+  await post(batch({ sid: 'b0b0b0b0b0b0b0b3', vid: VID, vn: 3 }), { country: 'DE' });              // kept without a yes, then travelled
+  await post(batch({ sid: 'b0b0b0b0b0b0b0b4', vid: VID, vn: 4, vc: 1 }), { country: 'DE' });       // said yes
+  await post(batch({ sid: 'b0b0b0b0b0b0b0b5', vid: 'not-an-id', vn: 9 }));
+  const { sessions } = await (await get('/admin/api/flow/sessions?days=1')).json();
+  const by = (n) => sessions.find((x) => x.key.endsWith('b0b0b0b0b0b0b0b' + n));
+  assert.equal(by(1).vid, VID); assert.equal(by(1).vn, 1); assert.equal(by(2).vn, 2);
+  assert.equal(by(3).vid, undefined, 'no yes from where one is needed: not linked');
+  assert.equal(by(4).vid, VID); assert.equal(by(4).vn, 4);
+  assert.equal(by(5).vid, undefined);
+  const stored = JSON.parse(env.FLOW.m.get(`flow/${DAY}/b0b0b0b0b0b0b0b4/000.json`).body);
+  assert.equal(stored.vc, undefined, 'the consent flag only steers the Worker');
+  const dash = fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8');
+  assert.match(dash, /data-vid=/); assert.match(dash, /returning visitor/);
+});
+
+test('visits older than 90 days are deleted each day; layouts and leaderboards stay', async () => {
+  const { prune, KEEP_DAYS } = await import('../worker/flow.js');
+  const R = fakeR2(), now = Date.parse('2026-10-12T04:17:00Z');
+  const day = (n) => new Date(now - n * 864e5).toISOString().slice(0, 10);
+  for (const k of [`flow/${day(91)}/aaaaaaaaaaaaaaa1/000.json`, `flow/${day(91)}/aaaaaaaaaaaaaaa1/001.json`, `flow/${day(200)}/aaaaaaaaaaaaaaa2/000.json`,
+    `flow/${day(90)}/aaaaaaaaaaaaaaa5/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, `flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, 'layout/0123456789ab.json', 'lb/board.json']) await R.put(k, '{}');
+  for (const [k, v] of R.m) v.uploaded = new Date(Math.min(now, Date.parse((k.split('/')[1] || '') + 'T12:00:00Z') || now));   // midday of their day
+  // the cutoff day (90 days back by date) goes only as far as its uploads are past 90 days: one a minute past, one a minute short
+  R.m.get(`flow/${day(90)}/aaaaaaaaaaaaaaa5/000.json`).uploaded = new Date(now - 90 * 864e5 - 60e3);
+  await R.put(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`, '{}'); R.m.get(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`).uploaded = new Date(now - 90 * 864e5 + 60e3);
+  assert.equal(await prune({ FLOW: R }, now), 4);
+  assert.ok(R.m.has(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`), 'not yet 90 days old'); R.m.delete(`flow/${day(90)}/aaaaaaaaaaaaaaa6/000.json`);
+  assert.deepEqual([...R.m.keys()].sort(), [`flow/${day(0)}/aaaaaaaaaaaaaaa4/000.json`, `flow/${day(89)}/aaaaaaaaaaaaaaa3/000.json`, 'layout/0123456789ab.json', 'lb/board.json'].sort());
+  assert.equal(KEEP_DAYS, 90);
+  assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /kept for 90 days, then deleted/, 'the privacy page states the same');
+  assert.match(fs.readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"crons"/);
+  assert.match(fs.readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8'), /scheduled\(event, env, ctx\) \{ ctx\.waitUntil\(prune\(env\)/);
+});
+
+test('the hosted page links its privacy page, keeps the visitor id in one place, and the build ships the page', () => {
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /href = '\/privacy'/); assert.match(client, /'gp\.vid'/);
+  assert.match(client, /fetch\('\/api\/flow', \{ credentials: 'omit' \}\)/, 'asks the Worker before storing anything');
+  assert.match(client, /addEventListener\('storage', \(e\) => \{ if \(e\.key === 'flow-off' && e\.newValue === '1'\) optOut\(\); \}\)/, 'opting out in another tab stops this one');
+  assert.ok(fs.existsSync(new URL('../dist/privacy.html', import.meta.url)), 'run npm run build first');
+  assert.match(fs.readFileSync(new URL('../dist/privacy.html', import.meta.url), 'utf8'), /localStorage\.removeItem\('gp\.vid'\)/, 'opting out forgets the id too');
+  assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /id="contact">[^<]*<a href="mailto:[^"@]+@[^"]+">/, 'a working address for privacy requests');
 });
