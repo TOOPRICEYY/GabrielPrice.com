@@ -84,8 +84,8 @@ const PROJECTS = [
       flight: ['Off the ground.', ''],
       liftoff: ['From its camera.', 'Takeoff to the rooftops, 4× speed.'],
       specs: ['Heavy Lift Hexacopter', ''] },
-    flight: `<figure class="gx-vid"><video src="photos/drone_flight.mp4" poster="photos/drone_flight.webp" autoplay muted loop playsinline preload="metadata" aria-label="The hexacopter hovering over a backyard shed"></video></figure>`,
-    liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" autoplay muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighbourhood roofs"></video></figure>`,
+    flight: `<figure class="gx-vid"><video src="photos/drone_flight.mp4" poster="photos/drone_flight.webp" muted loop playsinline preload="metadata" aria-label="The hexacopter hovering over a backyard shed"></video></figure>`,
+    liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighbourhood roofs"></video></figure>`,
     specs: `<dl class="spec"><dt>Autopilot</dt><dd>ArduPilot</dd><dt>Payload</dt><dd>8 kg</dd><dt>Frame</dt><dd>Six aluminium arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fibre</dd></dl>
       <div class="gx-gal two"><figure><img loading="lazy" src="photos/drone_build.webp" alt="The heavy lift hexacopter on a wood floor with its transmitter"><figcaption><b>Built</b></figcaption></figure>
       <figure><img loading="lazy" src="photos/drone_thrust.webp" alt="Thrust test rig: an Arduino drives an ESC, the motor and carbon prop sit on a kitchen scale, a multimeter reads the current from a Turnigy LiPo"><figcaption><b>Thrust test</b>Motor on a scale</figcaption></figure></div>` },
@@ -441,11 +441,17 @@ function openProject(id, from) {
   chEls = [...scroller.children]; scroller.scrollTop = 0; tT = tN = 0; userCam = false; spinAz = 0;
   lastFocus = from; bg.hidden = ov.hidden = false; document.documentElement.style.overflow = 'hidden';
   requestAnimationFrame(() => { bg.classList.add('on'); ov.classList.add('on'); });
-  resize(); snapCam(); open = true; clock.getDelta(); requestAnimationFrame(tick);
+  resize(); snapCam(); open = true; syncClips(true); clock.getDelta(); requestAnimationFrame(tick);
   ov.querySelector('#gx-close').focus({ preventScroll: true });
 }
+// chapter clips: only the one in the chapter on screen plays; all of them stop when the page closes
+let clipCh = -1;
+function syncClips(force) {
+  const i = open ? Math.round(tT) : -1; if (i === clipCh && !force) return; clipCh = i;
+  chEls.forEach((el, j) => el.querySelectorAll('video').forEach(v => { if (j === i) { v.muted = true; v.play().catch(() => {}); } else v.pause(); }));
+}
 function closeProject() {
-  if (!open) return; open = false;
+  if (!open) return; open = false; syncClips(true);
   bg.classList.remove('on'); ov.classList.remove('on'); document.documentElement.style.overflow = '';
   setTimeout(() => { if (!open) bg.hidden = ov.hidden = true; }, 350);
   lastFocus?.focus({ preventScroll: true });
@@ -456,7 +462,7 @@ addEventListener('keydown', e => { if (open && e.key === 'Escape') closeProject(
 scroller.addEventListener('scroll', () => {
   const mid = scroller.scrollTop + scroller.clientHeight / 2, cs = chEls.map(el => el.offsetTop + el.offsetHeight / 2);
   let t = 0; if (mid > cs[0]) { t = cs.length - 1; for (let i = 0; i < cs.length - 1; i++) if (mid <= cs[i + 1]) { t = i + (mid - cs[i]) / (cs[i + 1] - cs[i]); break; } }
-  tT = t; if (userCam) { userCam = false; fromCamera(); }   // scrolling eases the camera back onto the path
+  tT = t; syncClips(); if (userCam) { userCam = false; fromCamera(); }   // scrolling eases the camera back onto the path
 }, { passive: true });
 function resize() { if (!renderer) return; const w = ov.clientWidth, h = ov.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w <= 720 ? 40 : 30; camera.updateProjectionMatrix(); }
 addEventListener('resize', () => open && resize());
@@ -492,6 +498,7 @@ function applyModel(t) {
     M.grp.position.y = Math.sin(performance.now() / 900) * M.R * .02; plane.constant = 1e6;
     const io = CH.findIndex(q => q.key === 'open'), op = io < 0 ? 0 : sm((t - io + .7) / .55) * (1 - sm((t - io - .1) / .3));
     for (const p of M.parts) if (p.slide) p.mesh.position.copy(p.base).addScaledVector(p.slide, op);   // e.g. the desk top riding up its post
+    if (P.anim) P.anim(M);                          // e.g. the hexacopter's props
     return;
   }
   // explode ramps in over the .6 before the explode chapter; parts go back in order from .75 before the build chapter
