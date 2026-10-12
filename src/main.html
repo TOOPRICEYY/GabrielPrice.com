@@ -153,6 +153,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outlin
 .log img, .log video { width: 100%; height: 144px; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
 .log figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .log figcaption b { display: block; color: var(--cobalt); font-weight: 500; letter-spacing: .08em; }
+/* drive-ready section: no card, just the keys, lit while held */
+section.drive { min-height: 110vh; flex-direction: column; justify-content: flex-end; align-items: flex-start; padding: 0 0 12vh 4vw; gap: 14px; pointer-events: none; }
+.keys { display: grid; justify-items: center; gap: 8px; }
+.krow { display: flex; gap: 8px; align-items: center; }
+.keys kbd { min-width: 54px; height: 54px; display: grid; place-items: center; font-size: 18px; font-weight: 500; color: var(--graphite); background: var(--sheet); border: 1px solid var(--rule); border-bottom-width: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: background .08s, color .08s, transform .08s; }
+.keys kbd.wide { min-width: 120px; }
+.keys kbd.on { background: var(--cobalt); color: var(--vellum); transform: translateY(2px); }
+.krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
+@media (hover: none) { section.drive .keys, section.drive .keyhint { display: none; } }
 /* lead clip: the card's main story, full card width */
 .card.vid { width: min(480px, 100%); }
 .lead { margin: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -387,7 +396,16 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     </div>
   </section>
 
-  <section class="right" data-s="14">
+  <section class="drive" data-s="14" aria-label="Drive the couch">
+    <div class="keys" aria-hidden="true">
+      <div class="krow"><kbd data-k="w">W</kbd></div>
+      <div class="krow"><kbd data-k="a">A</kbd><kbd data-k="s">S</kbd><kbd data-k="d">D</kbd></div>
+      <div class="krow"><kbd class="wide" data-k="shift">Shift</kbd><span>drift</span></div>
+    </div>
+    <p class="keyhint">Take the wheel. Or keep scrolling.</p>
+  </section>
+
+  <section class="right" data-s="15">
     <div class="card">
       <div class="eyebrow">15 <b>CatZoom</b></div>
       <h2>A lamp that plays with the cat.</h2>
@@ -396,7 +414,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     </div>
   </section>
 
-  <section data-s="15">
+  <section data-s="16">
     <div class="card">
       <div class="eyebrow">16 <b>Up close</b></div>
       <h2>CatZoom, at play.</h2>
@@ -404,7 +422,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     </div>
   </section>
 
-  <section class="right" data-s="16">
+  <section class="right" data-s="17">
     <div class="card">
       <div class="eyebrow">17 <b>Inside CatZoom</b></div>
       <h2>Thirteen parts, seen through.</h2>
@@ -412,7 +430,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     </div>
   </section>
 
-  <section class="gallery" id="gallery" data-s="17" aria-labelledby="gallery-h">
+  <section class="gallery" id="gallery" data-s="18" aria-labelledby="gallery-h">
     <div class="gal-wrap">
       <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
       <h2 id="gallery-h">More from the bench.</h2>
@@ -1072,7 +1090,7 @@ function frame() {
   }
   if (Array.isArray(window.__cam)) { camera.position.fromArray(window.__cam[0]); camera.lookAt(_p1.fromArray(window.__cam[1])); } // debug hook for render checks
   // construction overlay: only in the opening hero and the closing shot
-  lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 16.3, 16.9)));
+  lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 17.3, 17.9)));
   constr.visible = lineMat.opacity > .002;
 
   // proof: wipe the as-built photo in over the render once the parts are back together
@@ -1091,7 +1109,7 @@ function frame() {
     // reveal: sweep a clip plane down the leg while fading in
     // worn only in its own sections: it comes off as the crutch scene fades in, stays off for the later builds, and sweeps
     // back on (the same clip plane down the leg) for the closing shot
-    const rev0 = smooth(seg(s, 1.45, 2.35)), revEnd = smooth(seg(s, 16.2, 16.9)), rev = s > 12 ? revEnd : rev0;
+    const rev0 = smooth(seg(s, 1.45, 2.35)), revEnd = smooth(seg(s, 17.2, 17.9)), rev = s > 12 ? revEnd : rev0;
     clip.constant = -(70 - rev * 80);
     const worn = Math.max(rev0 * (1 - smooth(seg(s, 7.5, 7.78))), revEnd);
     const op = clamp01(worn * 1.6);
@@ -1197,6 +1215,10 @@ buildFigure().then(() => {
   .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
 </script>
 <script>
+// drive-ready keys light up while held
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); document.querySelectorAll(`.keys kbd[data-k="${k === 'arrowup' ? 'w' : k === 'arrowdown' ? 's' : k === 'arrowleft' ? 'a' : k === 'arrowright' ? 'd' : k}"]`).forEach(b => b.classList.add('on')); });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); document.querySelectorAll('.keys kbd.on').forEach(b => { if (b.dataset.k === k || /^arrow/.test(k) || k === 'shift') b.classList.remove('on'); }); });
+addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
 // build log lightbox: tap a photo or clip in a .log row to see it large; tap again or Esc to close
 (() => {
   const lb = document.createElement('div'); lb.id = 'lb'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', 'Build photo'); document.body.appendChild(lb);

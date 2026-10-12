@@ -64,3 +64,6 @@ Sections 6 (Kicker), 7 (Exoleg) and 13 (Not So Lazy Boy) carry an `<ol class="lo
 
 ## Lean cards (v50, 2026-10-12)
 Gabriel: "remove maybe 90% of your describing text and sliders. The videos should be the main story" and "replace placeholder text". Each card is now eyebrow + h2 + at most one line, with a full-width lead clip (`figure.lead`, `.card.vid`) where there is media. Sliders, readouts, BOM lists, the gait plot and the walk button were not deleted: rigs.js reads them by id, so they sit in a hidden `<div class="jsonly" hidden>` inside their card (defaults still drive the scenes). Hero and About copy replaced. Gallery chapter text cut to a line or none (empty strings render no paragraph); the "Photo" placeholder boxes are gone. Pre-trim copy: /tmp only, so use git/premerge backups if needed.
+
+## Drive-ready stretch (v53)
+`section.drive` (data-s 14) follows the Not So Lazy Boy card. rigs.js holds the couch timeline there (`COUCH_IN`, `COUCH_HOLD`), and `rigs.chasePre` pulls the camera into the chase view. Keycaps light from keydown; arrow keys map to WASD. Later sections and camKeys are shifted +1 (gallery = 18).
