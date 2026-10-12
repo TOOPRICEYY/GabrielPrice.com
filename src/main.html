@@ -162,6 +162,12 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 .keys kbd { min-width: 54px; height: 54px; display: grid; place-items: center; font-size: 18px; font-weight: 500; color: var(--graphite); background: var(--sheet); border: 1px solid var(--rule); border-bottom-width: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: background .08s, color .08s, transform .08s; }
 .keys kbd.wide { min-width: 120px; }
 .keys kbd.on { background: var(--cobalt); color: var(--vellum); transform: translateY(2px); }
+/* once a couch run starts the keys leave the scroll: small, fixed bottom middle (over the scene, clear of the card), until you scroll away */
+.keys.pin { position: fixed; z-index: 24; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); gap: 4px; opacity: .9; }
+.keys.pin .krow { gap: 4px; } .keys.pin kbd { min-width: 30px; height: 28px; font-size: 12px; border-bottom-width: 2px; } .keys.pin kbd.wide { min-width: 62px; }
+.keys.pin .krow span { font-size: 9px; letter-spacing: .12em; min-width: 3.5em; }
+.keys.pin .krow:has(span) { margin-right: -4.2em; }
+@media (min-width: 721px) { .keys.pin { left: calc(230px + 50%); } }
 .krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
 .touchonly { display: none; }
 @media (hover: none), (pointer: coarse) { section.drive .keys, section.drive .keyhint:not(.touchonly), .kb, .kbonly { display: none; } .touchonly { display: revert; } }   /* keyboard hints mean nothing on touch screens */
