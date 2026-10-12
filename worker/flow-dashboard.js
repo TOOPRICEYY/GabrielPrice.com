@@ -52,7 +52,7 @@ function bars(el, items, unit) {
 const key = (list, i) => list[i] + '#' + list.slice(0, i).filter((t) => t === list[i]).length;
 function draw() {
   const dev = $('dev').value, V = data.sessions.filter((s) => !dev || s.dev === dev), N = V.length;
-  const cur = data.current.sections, L = (s) => data.layouts[s.layout] || data.layouts.legacy || cur;
+  const cur = data.current.sections, L = (s) => data.layouts[s.layout] || cur;
   const curKeys = cur.map((_, i) => key(cur, i));
   const name = (list, i) => (list[i] ? i + '. ' + list[i] : 'Section ' + i);
   const total = V.reduce((a, s) => a + s.ms, 0), drove = V.filter((s) => s.drive > 0).length;

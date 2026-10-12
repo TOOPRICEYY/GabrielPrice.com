@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { startFakes } from './fake-github.mjs';
 import worker from '../worker/index.js';
-import { checkBatch, summarise } from '../worker/flow.js';
+import { checkBatch, summarise, legacyFor } from '../worker/flow.js';
 
 const ORIGIN = 'https://gabrielprice.com';
 const DAY = new Date().toISOString().slice(0, 10);
@@ -149,7 +149,15 @@ test('the owner routes need the login, then list visits and merge a visit for re
   assert.ok(list.current.sections.length > 10);
   assert.equal(v.layout, LAYOUT); assert.equal(v.v, 'abc1234');
   assert.deepEqual(list.layouts[LAYOUT], SECTIONS, 'older layouts come back with the list');
-  assert.ok(list.layouts.legacy.length > 10);
+  assert.equal(list.layouts['legacy-18'].length, 18);
+  // a visit from before versions: read against the layout live when it arrived (here: now, which is today's page)
+  const sid = 'cccccccccccccccc', { v: _v, layout: _l, sections: _s, ...plain } = batch().meta;
+  await post(batch({ sid, meta: plain }));
+  const old = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  const { default: B } = await import('../worker/sections.gen.js');
+  assert.equal(old.layout, B.layout);
+  const oldRec = await (await get('/admin/api/flow/session?key=' + encodeURIComponent(old.key))).json();
+  assert.deepEqual(oldRec.meta.sections, B.sections, 'the replayer gets the legacy titles');
   const rec = await (await get('/admin/api/flow/session?key=' + encodeURIComponent(v.key))).json();
   assert.equal(rec.samples.length, 4); assert.equal(rec.meta.w, 1280);
   assert.deepEqual(rec.meta.sections, SECTIONS, 'the replayer gets the visit\'s own section titles');
@@ -157,4 +165,10 @@ test('the owner routes need the login, then list visits and merge a visit for re
   assert.equal((await get('/admin/api/flow/session?key=' + DAY + '/ffffffffffffffff')).status, 404);
   const noBucket = await worker.fetch(new Request(ORIGIN + '/admin/api/flow/sessions', { headers: { 'cf-access-jwt-assertion': token } }), { ...env, FLOW: undefined });
   assert.equal(noBucket.status, 503);
+});
+
+test('unversioned visits are read against the layout live when they arrived', () => {
+  assert.equal(legacyFor('2026-10-12T02:10:00Z').layout, 'legacy-18');
+  assert.equal(legacyFor('2026-10-12T02:10:00Z').sections[14], 'A lamp that plays with the cat.');
+  assert.equal(legacyFor('2026-10-12T02:30:00Z').sections[14], 'Drive the couch');
 });

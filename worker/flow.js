@@ -17,11 +17,23 @@ import dashboard from './flow-dashboard.js';
 
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
-// the layout live before visits carried one (PR #6, 2026-10-12)
-export const LEGACY = { layout: 'legacy', sections: ['Gabriel Price', 'Start from the body.', 'The Kicker', 'Built around one leg.',
-  'Motor to ankle, in four steps.', 'Every part, apart.', 'Then I built it.', 'Then it has to walk.', 'Water, on crutches.',
-  'A knee scooter with a belt drive.', 'Fast motor, slow wheel.', 'Twelve parts, pulled apart.', 'Take the bars.',
-  'A couch that drives sideways.', 'A lamp that plays with the cat.', 'CatZoom, at play.', 'Thirteen parts, seen through.', 'Still on the bench.'] };
+// layouts live before visits carried one, by when they went live: PR #6's 18 sections, then from #7 (deployed 02:24:13Z) the
+// couch drive section at 14. An unversioned visit is read against the one live when its first batch arrived.
+const T18 = ['Gabriel Price', 'Start from the body.', 'The Kicker', 'Built around one leg.', 'Motor to ankle, in four steps.',
+  'Every part, apart.', 'Then I built it.', 'Then it has to walk.', 'Water, on crutches.', 'A knee scooter with a belt drive.',
+  'Fast motor, slow wheel.', 'Twelve parts, pulled apart.', 'Take the bars.', 'A couch that drives sideways.'];
+export const LEGACY = [
+  { layout: 'legacy-18', until: Date.parse('2026-10-12T02:24:13Z'),
+    sections: [...T18, 'A lamp that plays with the cat.', 'CatZoom, at play.', 'Thirteen parts, seen through.', 'Still on the bench.'] },
+  { layout: 'legacy-19', until: Infinity,
+    sections: [...T18, 'Drive the couch', 'A lamp that plays with the cat.', 'CatZoom, at play.', 'Thirteen parts, seen through.', 'More from the bench.'] },
+];
+// a legacy list identical to today's page is today's layout, so those visits don't show as "older"
+for (const l of LEGACY) if (JSON.stringify(l.sections) === JSON.stringify(CURRENT.sections)) l.layout = CURRENT.layout;
+export function legacyFor(uploaded) {
+  const t = uploaded ? new Date(uploaded).getTime() : 0;
+  return LEGACY.find((l) => t < l.until) || LEGACY[LEGACY.length - 1];
+}
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
 const empty = (status) => new Response(null, { status, headers: NO_STORE });
@@ -126,7 +138,7 @@ export async function flowAdmin(request, env, url) {
   if (p === '/admin/api/flow/session') {
     const [day, sid] = String(url.searchParams.get('key') || '').split('/');
     if (!DAY.test(day || '') || !SID.test(sid || '')) return send({ error: 'bad key' }, 400);
-    const keys = (await listAll(env, `flow/${day}/${sid}/`, false)).map((o) => o.key).sort();
+    const objs = (await listAll(env, `flow/${day}/${sid}/`, false)).sort((x, y) => (x.key < y.key ? -1 : 1)), keys = objs.map((o) => o.key);
     if (!keys.length) return send({ error: 'no such visit' }, 404);
     const parts = await Promise.all(keys.map(async (k) => { const o = await env.FLOW.get(k); return o ? o.json() : null; }));
     const rec = { sid, day, meta: null, samples: [], events: [] };
@@ -135,6 +147,8 @@ export async function flowAdmin(request, env, url) {
       if (b.meta) rec.meta = b.meta;
       rec.samples.push(...b.samples); rec.events.push(...b.events);
     }
+    // recorded before visits named their layout: hand the replayer the titles that were live then
+    if (rec.meta && !rec.meta.layout) { const l = legacyFor(objs[0].uploaded); rec.meta.layout = l.layout; rec.meta.sections = l.sections; }
     return send(rec);
   }
   return send({ error: 'not found' }, 404);
@@ -168,7 +182,7 @@ export async function listSessions(env, days) {
       v.err = (v.err || 0) + (Number(m.err) || 0);
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || LEGACY.layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }
@@ -188,7 +202,7 @@ async function saveLayout(env, layout, sections) {
 
 // the title list of every layout the listed visits were recorded on
 async function loadLayouts(env, sessions) {
-  const out = { [CURRENT.layout]: CURRENT.sections, [LEGACY.layout]: LEGACY.sections };
+  const out = { ...Object.fromEntries(LEGACY.map((l) => [l.layout, l.sections])), [CURRENT.layout]: CURRENT.sections };
   const want = [...new Set(sessions.map((v) => v.layout).filter((l) => l && !out[l] && LAYOUT.test(l)))];
   await Promise.all(want.map(async (l) => { const o = await env.FLOW.get(`layout/${l}.json`); if (o) out[l] = await o.json(); }));
   return out;
