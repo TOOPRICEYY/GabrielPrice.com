@@ -17,7 +17,7 @@
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view crashed (s), e capture error (message). The first batch's meta carries the site version and its
+//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
 //          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
@@ -129,13 +129,18 @@
   });
   addEventListener('pagehide', flush);
   // the phone dropped the page's WebGL context (out of GPU memory, usually): mark where, and send it now, since the tab
-  // may be killed next. The event doesn't bubble, so it is caught on the way down; nothing runs until it fires.
-  let glLost = 0;
+  // may be killed next. Often the context comes back (Android drops it in the background), so that is marked too, and
+  // only a loss with no return counts as a crash. The events don't bubble, so they are caught on the way down; nothing
+  // runs until one fires.
+  let glLost = 0, glDown = false;
+  const stage = (e) => e.target instanceof Element && e.target.id === 'stage';
   document.addEventListener('webglcontextlost', (e) => {
-    if (!(e.target instanceof Element) || e.target.id !== 'stage' || ++glLost > 5) return;
+    if (!stage(e) || glDown || glLost >= 5) return;
+    glLost++; glDown = true;
     events.push([now(), 'g', window.__rig ? r3(window.__rig.s) : -1]);
     flush();
   }, { capture: true, passive: true });
+  document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); } }, { capture: true, passive: true });
 
   function flush() {
     lastFlush = performance.now();
@@ -296,7 +301,8 @@
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
         else if (E[ei][1] === 'l') { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
-        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view crashed here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
+        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view dropped out here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
+        else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         ei++;
       }
       if (head > stallUntil || head < stallFrom) stall.textContent = '';

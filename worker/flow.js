@@ -93,7 +93,7 @@ export function checkBatch(b) {
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l', 'g'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r'].includes(e[1])) return null;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
@@ -187,8 +187,10 @@ export function summarise(c) {
     err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}), ...(num(c.fms) ? { fms: String(c.fms) } : {}), ...(num(c.full) ? { full: String(c.full) } : {}) };
   const st = c.events.filter((e) => e[1] === 'l' && num(e[2]));
   if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
-  const gl = c.events.filter((e) => e[1] === 'g').length;
-  if (gl) m.gl = String(gl);   // times the 3D view crashed (the browser dropped its WebGL context)
+  // losses of the 3D view's WebGL context less the ones that came back; a loss and its return can land in different
+  // batches (the loss is sent at once), so a batch can count -1 and the visit's sum is what matters
+  const gl = c.events.filter((e) => e[1] === 'g').length - c.events.filter((e) => e[1] === 'r').length;
+  if (gl) m.gl = String(gl);
   const h = c.meta ? c.meta.hw : c.hw;
   if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(Math.max(h.full, c.full || 0)) });
   if (c.meta) {

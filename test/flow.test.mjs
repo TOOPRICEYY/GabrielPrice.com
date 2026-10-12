@@ -305,6 +305,12 @@ test('a 3D crash is stored with where it happened, counted per visit, and sent t
   assert.deepEqual(st.events[1], [5200, 'g', 7.25]);
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
   assert.equal(v.gl, 1); assert.equal(v.stalls, 1);
+  // a loss that came back, in the next batch, is not a crash
+  const sid2 = 'acacacacacacacac';
+  await post(batch({ sid: sid2, events: [[5200, 'g', 7.25]] }));
+  await post(batch({ sid: sid2, seq: 1, meta: undefined, samples: [sample(6000, 7.3)], events: [[6100, 'r']] }));
+  const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));
+  assert.ok(!(v2.gl > 0), 'restored');
   const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
   assert.match(client, /addEventListener\('webglcontextlost'[^]*?'g'[^]*?flush\(\)/, 'the recorder logs and sends a lost WebGL context');
   assert.match(fs.readFileSync(new URL('../src/main.html', import.meta.url), 'utf8'), /<canvas id="stage"/, 'the 3D canvas the recorder watches is still #stage');
