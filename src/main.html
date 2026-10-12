@@ -1216,8 +1216,10 @@ buildFigure().then(() => {
 </script>
 <script>
 // drive-ready keys light up while held
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); document.querySelectorAll(`.keys kbd[data-k="${k === 'arrowup' ? 'w' : k === 'arrowdown' ? 's' : k === 'arrowleft' ? 'a' : k === 'arrowright' ? 'd' : k}"]`).forEach(b => b.classList.add('on')); });
-addEventListener('keyup', e => { const k = e.key.toLowerCase(); document.querySelectorAll('.keys kbd.on').forEach(b => { if (b.dataset.k === k || /^arrow/.test(k) || k === 'shift') b.classList.remove('on'); }); });
+const KEYCAP = { w: 'w', a: 'a', s: 's', d: 'd', shift: 'shift', arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' };
+const keycaps = e => document.querySelectorAll(`.keys kbd[data-k="${KEYCAP[e.key.toLowerCase()]}"]`);
+addEventListener('keydown', e => keycaps(e).forEach(b => b.classList.add('on')));
+addEventListener('keyup', e => keycaps(e).forEach(b => b.classList.remove('on')));   // only the key let go
 addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
 // build log lightbox: tap a photo or clip in a .log row to see it large; tap again or Esc to close
 (() => {
