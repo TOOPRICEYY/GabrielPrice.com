@@ -572,7 +572,7 @@ function rigBuild() {
       return { m, ringG, yaw, roll, arrow, shaft, head, x, z, a: 0, s: 0, spin: 0 };
     });
     rigs.couch = { g, mods, wheel, handPts, feet, pedals, SX, x: 0, z: 0, h: 0, vx: 0, vz: 0, w: 0, t: 0, keys: new Set(), last: -1e9, kLast: -1e9, steer: 0, D,
-      dr: 0, dl: 0, u: 0, v: 0, r: 0, cy: 0, slip: 0, sp: 0, phi: 0, df: 0, tk: 0, lean: 0, nod: 0, spPrev: 0, dS: 0, combo: 1, dT: 0, grT: 0, score: 0, bank: 0, bankT: -9, ori: 0, oriS: 0, tap: {}, tut: 0, tutT: 0, dist: 0 };
+      dr: 0, dl: 0, u: 0, v: 0, r: 0, cy: 0, slip: 0, sp: 0, phi: 0, df: 0, tk: 0, lean: 0, nod: 0, spPrev: 0, nitro: 0, boostOn: false, bst: 0, fullT: 0, ori: 0, oriS: 0, tap: {}, tut: 0, tutT: 0, dist: 0 };
     rigs.chase = { p: new THREE.Vector3(), t: new THREE.Vector3(), w: 0 };
   }
 
@@ -851,7 +851,8 @@ function rigUI() {
         const T = clock.elapsedTime;
         Co.tap[sd] = T;   // (the double-tap swing to sideways steering is off: Gabriel 2026-10-12)
       }
-      if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and handbrake here instead of scrolling
+      if (k === ' ' && !e.repeat) couchBoost();                           // Space: spend the drift bar on a boost (it used to be the handbrake)
+      if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and boost here instead of scrolling
     }
     if (rigs.scootOn && (k.length === 1 ? 'wasd '.includes(k) : k.startsWith('arrow'))) {
       const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false; if (rigs.onDrive) rigs.onDrive();
@@ -859,6 +860,16 @@ function rigUI() {
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and hop here instead of scrolling the page
     }
   });
+  // a double tap (phones) or double click anywhere on the scene fires the couch's boost; buttons, cards and the board keep their clicks
+  { let tp = null;
+    addEventListener('pointerdown', (e) => {
+      if (!rigs.couchOn || (e.target.closest && e.target.closest('button, input, a, label, .card, #tpad, #tslide, #lboard, .viewbar, kbd'))) return;
+      const now = performance.now();
+      if (tp && now - tp.t < 320 && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) < 50) { tp = null; if (couchBoost()) e.preventDefault(); }
+      else tp = { t: now, x: e.clientX, y: e.clientY };
+    }, true);
+    addEventListener('dblclick', (e) => { if (rigs.couchOn && e.target.closest && !e.target.closest('input, textarea')) e.preventDefault(); });   // no word selection on a double click
+  }
   addEventListener('keyup', (e) => { rigs.couch.keys.delete(e.key.toLowerCase()); rigs.scooter.keys.delete(e.key.toLowerCase()); if (e.key === ' ') rigs.scooter.hopHeld = false; });
   addEventListener('blur', () => { rigs.couch.keys.clear(); rigs.scooter.keys.clear(); });
   // touch screens: an on-screen pad while the couch or the scooter can be driven. Each button sends the same key events
@@ -866,14 +877,52 @@ function rigUI() {
   if (matchMedia('(hover: none), (pointer: coarse)').matches) {
     const pad = document.createElement('div'); pad.id = 'tpad'; pad.hidden = true; pad.setAttribute('aria-label', 'Driving controls');
     pad.innerHTML = '<div class="tp-l"><button class="tp-act" data-k=" ">Hop</button><div class="tp-row"><button data-k="a" aria-label="Steer left">◀</button><button data-k="d" aria-label="Steer right">▶</button></div></div>' +
-      '<div class="tp-r"><button class="tp-drift" data-k="shift w" hidden>Drift</button><div class="tp-col"><button data-k="w" aria-label="Forward">▲</button><button data-k="s" aria-label="Back">▼</button></div></div>';
+      '<button class="tp-play" hidden>Play ▶</button><div class="tp-r"><button class="tp-drift" data-k="shift w" hidden>Drift</button><div class="tp-col"><button data-k="w" aria-label="Forward">▲</button><button data-k="s" aria-label="Back">▼</button></div></div>';
     document.body.appendChild(pad);
     // Hop (scooter) sits big on the left; Drift (couch) stays on the right and holds the gas too, so one thumb drifts.
     // Keys are counted, so letting go of ▲ while Drift is still held keeps the gas on.
     const hop = pad.querySelector('.tp-act'), drift = pad.querySelector('.tp-drift'), held = {};
     const send = (type, k) => { held[k] = (held[k] || 0) + (type === 'keydown' ? 1 : -1); if (type === 'keydown' ? held[k] === 1 : held[k] === 0) dispatchEvent(new KeyboardEvent(type, { key: k })); };
     const keys = (b) => b.dataset.k === ' ' ? [' '] : b.dataset.k.split(' ');
-    for (const b of pad.querySelectorAll('button')) {
+    const play = pad.querySelector('.tp-play');
+    play.addEventListener('click', () => { const S = rigs.scooter; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
+    // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap to jump
+    const sw = document.createElement('div'); sw.id = 'swipe'; sw.hidden = true; document.body.appendChild(sw); let t0 = null;
+    sw.addEventListener('pointerdown', (e) => { e.preventDefault(); t0 = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, done: false }; sw.setPointerCapture?.(e.pointerId); });
+    sw.addEventListener('pointermove', (e) => {
+      if (!t0 || t0.done || e.pointerId !== t0.id) return;
+      const dx = e.clientX - t0.x, dy = e.clientY - t0.y, S = rigs.scooter; if (Math.hypot(dx, dy) < 30) return;
+      t0.done = true; S.last = clock.elapsedTime;
+      if (Math.abs(dx) > Math.abs(dy)) S.lane = Math.max(-1, Math.min(1, (S.lane || 0) + (dx < 0 ? 1 : -1)));   // swipe left = rider's left = +x
+      else if (dy > 0) S.duckUntil = clock.elapsedTime + .9;
+    });
+    const end = (e) => {
+      if (!t0 || e.pointerId !== t0.id) return; const S = rigs.scooter;
+      if (!t0.done && performance.now() - t0.t < 350) { S.hop = true; S.hopHeld = true; S.last = clock.elapsedTime; clearTimeout(sw.ht); sw.ht = setTimeout(() => { S.hopHeld = false; }, 220); }   // a tap: a good-height jump
+      t0 = null;
+    };
+    sw.addEventListener('pointerup', end); sw.addEventListener('pointercancel', (e) => { t0 = null; });
+    // the couch on phones: a throttle lever down the left edge (full ahead at the top, neutral in the middle, reverse at the
+    // bottom). Gas only while your thumb is on it: let go and it springs back to neutral. Drift, just under it, keeps the gas
+    // on by itself, so the left thumb slides down onto Drift for a slide while the right one steers.
+    const ts = document.createElement('div'); ts.id = 'tslide'; ts.hidden = true;
+    ts.setAttribute('role', 'slider'); ts.setAttribute('aria-label', 'Throttle'); ts.setAttribute('aria-valuemin', '-100'); ts.setAttribute('aria-valuemax', '100');
+    ts.innerHTML = '<span class="tk f">Full</span><span class="tk n">N</span><span class="tk r">R</span><i class="fill"></i><b class="knob"></b>';
+    document.body.appendChild(ts);
+    const tsSet = (v) => {
+      const Co = rigs.couch; v = Math.max(-1, Math.min(1, v)); if (Math.abs(v) < .08) v = 0; else if (Math.abs(v) > .9) v = Math.sign(v);   // clicks into neutral and the ends
+      if (Co.hold && v > .2 && !(Co.thrA > .2)) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); }   // waiting on the line after a lap: push it up to go again
+      Co.thrA = v; Co.last = Co.kLast = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive();
+      const y = (1 - v) / 2 * 100; ts.querySelector('.knob').style.top = y + '%';
+      const f = ts.querySelector('.fill'); f.style.top = Math.min(y, 50) + '%'; f.style.bottom = (100 - Math.max(y, 50)) + '%';
+      ts.classList.toggle('rev', v < 0); ts.setAttribute('aria-valuenow', Math.round(v * 100));
+    };
+    let tsId = null; const tsAt = (e) => { const r = ts.getBoundingClientRect(), pad = 22; return 1 - 2 * (e.clientY - r.top - pad) / (r.height - 2 * pad); };
+    ts.addEventListener('pointerdown', (e) => { e.preventDefault(); tsId = e.pointerId; ts.setPointerCapture?.(e.pointerId); ts.classList.add('on'); tsSet(tsAt(e)); });
+    ts.addEventListener('pointermove', (e) => { if (e.pointerId === tsId) tsSet(tsAt(e)); });
+    const tsUp = (e) => { if (e.pointerId === tsId) { tsId = null; ts.classList.remove('on'); tsSet(0); } };
+    ts.addEventListener('pointerup', tsUp); ts.addEventListener('pointercancel', tsUp); ts.addEventListener('contextmenu', e => e.preventDefault());
+    for (const b of pad.querySelectorAll('button[data-k]')) {
       const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); for (const k of keys(b)) send('keydown', k); };
       const up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); for (const k of keys(b)) send('keyup', k); };
       b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
@@ -887,6 +936,10 @@ function rigUI() {
       pad.classList.toggle('wait', !on);
       if (on && pad.hidden) pad.hidden = false;
       if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }
+      { const c = !!(on && rigs.couchOn); pad.classList.toggle('couch', !!rigs.couchOn); if (ts.hidden === c) ts.hidden = !c;
+        if (!rigs.couchOn && rigs.couch.thrA) tsSet(0); }   // off the couch: the lever goes back to neutral
+      { const S = rigs.scooter, run = !!(rigs.scootOn && S.touchRun); if (!rigs.scootOn && S.touchRun) S.touchRun = false;
+        pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; if (sw.hidden !== !run) sw.hidden = !run; }
       requestAnimationFrame(tick);
     };
     tick();
@@ -895,19 +948,19 @@ function rigUI() {
   // scooter score panel: shown only while the reader drives (gameFrame fills it)
   ui.schud = document.createElement('div'); ui.schud.id = 'schud'; ui.schud.setAttribute('aria-live', 'off');
   ui.schud.innerHTML = '<div><b class="sc">0</b><span class="mu"></span></div><div class="row"><span class="pi"></span><span class="be"></span></div>';
-  // couch speed dial: 0 to 25 km/h over a 240° sweep (its top speed is 24)
+  // couch speed dial: 0 to 40 km/h over a 240° sweep (its top speed is 24; a boost takes it to ~37)
   ui.scdial = document.createElement('div'); ui.scdial.id = 'codial'; ui.scdial.setAttribute('aria-hidden', 'true');
   { const arc = (a0, a1, r) => { const p = (a) => [60 + r * Math.cos(a), 60 + r * Math.sin(a)]; const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
     const A0 = Math.PI * 5 / 6, SW = Math.PI * 4 / 3; let ticks = '';
-    for (let v = 0; v <= 25; v += 5) { const a = A0 + SW * v / 25, c = Math.cos(a), s = Math.sin(a);
+    for (let v = 0; v <= 40; v += 10) { const a = A0 + SW * v / 40, c = Math.cos(a), s = Math.sin(a);
       ticks += `<line x1="${(60 + 40 * c).toFixed(1)}" y1="${(60 + 40 * s).toFixed(1)}" x2="${(60 + 47 * c).toFixed(1)}" y2="${(60 + 47 * s).toFixed(1)}"/><text x="${(60 + 31 * c).toFixed(1)}" y="${(60 + 31 * s).toFixed(1)}">${v}</text>`; }
     ui.scdial.innerHTML = `<svg viewBox="0 0 120 104"><path class="bg" d="${arc(A0, A0 + SW, 50)}"/><path class="fg" d="${arc(A0, A0 + SW, 50)}"/>${ticks}<line class="nd" x1="60" y1="60" x2="60" y2="20"/><circle cx="60" cy="60" r="4"/><text class="kmh" x="60" y="86">0</text><text class="u" x="60" y="98">km/h</text></svg>`;
     ui.scdial.fg = ui.scdial.querySelector('.fg'); ui.scdial.nd = ui.scdial.querySelector('.nd'); ui.scdial.kmh = ui.scdial.querySelector('.kmh');
     ui.scdial.len = ui.scdial.fg.getTotalLength ? 0 : 0; ui.scdial.A0 = A0; ui.scdial.SW = SW; }
   document.body.appendChild(ui.scdial);
-  // couch score panel: big drift score, the slide in progress, best and the course target
+  // couch score panel: the lap clock, best lap, the drift bar and the course target
   ui.cohud = document.createElement('div'); ui.cohud.id = 'cohud'; ui.cohud.setAttribute('aria-live', 'off');
-  ui.cohud.innerHTML = '<span class="lb">Drift score</span><b class="sc">0</b><div class="row"><span class="dr"></span><span class="be"></span></div><div class="tg"></div>';
+  ui.cohud.innerHTML = '<span class="lb">Lap</span><b class="sc">0</b><div class="row"><span class="be"></span></div><div class="nb"><i></i><span></span></div><div class="tg"></div>';
   document.body.appendChild(ui.cohud);
   document.body.appendChild(ui.schud);
   // the little body: each part reddens with the damage it has taken and flashes when hit (seen from behind, like the rider)
@@ -1165,7 +1218,8 @@ function gameHurt(S, T, part, amt, label, fall) {
   G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud();
   starPop(label, S.g.localToWorld(R3.u.set(0, 120, 0)));
   if (G.hp <= 0) {
-    G.downUntil = T + 3.4; G.ragT = T; G.ragV = Math.max(160, Math.abs(S.v) / .35); G.ragSide = Math.random() < .5 ? -1 : 1; G.ragFall = !!fall; S.v = fall ? 0 : .5 * G.ragV; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc);
+    // (phones stay down longer: the leaderboard shows then)
+    G.downUntil = T + (TOUCH ? 5.5 : 3.4); S.touchRun = false; G.ragT = T; G.ragV = Math.max(160, Math.abs(S.v) / .35); G.ragSide = Math.random() < .5 ? -1 : 1; G.ragFall = !!fall; S.v = fall ? 0 : .5 * G.ragV; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc);
     const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = (fall ? 'Fell · ' : 'Wiped out · ') + sc;
     el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
   }
@@ -1420,7 +1474,11 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   }
   if (G.hurtT === T) { ui.schurt.classList.remove('hurt'); void ui.schurt.offsetWidth; ui.schurt.classList.add('hurt'); }
   if (show && G.mini) G.mini = miniDraw(G, T);
-  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0);
+  // the board: beside the run on wide screens; on phones only once you are down (it would cover the walk)
+  { const pl = show && w > .5; if (hud.playing !== pl) { hud.playing = pl; document.body.classList.toggle('playing', pl); } }   // phones hide the orbit hint while you play
+  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0, (G.ragT != null && T < G.downUntil) || !G.on);
+  // the "Take the bars" card steps aside while a run is on
+  { const c = ui.scCard || (ui.scCard = document.querySelector('section[data-s="12"] .card')); if (c) { const on = show && G.on && w > .5; if (c.classList.contains('playing') !== on) c.classList.toggle('playing', on); } }
 }
 function chirp() {
   try {
@@ -1455,7 +1513,8 @@ function scooterFrame(s, dt, w) {
   const manual = rigs.scootOn && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
   let vT, dT;
   if (manual) {
-    const fwd = K.has('w') || K.has('arrowup'), back = K.has('s') || K.has('arrowdown');
+    const run = S.touchRun; if (run) S.last = T;
+    const fwd = run || K.has('w') || K.has('arrowup'), back = (run && T < (S.duckUntil || 0)) || K.has('s') || K.has('arrowdown');
     const left = K.has('a') || K.has('arrowleft'), right = K.has('d') || K.has('arrowright');
     const G = S.game, bst = T < G.boostUntil, vMax = Math.min(GAME.vTop, GAME.v0 + G.dist * GAME.vGain);   // the further you get, the faster
     vT = fwd || bst ? vMax + G.vb + (bst ? GAME.boost : 0) : S.useSlider ? SC.vAuto : 0; S.duckT = back ? 1 : 0;   // down ducks (under birds and high balls)   // a boost carries you even off the gas
@@ -1463,6 +1522,7 @@ function scooterFrame(s, dt, w) {
     // at speed the bars turn less, so the turn rate v·tan δ / L stays near 1.8 rad/s and fast runs stay controllable
     const dLim = Math.min(SC.dMax, Math.atan(1.8 * L / Math.max(1, Math.abs(S.v))));
     dT = left ? dLim : right ? -dLim : S.useSlider ? +ui.scSteer.value * RD : 0;   // rider's left is world +x
+    if (run) { const Ld = 150; let al = Math.atan2((S.lane || 0) * 55 - S.X, Ld) - S.psi; al = Math.atan2(Math.sin(al), Math.cos(al)); dT = Math.max(-dLim, Math.min(dLim, Math.atan(2 * L * Math.sin(al) / Ld) * 1.6)); }   // lanes: pursue x = −55, 0, 55
     if (T < G.slipUntil) dT = dT * .25 + G.slipDir * dLim * .9 * Math.sin((G.slipUntil - T) / .9 * Math.PI);   // skidding in a puddle
   } else {
     // pure pursuit: aim the rear axle at a point on the slalom line Ld ahead; δ = atan(2 L sin α / Ld)
@@ -1527,7 +1587,9 @@ function scooterFrame(s, dt, w) {
   const cw = smooth(clamp01(S.starW || 0)) * w * (1 - e);
   if (cw > .001) {
     const C = rigs.chase, P = S.g.position, off = innerWidth > 720 ? -70 : 0;
-    C.p.set(P.x + off, 330, P.z - 420); C.t.set(P.x + off * .4, 30, P.z + 260); C.fov = 6; C.w = Math.max(C.w, cw);
+    if (innerWidth > 720) { C.p.set(P.x + off, 330, P.z - 420); C.t.set(P.x + off * .4, 30, P.z + 260); }
+    else { C.p.set(P.x + 18, 470, P.z - 600); C.t.set(P.x + 18, 50, P.z + 240); }   // portrait: further back and centred on the rider, so the lanes either side show
+    C.fov = 6; C.w = Math.max(C.w, cw);
   }
   // roll: track the scooter's pose on the course (rear axle X, Z, heading ψ) with the bicycle model ψ' = v·tan δ / L,
   // then hold the scooter still on screen and move the course and floor by the inverse of that pose
@@ -1656,7 +1718,7 @@ function courseFrame(Co, dt, w) {
     const G = C.gates[C.i];
     const ux = p.x - G.x, uz = p.z - G.z, along = ux * Math.sin(G.h) + uz * Math.cos(G.h), lat = ux * Math.cos(G.h) - uz * Math.sin(G.h);
     if (Math.abs(along) < 90 && Math.abs(lat) < G.W + 40) {     // through it, either way
-      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; } C.t0 = T; C.done = false; }
+      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; }
       G.pulse = T; C.i++; C.acc = 0; C.a0 = null;
     }
   } else {
@@ -1668,12 +1730,12 @@ function courseFrame(Co, dt, w) {
   C.arcG.setDrawRange(0, 6 * Math.round(96 * clamp01(Math.abs(C.acc) / (2 * Math.PI))));
   const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
   const target = onRing ? 'Drift a full lap round the roundabout ' + Math.round(Math.abs(C.acc) / (2 * Math.PI) * 100) + '%' : C.i === 0 && C.done ? 'Back through gate 1 to finish' : 'Gate ' + (C.i + 1) + ' of ' + n;
-  return target + (C.t0 >= 0 ? ' · ' + tm(T - C.t0) : '') + (C.best ? ' · best ' + tm(C.best) : '') + (C.flash && T - C.flash < 4 ? ' · lap ' + tm(C.last) + '!' : '');
+  return target;   // the lap clock itself is the big number on #cohud
 }
 // skid marks and smoke from each module that is sliding (its wheel's velocity off its own heading), and while it spins on the spot
 function juiceFrame(Co, dt, w) {
   const J = rigs.course.juice, T = clock.elapsedTime, N = JU.skidN;
-  const slide = clamp01((Math.abs(Co.slip) - 5 * RD) / (20 * RD)) * clamp01(Math.abs(Co.sp) / 60), hb = Co.keys.has(' ') && Math.abs(Co.sp) > 40;
+  const slide = clamp01((Math.abs(Co.slip) - 5 * RD) / (20 * RD)) * clamp01(Math.abs(Co.sp) / 60), hb = false;
   const spin = clamp01(Math.abs(Co.tk) / 1);
   const str = w > .3 ? Math.max(slide, hb ? .8 : 0, spin * .7) : 0;
   Co.g.updateMatrixWorld(true);
@@ -1707,27 +1769,40 @@ function juiceFrame(Co, dt, w) {
   }
   J.pG.attributes.position.needsUpdate = J.pG.attributes.color.needsUpdate = true;
 }
-// drift score: points for slip angle × speed while it slides, a combo that climbs the longer you hold it, banked when it grips again
-function driftHud(Co, dt) {
-  const T = clock.elapsedTime, sl = Math.abs(Co.slip) / RD, drifting = sl > 10 && Math.abs(Co.sp) > 90;
-  if (drifting) { Co.dT += dt; Co.grT = 0; Co.combo = Math.min(5, 1 + Math.floor(Co.dT / 1.5)); Co.dS += sl * Math.abs(Co.sp) * dt * .02 * Co.combo; }
-  else if (Co.dS > 0) { Co.grT += dt; if (Co.grT > .6) { Co.score += Math.round(Co.dS); lbSubmit('co', Co.score); Co.bank = Math.round(Co.dS); Co.bankT = T; Co.dS = 0; Co.dT = 0; Co.combo = 1; } }
-  return Co.dS > 0 ? 'Drift ×' + Co.combo + ' +' + Math.round(Co.dS).toLocaleString() : T - Co.bankT < 2.5 ? '+' + Co.bank.toLocaleString() + '!' : '';
+// drift bar: sliding fills it (slip angle × speed), a double tap / double click or Space spends it on a boost.
+// (It used to bank a drift score; Gabriel swapped that for the boost on 2026-10-12, so the lap time is the only score.)
+const NITRO = { fill: 2.6, burn: 2.4, min: .15, acc: 420 };   // s of good drifting to fill it, s a full bar lasts, least charge to fire, cm/s² of push
+function nitroFrame(Co, dt) {
+  const sl = Math.abs(Co.slip) / RD, T = clock.elapsedTime;
+  if (Co.boostOn) { Co.nitro = Math.max(0, Co.nitro - dt / NITRO.burn); if (!Co.nitro) Co.boostOn = false; }
+  else if (!Co.hold) Co.nitro = Math.min(1, Co.nitro + dt / NITRO.fill * clamp01((sl - 6) / 20) * clamp01((Math.abs(Co.sp) - 80) / 220));
+  if (Co.nitro >= 1 && !Co.fullT) Co.fullT = T; else if (Co.nitro < 1) Co.fullT = 0;
+  Co.bst = (Co.bst || 0) + ((Co.boostOn ? 1 : 0) - (Co.bst || 0)) * (1 - Math.pow(Co.boostOn ? .001 : .05, dt));   // eased, for the juice
 }
-// ----- live leaderboards (scooter: distance + stars; couch: drift score) -----
-// On claude.ai the artifact's db holds one doc per player, lb/<their id> {tag, sc, co}; everyone reads, each writes only their own.
-// On the hosted site the Worker's /api/lb does the same job. A tag of up to 10 characters names you; it lives in this browser.
-const LB = { el: null, mode: null, rows: { sc: [], co: [] }, mine: { sc: 0, co: 0 }, tag: '', db: null, me: null, api: null, pend: {}, busy: false, drawn: '', a: 0 };
+function couchBoost() {
+  const Co = rigs.couch; if (!rigs.couchOn || Co.hold || Co.boostOn || Co.nitro < NITRO.min || (Co.goT != null && clock.elapsedTime < Co.goT)) return false;
+  Co.boostOn = true; Co.last = Co.kLast = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive();
+  const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = Co.nitro >= 1 ? 'Full boost!' : 'Boost!';
+  el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+  whoosh(); return true;
+}
+// ----- live leaderboards (scooter: metres + 10 per star, higher wins; couch: full-course time in ms, lower wins) -----
+// On claude.ai the artifact's db holds one doc per player, lb/<their id> {tag, sc, lap}; everyone reads, each writes only their own.
+// On the hosted site the Worker's /api/lb does the same job. A name of up to 10 characters, entered at the end of a run, labels you.
+// While you play the board is small (top 3); when you go down or finish it opens up with your name box.
+const LB = { el: null, mode: null, full: false, rows: { sc: [], lap: [] }, mine: { sc: 0, lap: 0 }, tag: '', db: null, me: null, api: null, pend: {}, busy: false, drawn: '', a: 0, fresh: false };
+const LBK = { sc: { title: 'Top riders', asc: false, fmt: (v) => v.toLocaleString() }, lap: { title: 'Fastest laps', asc: true, fmt: (v) => Math.floor(v / 60000) + ':' + (v % 60000 / 1000).toFixed(1).padStart(4, '0') } };
+const lbBetter = (k, a, b) => !b || (LBK[k].asc ? a < b : a > b);
 function lbTag(v) { try { if (v != null) localStorage.setItem('gp.tag', v); return localStorage.getItem('gp.tag') || ''; } catch (e) { return v || ''; } }
 function lbId() { try { let id = localStorage.getItem('gp.lbid'); if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('gp.lbid', id); } return id; } catch (e) { return 'anon'; } }
 function lbInit() {
   if (LB.el) return; LB.tag = lbTag();
   const el = LB.el = document.createElement('div'); el.id = 'lboard'; el.setAttribute('aria-label', 'Leaderboard');
-  el.innerHTML = '<div class="hd"><b>Leaderboard</b><span class="lv">live</span></div><ol></ol><div class="you"></div><label class="tg">Your tag <input maxlength="10" autocomplete="off" spellcheck="false" placeholder="name"></label>';
+  el.innerHTML = '<div class="hd"><b>Leaderboard</b><span class="lv">live</span></div><ol></ol><div class="you"></div><label class="tg"><span>Your name</span><input maxlength="10" autocomplete="off" spellcheck="false" placeholder="name"></label>';
   document.body.appendChild(el);
   const inp = el.querySelector('input'); inp.value = LB.tag;
   inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^A-Za-z0-9 ._-]/g, '').slice(0, 10); });
-  inp.addEventListener('change', () => { LB.tag = lbTag(inp.value.trim()); if (LB.tag.length) { if (LB.mine.sc) LB.pend.sc = LB.mine.sc; if (LB.mine.co) LB.pend.co = LB.mine.co; lbFlush(); } });
+  inp.addEventListener('change', () => { LB.tag = lbTag(inp.value.trim()); if (LB.tag.length) { for (const k of ['sc', 'lap']) if (LB.mine[k]) LB.pend[k] = LB.mine[k]; LB.drawn = ''; lbDraw(); lbFlush(); } });
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
   const C = window.claude;
   if (C && C.use) {
@@ -1735,8 +1810,8 @@ function lbInit() {
       if (!db || !user) return;
       try { LB.me = await user.id(); } catch (e) { return; }
       LB.db = db;
-      try { const d = await db.doc('lb/' + LB.me).get(); if (d.exists) { const b = d.data(); LB.mine.sc = +b.sc || 0; LB.mine.co = +b.co || 0; if (!LB.tag && b.tag) { LB.tag = lbTag(b.tag); inp.value = LB.tag; } } } catch (e) {}
-      for (const k of ['sc', 'co']) db.collection('lb').orderBy(k, 'desc').limit(10).onSnapshot((snap) => {
+      try { const d = await db.doc('lb/' + LB.me).get(); if (d.exists) { const b = d.data(); LB.mine.sc = +b.sc || 0; LB.mine.lap = +b.lap || 0; if (!LB.tag && b.tag) { LB.tag = lbTag(b.tag); inp.value = LB.tag; } } } catch (e) {}
+      for (const k of ['sc', 'lap']) db.collection('lb').where(k, '>', 0).orderBy(k, LBK[k].asc ? 'asc' : 'desc').limit(10).onSnapshot((snap) => {
         LB.rows[k] = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => +x[k] > 0).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x[k], you: x.id === LB.me }));
         LB.drawn = ''; lbDraw();
       }, () => {});
@@ -1750,22 +1825,23 @@ function lbPoll() {
   if (!LB.api) return;
   fetch(LB.api + '?id=' + encodeURIComponent(LB.me), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
     if (!j) { LB.api = null; return; }
-    for (const k of ['sc', 'co']) LB.rows[k] = (j[k] || []).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x.score || 0, you: !!x.you }));   // the Worker marks your own row; it never sends ids
+    for (const k of ['sc', 'lap']) LB.rows[k] = (j[k] || []).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x.score || 0, you: !!x.you }));   // the Worker marks your own row; it never sends ids
     LB.drawn = ''; lbDraw();
   }).catch(() => { LB.api = null; });
   clearTimeout(LB.pt); LB.pt = setTimeout(lbPoll, LB.mode ? 15000 : 60000);
 }
-// a new personal best: remember it and send it (one write at a time)
+// a new personal best: remember it and send it (one write at a time); the end-of-run board then asks for your name
 function lbSubmit(k, score) {
-  score = Math.round(score); if (!(score > LB.mine[k])) return;
-  LB.mine[k] = score; LB.pend[k] = score; lbFlush();
+  score = Math.round(score); if (!(score > 0) || !lbBetter(k, score, LB.mine[k])) return;
+  LB.mine[k] = score; LB.pend[k] = score; LB.fresh = true; LB.drawn = ''; lbFlush();
 }
 async function lbFlush() {
   if (LB.busy || !Object.keys(LB.pend).length) return;
   const tag = LB.tag || '???';
   if (LB.db && LB.me) {
     LB.busy = true; LB.pend = {};
-    try { await LB.db.doc('lb/' + LB.me).set({ tag, sc: LB.mine.sc, co: LB.mine.co }); } catch (e) { if (e && e.code === 'invalid_argument') { LB.ro = true; LB.drawn = ''; lbDraw(); } }   // view-only visitors can read the board, not post
+    const body = { tag }; for (const k of ['sc', 'lap']) if (LB.mine[k]) body[k] = LB.mine[k];
+    try { await LB.db.doc('lb/' + LB.me).set(body); } catch (e) { if (e && e.code === 'invalid_argument') { LB.ro = true; LB.drawn = ''; lbDraw(); } }   // view-only visitors can read the board, not post
     LB.busy = false; if (Object.keys(LB.pend).length) lbFlush();
   } else if (LB.api) {
     LB.busy = true; const p = LB.pend; LB.pend = {};
@@ -1775,46 +1851,60 @@ async function lbFlush() {
 }
 function lbDraw() {
   const el = LB.el; if (!el || !LB.mode) return;
-  const k = LB.mode, rows = LB.rows[k], key = k + '|' + LB.tag + '|' + LB.mine[k] + '|' + rows.map(x => x.tag + x.score + (x.you ? '*' : '')).join();
+  const k = LB.mode, K = LBK[k], rows = LB.rows[k], key = k + '|' + LB.full + '|' + LB.fresh + '|' + LB.tag + '|' + LB.mine[k] + '|' + LB.ro + '|' + rows.map(x => x.tag + x.score + (x.you ? '*' : '')).join();
   if (key === LB.drawn) return; LB.drawn = key;
-  el.querySelector('.hd b').textContent = k === 'sc' ? 'Top riders' : 'Top drifters';
+  el.classList.toggle('mini', !LB.full);
+  el.querySelector('.hd b').textContent = K.title;
   el.querySelector('.lv').hidden = !(LB.db || LB.api);
   const ol = el.querySelector('ol'); ol.replaceChildren();
   if (!rows.length) { const li = document.createElement('li'); li.className = 'em'; li.textContent = LB.db || LB.api ? 'No scores yet. Be first.' : 'Scores show here when you are signed in.'; ol.appendChild(li); }
-  rows.forEach((x, i) => { const li = document.createElement('li'); li.className = x.you ? 'me' : ''; const t = document.createElement('span'); t.textContent = (i + 1) + '. ' + x.tag; const s = document.createElement('b'); s.textContent = x.score.toLocaleString(); li.append(t, s); ol.appendChild(li); });
+  rows.forEach((x, i) => { const li = document.createElement('li'); li.className = x.you ? 'me' : ''; const t = document.createElement('span'); t.textContent = (i + 1) + '. ' + x.tag; const s = document.createElement('b'); s.textContent = K.fmt(x.score); li.append(t, s); ol.appendChild(li); });
   const you = el.querySelector('.you'), inTop = rows.some(x => x.you);
-  you.textContent = LB.ro ? (LB.mine[k] ? 'Your best ' + LB.mine[k].toLocaleString() + '. ' : '') + 'This link can view the board but not post to it.' : LB.mine[k] && !inTop ? 'Your best ' + LB.mine[k].toLocaleString() : ''; you.hidden = !you.textContent;
-  el.querySelector('.tg').hidden = !(LB.db || LB.api) || !!LB.ro;
+  you.textContent = LB.ro ? (LB.mine[k] ? 'Your best ' + K.fmt(LB.mine[k]) + '. ' : '') + 'This link can view the board but not post to it.'
+    : LB.full && LB.fresh ? 'New best ' + K.fmt(LB.mine[k]) + '!' + (LB.tag ? '' : ' Add your name:') : LB.mine[k] && !inTop ? 'Your best ' + K.fmt(LB.mine[k]) : '';
+  you.hidden = !you.textContent;
+  el.querySelector('.tg').hidden = !LB.full || !(LB.db || LB.api) || !!LB.ro;   // the name box: at the end of a run
 }
-// shown beside whichever game you are playing, once you have taken over
-function lbShow(k, a) {
+// beside whichever game you are playing once you have taken over: small while you play, full (with the name box) at the end
+function lbShow(k, a, full) {
   if (!LB.el) lbInit();
-  if (a > .5 && LB.mode !== k) { LB.mode = k; LB.drawn = ''; lbDraw(); if (LB.api) lbPoll(); }
-  if (a <= .5 && LB.mode === k) LB.mode = null;
+  if (a > .5 && LB.mode !== k) { LB.mode = k; LB.drawn = ''; if (LB.api) lbPoll(); }
+  if (a <= .5 && LB.mode === k) { LB.mode = null; LB.fresh = false; }
+  if (LB.mode === k && LB.full !== !!full) { LB.full = !!full; if (!full) LB.fresh = false; LB.drawn = ''; }
+  if (LB.mode) lbDraw();
   const o = LB.mode ? 1 : 0; if (LB.a !== o) { LB.a = o; LB.el.classList.toggle('on', !!o); }
 }
 function couchBest(v) { try { if (v != null) localStorage.setItem('gp.couch.best', v); return +localStorage.getItem('gp.couch.best') || 0; } catch (e) { return v || 0; } }
 // the couch's score panel (top middle) and speed dial (bottom right; top right on touch screens)
 function couchHud(Co, show, live, target) {
   const H = ui.cohud, D = ui.scdial; if (!H) return;
-  if (show || LB.mode === 'co') lbShow('co', show ? 1 : 0);
+  if (show || LB.mode === 'lap') lbShow('lap', show ? 1 : 0, !!Co.hold);   // small while you drive, full on the line after a lap
+  if (H.playing !== show) { H.playing = show; document.body.classList.toggle('playing', show || !!(ui.schud && ui.schud.playing)); }   // phones hide the orbit hint while you play
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
   H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) return;
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
-  if (Co.score > (Co.best ?? (Co.best = couchBest()))) Co.best = couchBest(Co.score);
-  const txt = Co.score + '|' + live + '|' + target + '|' + Co.best;
+  // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
+  const C = rigs.course, T = clock.elapsedTime, fmt = LBK.lap.fmt, run = C.t0 >= 0 ? (T - C.t0) * 1000 : 0, held = Co.hold && C.last;
+  const big = held ? fmt(C.last * 1000) : run ? fmt(run) : '0:00.0', best = C.best || (LB.mine.lap / 1000);
+  const txt = big + '|' + live + '|' + target + '|' + best;
   if (txt !== H.txt) {
-    if (H.sc0 != null && Co.score > H.sc0) { H.classList.remove('pulse'); void H.offsetWidth; H.classList.add('pulse'); }
-    H.txt = txt; H.sc0 = Co.score;
-    H.querySelector('.sc').textContent = Co.score.toLocaleString(); H.querySelector('.dr').textContent = live;
-    H.querySelector('.be').textContent = 'Best ' + Co.best.toLocaleString(); H.querySelector('.tg').textContent = target;
-    H.classList.toggle('live', Co.dS > 0);
+    H.txt = txt;
+    H.querySelector('.lb').textContent = held ? 'Lap time' : 'Lap';
+    H.querySelector('.sc').textContent = big;
+    H.querySelector('.be').textContent = best ? 'Best ' + fmt(best * 1000) : 'No lap yet'; H.querySelector('.tg').textContent = held ? '' : target;
   }
-  const kmh = Math.abs(Co.sp) * .036, f = clamp01(kmh / 25), a = D.A0 + D.SW * f;
+  // the drift bar: fills while you slide, glows when it can fire, drains while it burns
+  { const N = H.nb || (H.nb = H.querySelector('.nb')), f = Co.nitro || 0, st = Co.boostOn ? 'burn' : f >= 1 ? 'full' : f >= NITRO.min ? 'ready' : 'fill';
+    N.firstChild.style.transform = `scaleX(${f.toFixed(3)})`;
+    if (N.st !== st) { N.st = st; N.className = 'nb ' + st; N.lastChild.textContent = st === 'burn' ? 'Boost!' : st === 'fill' ? 'Drift to fill' : TOUCH ? 'Double-tap to boost' : 'Space to boost'; }
+    H.classList.toggle('live', st === 'full' || st === 'burn'); }
+  if (C.flash && H.fl !== C.flash) { H.fl = C.flash; H.classList.remove('pulse'); void H.offsetWidth; H.classList.add('pulse'); }
+  const kmh = Math.abs(Co.sp) * .036, f = clamp01(kmh / 40), a = D.A0 + D.SW * f;
   D.nd.setAttribute('transform', `rotate(${(a * 180 / Math.PI + 90).toFixed(1)} 60 60)`);
   if (!D.L) { try { D.L = D.fg.getTotalLength(); D.fg.style.strokeDasharray = D.L; } catch (e) { D.L = 1; } }
   D.fg.style.strokeDashoffset = (D.L * (1 - f)).toFixed(1); const k = Math.round(kmh); if (D.k !== k) { D.k = k; D.kmh.textContent = k; }
-  D.classList.toggle('boost', Co.dS > 0);
+  D.classList.toggle('boost', !!Co.boostOn);
+  if (ui.boostfx) { const b = (Co.bst || 0) * (Co.boostOn ? 1 : .6); ui.boostfx.style.opacity = b.toFixed(3); ui.boostfx.classList.toggle('on', b > .02); }   // the scooter's speed streaks
 }
 // just-in-time tips while you drive: each one waits for you to try it, then the next
 const TIPS = [
@@ -1843,7 +1933,7 @@ function couchCues(Co, Tn, drive, st) {
   if (!drive) { if (Co.cue && el) el.className = 'gone'; Co.cue = null; Co.goT = null; return; }
   if (Co.goT == null) { Co.goT = Tn + 2.4; Co.cue = 'count'; Co.cn = 4; Co.turnT = 0; }
   if (Tn < Co.goT) { const n = Math.ceil((Co.goT - Tn) / .8); if (n !== Co.cn) { Co.cn = n; bigCue(String(n), '', true); } return; }
-  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? '▲ to drive' : 'W to drive'); return; }
+  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? 'slide up to drive' : 'W to drive'); return; }
   // after GO the cues follow the course: DRIFT at the roundabout, Keep going while you slide round it, Return to start once the
   // lap is done, and the lap time when you cross gate 1. A slide has to hold .25 s to count and lapse .8 s to end, so they don't flicker.
   const C = rigs.course, n = CC.gates.length, sl = Math.abs(Co.slip) / RD, raw = sl > 10 && Math.abs(Co.sp) > 90;
@@ -1852,12 +1942,12 @@ function couchCues(Co, Tn, drive, st) {
   if (C.flash && Co.lapCue !== C.flash) {          // over the line: the lap time
     Co.lapCue = C.flash; Co.cue = 'wait'; Co.waitT = Tn + 1.8; const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
     bigCue(tm(C.last), C.best === C.last ? 'new best lap' : 'lap · best ' + tm(C.best));
-    // finished: back on the start line, stopped, a fresh drift score; it waits there for a new press of W (or ▲)
-    Object.assign(Co, { x: 0, z: 0, h: 0, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, slip: 0, phi: 0, dl: 0, cy: 0, tk: 0, dS: 0, dT: 0, combo: 1, score: 0, hold: true, px: undefined });
+    // finished: back on the start line, stopped, an empty drift bar; it waits there for a new press of W (or ▲)
+    Object.assign(Co, { x: 0, z: 0, h: 0, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, slip: 0, phi: 0, dl: 0, cy: 0, tk: 0, nitro: 0, boostOn: false, bst: 0, hold: true, px: undefined });
     Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
     return;
   }
-  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
+  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? 'slide up to go again' : 'W to go again'); } return; }
   const P = Co.g.position, near = Math.hypot(P.x - CC.ring[0], P.z - CC.ring[1]) < CC.ringR + 120;   // at the roundabout itself, not just past the last gate
   if (C.i === n && near) {                          // on the roundabout
     if (Co.dOn && Co.cue !== 'keep') { Co.cue = 'keep'; bigCue('Keep drifting', 'all the way round'); }
@@ -1894,7 +1984,7 @@ function couchFrame(s, dt, w) {
   const pk = smooth(seg(s, 10.2, 10.7));             // parking: 0 = free driving, 1 = stopped in front of the hearth
   const wDrive = w * (1 - smooth(seg(s, 10.45, 10.8)));  // hands and feet on the controls until he sits back
   let vx = 0, vz = 0, om = +ui.cwSpin.value;
-  const K = Co.keys, Tn = clock.elapsedTime; if (K.size) Co.last = Co.kLast = Tn;
+  const K = Co.keys, Tn = clock.elapsedTime; if (K.size || Co.thrA) Co.last = Co.kLast = Tn;   // the phone's throttle lever counts as a key held
   const VMAX = 70, WMAX = .8, k = 1 - Math.pow(.02, dt);
   // keys: driven like a car (Ackermann on the front modules, rear fixed) with the back end stepping out in a drift; the camera
   // pulls in behind for a third-person view. Left alone for 3 s, it goes back to showing off what a holonomic base can do.
@@ -1905,8 +1995,8 @@ function couchFrame(s, dt, w) {
   if (drive) {
     const has = (a, b) => K.has(a) || K.has(b);
     const st = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
-    const thr = Co.hold || (Co.goT != null && Tn < Co.goT) ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);   // held on the line until GO
-    const hb = K.has(' ');                                                // handbrake: the rear lets go
+    const thr = Co.hold || (Co.goT != null && Tn < Co.goT) ? 0 : ((has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0) || Co.thrA || 0);   // held on the line until GO; phones: the lever, -1 to 1
+    const hb = false;                                                     // (Space was the handbrake; it fires the boost now)
     Co.df += ((K.has('shift') ? 1 : 0) - Co.df) * (1 - Math.pow(.02, dt));   // Shift: drift mode (oversteer, loose rear); otherwise it grips
     // steering frame: the body stays put while the modules re-aim, so the direction of travel swings with it (with some speed lost)
     const dO = (Co.ori * Math.PI / 2 - Co.oriS) * (1 - Math.pow(1e-4, dt)); Co.oriS += dO; Co.phi += dO;
@@ -1917,6 +2007,7 @@ function couchFrame(s, dt, w) {
     let a = thr * CD.acc - CD.drag * Co.sp;
     if (thr && Math.sign(thr) !== Math.sign(Co.sp) && Math.abs(Co.sp) > 5) a = -Math.sign(Co.sp) * CD.brake;
     if (hb) a -= Math.sign(Co.sp) * Math.min(Math.abs(Co.sp) / dt, CD.brake * .4);
+    if (Co.boostOn && Co.sp > -5) a += NITRO.acc;                        // boost: a hard push along the heading, past the usual top speed
     Co.sp += a * dt;
     // the body yaws at the Ackermann rate u·tan δ / L, overdriven as speed builds (oversteer); the direction of travel only
     // follows the heading as fast as the tyres grip, so in a hard turn the couch points into the corner and slides: a drift
@@ -1973,14 +2064,14 @@ function couchFrame(s, dt, w) {
     const sy = Math.sin(Co.cy), cy = Math.cos(Co.cy);
     const spd01 = clamp01(Math.abs(Co.sp) / CD.vTop), back = 720 - 140 * spd01;           // it pulls in a little as speed builds (the FOV opens)
     C.p.set(P.x - sy * back, 330 - 60 * spd01, P.z - cy * back); C.t.set(P.x + sy * 260, 30, P.z + cy * 260); C.w = Math.max(smooth(Co.dr), rigs.chasePre || 0) * w * (1 - pk);
-    C.fov = JU.fov * spd01 * spd01;
+    C.fov = JU.fov * spd01 * spd01 + 14 * (Co.bst || 0);                 // a boost throws the view wide
     // shake while sliding hard, from a few sines so it reads as rumble rather than jitter
-    const sh = clamp01((Math.abs(Co.slip) - 6 * RD) / (30 * RD)) * spd01 * 6, Tc = clock.elapsedTime;
+    const sh = clamp01((Math.abs(Co.slip) - 6 * RD) / (30 * RD)) * spd01 * 6 + 5 * (Co.bst || 0), Tc = clock.elapsedTime;
     C.p.x += sh * Math.sin(Tc * 37.1) * Math.cos(Tc * 13.3); C.p.y += sh * .7 * Math.sin(Tc * 41.7 + 1); C.t.y += sh * .4 * Math.sin(Tc * 29.3 + 2);
     if (innerWidth > 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
-  { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); const live = driftHud(Co, dt), tg = courseFrame(Co, dt, wc); tipFrame(Co, dt, false, ''); couchHud(Co, wc > .5, live, tg); }
+  { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); nitroFrame(Co, dt); const live = '', tg = courseFrame(Co, dt, wc); tipFrame(Co, dt, false, ''); couchHud(Co, wc > .5, live, tg); }
   // the wheel turns with the spin rate (it is what he steers with), within the T128's lock
   const stT = Co.dr > .5 ? Co.dl * 2.4 : Co.sw / WMAX * 1.3;            // driving, the T128 turns with the steering angle (+ = counterclockwise to him = left)
   Co.steer += (Math.max(-1.2, Math.min(1.2, stT)) - Co.steer) * (1 - Math.pow(.01, dt));
