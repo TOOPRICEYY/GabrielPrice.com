@@ -162,7 +162,20 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 .keys kbd.wide { min-width: 120px; }
 .keys kbd.on { background: var(--cobalt); color: var(--vellum); transform: translateY(2px); }
 .krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
-@media (hover: none), (pointer: coarse) { section.drive .keys, section.drive .keyhint, .kb { display: none; } }   /* keyboard hints mean nothing on touch screens */
+.touchonly { display: none; }
+@media (hover: none), (pointer: coarse) { section.drive .keys, section.drive .keyhint:not(.touchonly), .kb, .kbonly { display: none; } .touchonly { display: revert; } }   /* keyboard hints mean nothing on touch screens */
+/* on-screen driving pad (touch screens only, built in rigs.js) */
+#tpad { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+#tpad[hidden] { display: none; }
+#tpad > div { display: flex; gap: 10px; align-items: flex-end; }
+#tpad .tp-col { display: grid; gap: 10px; }
+#tpad button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--graphite);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font: 500 20px var(--f-mono); display: grid; place-items: center; transition: background .1s, transform .1s; }
+#tpad .tp-act { width: 72px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+#tpad button.on { background: var(--cobalt); color: var(--vellum); transform: scale(.94); }
+@media (hover: none), (pointer: coarse) { section[data-s="12"] { padding-bottom: calc(8vh + 160px); } section.drive { padding-bottom: calc(12vh + 160px); padding-right: 16px; } }   /* the cards sit above the pad */
 /* lead clip: the card's main story, full card width */
 .card.vid { width: min(480px, 100%); }
 .lead { margin: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -225,6 +238,10 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   main section.gallery .gal-wrap { width: min(620px, 50vw); }
   main section.gallery .gal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.starpop { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--f-mono); font-weight: 500; font-size: 13px; letter-spacing: .08em;
+  color: var(--graphite); opacity: .8; animation: starpop .9s ease-out forwards; }
+@keyframes starpop { 0% { opacity: 0; transform: translate(-50%, -40%); } 20% { opacity: .8; } 100% { opacity: 0; transform: translate(-50%, -140%); } }
+@media (prefers-reduced-motion: reduce) { .starpop { animation-duration: .01s; } }
 .alsolist li { border: 1px solid var(--rule); padding: 3px 8px; background: var(--sheet); }
 .card .media { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 @media (max-width: 720px) {
@@ -419,9 +436,10 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars.</h2>
-      <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop.</p>
+      <p class="touchonly">Use the pad at the bottom: ◀ ▶ to steer, ▲ to ride, Hop to jump. Take over and hit a ramp flat out to catch its star.</p>
+      <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop. Take over and hit a ramp flat out to catch its star.</p>
       <div class="jsonly" hidden><div class="readout" id="scRead"></div><div class="ctl">
-        <label>Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
+        <label class="kbonly">Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
         <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
       </div></div>
     </div>
@@ -452,6 +470,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="krow"><kbd class="wide" data-k="shift">Shift</kbd><span>drift</span></div>
     </div>
     <p class="keyhint">Take the wheel. Or keep scrolling.</p>
+    <p class="keyhint touchonly">Drive with the pad below. Tap ◀ or ▶ twice to swing the wheels sideways. Or keep scrolling.</p>
   </section>
 
   <section class="right" data-s="15">
@@ -1143,7 +1162,7 @@ function frame() {
   if (kicker.ready) { figure.updateMatrixWorld(true); kicker.parts.housing.m.localToWorld(devAnchor.copy(kicker.parts.housing.c)); }
   applyCam(s);
   if (rigs.chase && rigs.chase.w > 0) { camPos.lerp(rigs.chase.p, rigs.chase.w); camTgt.lerp(rigs.chase.t, rigs.chase.w); }   // third-person drive (couch)
-  { const fv = (innerWidth <= 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
+  { const fv = (innerWidth <= 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0) + (rigs.kick || 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
   { // phones: the card docks over the bottom half, so shift the picture up: the subject sits ~28% down the screen (none in the hero or the drive)
     const vo = innerWidth <= 720 ? .25 * smooth(seg(s, .5, 1)) * (1 - (rigs.chase ? rigs.chase.w : 0)) : 0;
     if (Math.abs(vo - camVO) > 1e-4) { camVO = vo; if (vo) camera.setViewOffset(innerWidth, innerHeight, 0, vo * innerHeight, innerWidth, innerHeight); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }

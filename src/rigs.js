@@ -62,6 +62,7 @@ const COUCH_IN = 1, COUCH_HOLD = 10.05;
 // scooter course: cones every SC.gap cm down the middle of a sidewalk; the autopilot weaves x = amp·sin(π z / gap)
 const SC = { gap: 240, amp: 60, len: 1920, walkW: 180, slab: 120, nCone: 4, vAuto: 90, L: 51.2, dMax: 35 * RD,
   rampX: -62, rampW: 34, rampL: 50, rampH: 18, hop: 200, g: 981 };   // kicker ramps beside every other cone, opposite the slalom line
+const STAR = { y: 96, dz: 44, r: 30, back: 6 };   // star centre height over the walk, its distance past a ramp's lip, catch radius (cm), respawn (s)
 // exploded view: each part's offset in Fusion axes (x = rider's right, y = forward, z = up), cm, relative to its parent
 // (the wheel pulley rides in the right rear wheel, the front wheels and fork on the steering, the motor pulley on the motor)
 const SC_EX = { kneepad: [0, 0, 14], column: [0, 0, 16], basket: [0, 24, 6], fork: [0, 6, -10], wFL: [-14, 6, -10], wFR: [14, 6, -10],
@@ -376,6 +377,30 @@ function rigBuild() {
       const m = new THREE.Mesh(rg, CM.ramp); m.castShadow = m.receiveShadow = true; r.add(m);
       const lip = new THREE.Mesh(new THREE.BoxGeometry(SC.rampW, 1.4, 2.4), CM.cone); lip.position.set(0, SC.rampH - .6, SC.rampL / 2 - 1.2); r.add(lip);
     }
+    // collectable stars where the rider's chest passes at the top of a full-speed jump off each ramp (see starsFrame)
+    const sp = [];
+    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 2.6 : 6; sp.push(new THREE.Vector2(Math.cos(a) * rr, Math.sin(a) * rr)); }
+    const sg = new THREE.ExtrudeGeometry(new THREE.Shape(sp), { depth: 1.2, bevelEnabled: true, bevelThickness: .5, bevelSize: .4, bevelSegments: 1 }); sg.center();
+    const sMat = new THREE.MeshStandardMaterial({ color: 0xf6ead2, emissive: 0xffc870, emissiveIntensity: .25, roughness: .45, metalness: .1, flatShading: true, transparent: true });
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,200,.8)'); gr.addColorStop(.35, 'rgba(255,210,150,.25)'); gr.addColorStop(1, 'rgba(255,79,154,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64);
+    const glowTex = new THREE.CanvasTexture(cv);
+    const stars = [];
+    for (let k = -SC.nCone; k < SC.nCone; k += 2) {
+      const g = new THREE.Group(); g.position.set(SC.rampX, STAR.y, SC.gap / 2 + k * SC.gap + SC.rampL / 2 + STAR.dz); course.add(g);
+      const m = new THREE.Mesh(sg, sMat.clone()); m.castShadow = true; m.material.userData.own = true; g.add(m);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.material.userData.own = true; glow.scale.setScalar(22); g.add(glow);
+      stars.push({ g, m, glow, k });
+    }
+    // burst pool: sparks and a ring, reused by whichever star was taken last
+    const nP = 18, pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nP * 3), 3));
+    const pc = new Float32Array(nP * 3); for (let i = 0; i < nP; i++) new THREE.Color(i % 4 ? 0xffe2a8 : 0xbff9ff).toArray(pc, i * 3);
+    pg.setAttribute('color', new THREE.BufferAttribute(pc, 3));
+    const sparks = new THREE.Points(pg, new THREE.PointsMaterial({ size: 1.8, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    sparks.material.userData.own = true; sparks.visible = false; sparks.frustumCulled = false; course.add(sparks);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffe2a8, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide }));
+    ring.material.userData.own = true; ring.visible = false; course.add(ring);
+    CM.stars = { list: stars, sparks, ring, vel: new Float32Array(nP * 3), t0: -1e9, got: {}, n: 0, combo: 0, last: -1e9 };
     rigs.scooter = { g, root, kneepad, steer, wheels: Object.values(wheels), motor, grips, ratio: wheelPulleyR / motorPulleyR, rW: wheelPulleyR, rM: motorPulleyR,
       rearY: wsJoint('scooter6', 'Rear L Wheel').origin[1], psi: 0, X: 0, Z: 0, v: 0, spin: 0, delta: 0, D, ex, box, piv, course, cones, CM,
       keys: new Set(), last: -1e9, knock: {}, hits: 0, y: 0, vy: 0, p: 0, air: false, hop: false, jumps: 0 };
@@ -766,6 +791,28 @@ function rigUI() {
   });
   addEventListener('keyup', (e) => { rigs.couch.keys.delete(e.key.toLowerCase()); rigs.scooter.keys.delete(e.key.toLowerCase()); });
   addEventListener('blur', () => { rigs.couch.keys.clear(); rigs.scooter.keys.clear(); });
+  // touch screens: an on-screen pad while the couch or the scooter can be driven. Each button sends the same key events
+  // the keyboard does (◀ ▶ = A D, ▲ ▼ = W S, the action button = Shift drift on the couch, Space hop on the scooter)
+  if (matchMedia('(hover: none), (pointer: coarse)').matches) {
+    const pad = document.createElement('div'); pad.id = 'tpad'; pad.hidden = true; pad.setAttribute('aria-label', 'Driving controls');
+    pad.innerHTML = '<div class="tp-l"><button data-k="a" aria-label="Steer left">◀</button><button data-k="d" aria-label="Steer right">▶</button></div>' +
+      '<div class="tp-r"><button class="tp-act" data-k=" ">Hop</button><div class="tp-col"><button data-k="w" aria-label="Forward">▲</button><button data-k="s" aria-label="Back">▼</button></div></div>';
+    document.body.appendChild(pad);
+    const act = pad.querySelector('.tp-act'), send = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
+    for (const b of pad.querySelectorAll('button')) {
+      const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); send('keydown', b.dataset.k); };
+      const up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); send('keyup', b.dataset.k); };
+      b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+      b.addEventListener('contextmenu', e => e.preventDefault());
+    }
+    const tick = () => {
+      const on = rigs.ready && (rigs.couchOn || rigs.scootOn);
+      if (pad.hidden === on) pad.hidden = !on;
+      if (on) { const couch = rigs.couchOn; act.dataset.k = couch ? 'shift' : ' '; act.textContent = couch ? 'Drift' : 'Hop'; }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }
   ui.scSteer.addEventListener('input', () => { rigs.scooter.last = clock.elapsedTime; rigs.scooter.useSlider = true; });
   ui.scBelt = $('scBelt');
   ui.asRead = $('asRead'); ui.laser = $('laser');
@@ -899,6 +946,74 @@ function crutchFrame(s, dt, w) {
 // punches in on the belt, the scooter stops and comes apart, then it goes back together and the reader can drive it.
 // The autopilot is pure pursuit on the slalom line; any key (or the steering slider) takes over, and 3 s of nothing hands back.
 const SCF = { v: new THREE.Vector3(), q: new THREE.Quaternion(), a: new THREE.Vector3() };
+// stars over the jumps: each spins and bobs over its ramp; flying through one (airborne, chest at the star) takes it with a pop,
+// a spark burst, a ring, a chime that climbs with a combo, a +1 over the spot and a small punch-in of the view. Back after STAR.back s.
+let starAudio = null;
+function starChime(combo) {
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    if (starAudio.state === 'suspended') starAudio.resume();
+    const t = starAudio.currentTime, up = Math.pow(2, Math.min(combo, 8) / 12);
+    [880, 1318.5, 1760].forEach((f, i) => {
+      const o = starAudio.createOscillator(), g = starAudio.createGain(); o.type = i === 2 ? 'sine' : 'triangle'; o.frequency.value = f * up;
+      g.gain.setValueAtTime(0, t + i * .055); g.gain.linearRampToValueAtTime(.035, t + i * .055 + .008); g.gain.exponentialRampToValueAtTime(.0005, t + i * .055 + .32);
+      o.connect(g).connect(starAudio.destination); o.start(t + i * .055); o.stop(t + i * .055 + .35);
+    });
+  } catch (e) { }
+}
+function starPop(text, wp) {
+  const v = wp.clone().project(camera); if (v.z > 1) return;
+  const el = document.createElement('div'); el.className = 'starpop'; el.textContent = text;
+  el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+}
+function starsFrame(S, T, dt, w, Zw, manual) {
+  const Q = S.CM.stars, P2 = 2 * SC.gap;
+  rigs.kick = (rigs.kick || 0) * Math.pow(.004, dt);
+  // the rider's chest in course coordinates: 28 cm ahead of the rear axle, up with the jump
+  const cx = S.X + Math.sin(S.psi) * 28, cz = S.Z + Math.cos(S.psi) * 28;
+  for (const st of Q.list) {
+    const zG = st.g.position.z + Zw, n = Math.round((zG - SC.gap / 2 - SC.rampL / 2 - STAR.dz) / SC.gap);
+    const got = Q.got[n], age = got != null ? T - got : 1e9;
+    if (got != null && age > STAR.back) delete Q.got[n];
+    if (got == null && manual && S.air && S.y > SC.rampH * .5 && Math.abs(cx - SC.rampX) < STAR.r && Math.abs(cz - zG) < STAR.r * 1.3) {
+      Q.got[n] = T; Q.n++; Q.combo = T - Q.last < 6 ? Q.combo + 1 : 0; Q.last = T;
+      // burst at this star
+      const pos = Q.sparks.geometry.attributes.position.array;
+      for (let i = 0; i < pos.length; i += 3) {
+        pos[i] = st.g.position.x; pos[i + 1] = st.g.position.y; pos[i + 2] = st.g.position.z;
+        const a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1), sp = 45 + Math.random() * 55;
+        Q.vel[i] = Math.sin(b) * Math.cos(a) * sp; Q.vel[i + 1] = Math.abs(Math.cos(b)) * sp * .9 + 40; Q.vel[i + 2] = Math.sin(b) * Math.sin(a) * sp;
+      }
+      Q.sparks.geometry.attributes.position.needsUpdate = true; Q.t0 = T; Q.ring.position.copy(st.g.position);
+      rigs.kick = -.6;
+      starChime(Q.combo);
+      starPop(Q.combo ? '★ ×' + (Q.combo + 1) : '★ +1', st.g.getWorldPosition(new THREE.Vector3()).add(R3.u.set(0, 14, 0)));
+    }
+    // idle spin and bob; taken: a quick swell and shrink while it flies up; back: it grows in
+    const ag = Q.got[n] != null ? T - Q.got[n] : 1e9;
+    let sc = 1, lift = 0, o = 1;
+    if (ag < .45) { const f = ag / .45; sc = 1 + .3 * Math.sin(Math.min(1, f * 1.6) * Math.PI / 2) - 1.3 * f * f; lift = 20 * f; o = 1 - f; }
+    else if (ag < STAR.back) { sc = 0; o = 0; }
+    else if (ag < STAR.back + .5) { const f = (ag - STAR.back) / .5; sc = 1 + .25 * Math.sin(f * Math.PI) * (1 - f); }
+    sc = Math.max(0, sc);
+    st.g.visible = sc > .01 && w > .002;
+    st.m.rotation.y = reduced ? 0 : T * 1.2 + st.k; st.m.position.y = (reduced ? 0 : Math.sin(T * 1.6 + st.k) * 1.5) + lift;
+    st.m.scale.setScalar(sc); st.glow.position.y = st.m.position.y; st.glow.scale.setScalar(22 * sc);
+    st.m.material.opacity = .85 * o * w; st.glow.material.opacity = .35 * o * w;
+  }
+  // burst: sparks fly out under gravity and fade; the ring swells and fades
+  const a = T - Q.t0, on = a < .9 && w > .002 && !reduced;
+  Q.sparks.visible = Q.ring.visible = on;
+  if (on) {
+    const pos = Q.sparks.geometry.attributes.position.array;
+    for (let i = 0; i < pos.length; i += 3) { Q.vel[i + 1] -= 420 * dt; for (let c = 0; c < 3; c++) { Q.vel[i + c] *= Math.pow(.25, dt); pos[i + c] += Q.vel[i + c] * dt; } }
+    Q.sparks.geometry.attributes.position.needsUpdate = true;
+    Q.sparks.material.opacity = .6 * (1 - a / .9) * w; Q.sparks.material.size = 1.8 * (1 - .5 * a);
+    const r = 5 + 26 * ease(Math.min(1, a / .5)); Q.ring.scale.setScalar(r); Q.ring.material.opacity = Math.max(0, 1 - a / .5) * .3 * w;
+    Q.ring.quaternion.copy(camera.quaternion).premultiply(S.course.getWorldQuaternion(R3.q).invert());   // face the camera
+  }
+}
 function scooterFrame(s, dt, w) {
   const S = rigs.scooter; fade(S.g, w); fade(S.course, w);
   rigs.ghost = 0; rigs.scootOn = false;
@@ -1025,12 +1140,14 @@ function scooterFrame(s, dt, w) {
     }
     if (!f) { c.tip.position.set(0, 0, 0); c.body.position.set(0, 0, 0); c.tip.quaternion.identity(); }
   }
+  S.starW = (S.starW || 0) + ((manual ? 1 : 0) - (S.starW || 0)) * (1 - Math.pow(.02, dt));   // stars only while the reader drives
+  starsFrame(S, T, dt, w * S.starW, Zw, manual);
   // readouts
   const rpm = Math.abs(S.v) / RW / (2 * Math.PI) * 60, R = Math.abs(S.delta) > .005 ? L / Math.tan(Math.abs(S.delta)) : Infinity;
   ui.scBelt.textContent = 'Wheel ' + Math.round(rpm) + ' rpm · motor ' + Math.round(rpm * S.ratio) + ' rpm · pulleys ' + (2 * S.rM * 10).toFixed(0) + ' and ' +
     (2 * S.rW * 10).toFixed(0) + ' mm across (' + S.ratio.toFixed(1) + ':1)';
   ui.scRead.textContent = (manual ? 'You are driving' : 'Autopilot, weaving the cones and missing the ramps') + ' · ' + (Math.abs(S.v) * .036).toFixed(1) + ' km/h · turning radius ' +
-    (isFinite(R) && R < 5000 ? (R / 100).toFixed(2) + ' m' : 'straight') + ' · cones knocked ' + S.hits + (S.air ? ' · airborne ' + Math.round(S.y) + ' cm' : S.jumps ? ' · jumps ' + S.jumps : '');
+    (isFinite(R) && R < 5000 ? (R / 100).toFixed(2) + ' m' : 'straight') + ' · cones knocked ' + S.hits + (S.air ? ' · airborne ' + Math.round(S.y) + ' cm' : S.jumps ? ' · jumps ' + S.jumps : '') + (S.CM.stars.n ? ' · ★ ' + S.CM.stars.n : '');
   // balloons on the parts while it is apart
   const show = clamp01(e * 3) * (s > 10.5 && s < 11.65 ? 1 : 0);
   ui.callouts3.style.opacity = show;
