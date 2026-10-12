@@ -387,4 +387,5 @@ test('the hosted page links its privacy page, keeps the visitor id in one place,
   assert.match(client, /fetch\('\/api\/flow', \{ credentials: 'omit' \}\)/, 'asks the Worker before storing anything');
   assert.ok(fs.existsSync(new URL('../dist/privacy.html', import.meta.url)), 'run npm run build first');
   assert.match(fs.readFileSync(new URL('../dist/privacy.html', import.meta.url), 'utf8'), /localStorage\.removeItem\('gp\.vid'\)/, 'opting out forgets the id too');
+  assert.match(fs.readFileSync(new URL('../flow/privacy.html', import.meta.url), 'utf8'), /id="contact">[^<]*<a href="mailto:[^"@]+@[^"]+">/, 'a working address for privacy requests');
 });
