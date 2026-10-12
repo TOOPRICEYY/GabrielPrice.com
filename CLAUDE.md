@@ -41,6 +41,8 @@ Never close a note as "not planned". That state means Gabriel deleted it, and th
 
 The page applies edits at load from the baked JSON, so they need no source change. To bake one into the source (when the file gets long, or when an edit has gone stale because its source text changed), apply it to `src/main.html` and remove its entry from `site-edits/edits.json` in the same PR. Each entry's `fp`/`origHtml` is the element's original text and `html` is the new text. `style` and `layout.desktop|phone` become CSS, with phone meaning ≤ 720 px.
 
+An edit goes stale when its original text leaves the source, and the page then skips it silently. `test/build.test.mjs` fails when that happens and names the edit, so a fork sync that rewrites edited text has to bake those edits in the same PR. Bake the fork's copy too (`/mnt/project-files/gabrielprice-site-photos`), or the next sync puts the old text back.
+
 ## Where the page is developed
 
 Claude threads in the project build the page in `/mnt/project-files/gabrielprice-site-photos`, which is also published as a claude.ai artifact for preview. To ship that work to the live site:

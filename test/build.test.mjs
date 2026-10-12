@@ -35,3 +35,23 @@ test('every local file the page refers to is in dist', () => {
   const missing = [...refs].filter((r) => !fs.existsSync(new URL('dist/' + r, root)));
   assert.deepEqual(missing, [], 'missing from dist: add the folder to STATIC_DIRS in scripts/build.mjs');
 });
+
+test('every editor edit still finds its text in the page source', () => {
+  // An edit is keyed to its element's original text (fp). If the source text changes under it, the page skips the edit,
+  // silently. Fix by baking the edit into src/main.html (or src/gallery.js) and removing it from site-edits/edits.json:
+  // see "Edits from the editor" in CLAUDE.md.
+  const src = (f) => fs.readFileSync(new URL('src/' + f, root), 'utf8');
+  const norm = (s) => s.replace(/\s+/g, ' ').trim();
+  const ent = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  const text = norm(src('main.html').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '')
+    .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(parseInt(e.slice(1).replace(/^x/i, '0x'))) : ent[e] ?? m));
+  // gallery cards are written by gallery.js: tag, title, blurb
+  const q = String.raw`'((?:[^'\\]|\\.)*)'`, unq = (s) => s.replace(/\\(.)/g, '$1');
+  const cards = [...src('gallery.js').matchAll(new RegExp(String.raw`\{ id: '[^']+', title: ${q}, kind: ${q}[^\n]*\n\s*blurb: ${q}`, 'g'))]
+    .map((m) => norm(unq(m[2]) + unq(m[1]) + unq(m[3])));
+  assert.ok(cards.length > 3, 'read the gallery cards');
+  const edits = JSON.parse(fs.readFileSync(new URL('site-edits/edits.json', root), 'utf8')).edits;
+  const stale = Object.entries(edits).filter(([, d]) => d.fp && !text.includes(norm(d.fp)) && !cards.some((c) => c.includes(norm(d.fp))))
+    .map(([k, d]) => `${k} (“${d.fp.slice(0, 40)}”)`);
+  assert.deepEqual(stale, [], 'these edits no longer match the page source, so the page skips them');
+});
