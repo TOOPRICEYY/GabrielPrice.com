@@ -945,11 +945,19 @@ let figureScale = 1, figureMesh = null, thighAxis = null;
 // per-vertex push (bind space, vertex index then xyz) that keeps the left thigh inside the brace cuffs; measured against
 // the cuff geometry over the walk, crutch, scooter and couch poses and spread one ring to neighbours so the skin eases in
 const THIGH_FIT = [10945,-0.02,0.00,-0.04,10946,-0.00,0.00,-0.00,11019,-0.00,-0.00,0.01,11021,-0.02,-0.01,0.01,11022,-0.01,-0.01,0.01,11023,-0.03,-0.01,-0.00,11024,-0.03,-0.01,0.00,11025,-0.00,-0.00,-0.01,11033,-0.02,-0.00,-0.04,11034,0.00,0.00,-0.02,11035,-0.01,-0.00,-0.02,11036,-0.02,-0.01,-0.01,11041,0.00,0.00,-0.00,11047,-0.02,-0.01,-0.01,11052,-0.05,0.02,-0.19,11053,-0.04,-0.03,0.06,11054,-0.01,-0.01,0.02,11055,-0.16,-0.08,0.08,11056,-0.09,-0.06,0.09,11057,-0.25,-0.09,-0.03,11058,-0.23,-0.10,0.03,11059,-0.15,-0.00,-0.25,11060,0.01,0.03,-0.11,11061,-0.14,-0.02,-0.15,11062,-0.16,-0.04,-0.09,11063,0.02,0.01,-0.03,11064,0.01,0.00,-0.00,11067,-0.21,-0.06,-0.07,11069,-0.01,-0.01,0.02,11071,-0.17,0.10,-0.74,11072,-0.18,-0.13,0.29,11073,-0.04,-0.04,0.09,11074,-0.78,-0.39,0.40,11075,-0.44,-0.27,0.43,11076,-1.21,-0.43,-0.14,11077,-1.08,-0.45,0.17,11078,-0.69,-0.02,-1.07,11079,0.10,0.14,-0.45,11080,-0.53,-0.07,-0.58,11081,-0.82,-0.21,-0.47,11082,0.05,0.05,-0.15,11083,0.03,0.02,-0.03,11086,-0.97,-0.29,-0.32,11088,-0.02,-0.02,0.04,11089,-0.00,-0.00,0.01,11090,-0.23,0.44,-2.32,11091,-0.49,-0.43,1.05,11092,-0.12,-0.10,0.24,11093,-2.68,-1.37,1.52,11094,-1.47,-0.93,1.63,11095,-4.45,-1.57,-0.57,11096,-3.85,-1.61,0.63,11097,-1.69,0.10,-3.30,11098,0.58,0.56,-1.50,11099,-1.48,-0.20,-1.61,11100,-2.91,-0.76,-1.62,11101,0.17,0.15,-0.38,11102,0.04,0.04,-0.09,11103,0.00,0.00,-0.00,11105,-3.29,-0.97,-1.15,11107,-0.00,-0.00,0.00,11109,-0.14,0.51,-2.48,11110,-0.17,-0.10,0.15,11111,-0.05,-0.03,0.05,11112,-1.96,-0.93,0.78,11113,-0.66,-0.35,0.42,11114,-2.64,-0.87,-0.61,11115,-1.52,-0.60,0.10,11116,-1.26,0.22,-3.10,11117,0.34,0.39,-1.15,11118,-2.39,-0.24,-2.96,11119,-1.86,-0.37,-1.48,11120,0.10,0.11,-0.31,11121,0.03,0.03,-0.07,11122,0.00,0.00,-0.00,11124,-1.82,-0.49,-0.91,11128,-0.09,0.13,-0.72,11129,-0.07,-0.04,0.05,11130,-0.00,-0.00,0.00,11131,-0.50,-0.23,0.17,11132,-0.18,-0.09,0.10,11133,-0.69,-0.23,-0.16,11134,-0.44,-0.17,0.02,11135,-0.39,0.06,-0.91,11136,0.06,0.11,-0.37,11137,-0.66,-0.06,-0.84,11138,-0.59,-0.11,-0.48,11139,0.03,0.04,-0.11,11140,0.01,0.01,-0.03,11141,0.01,0.00,0.00,11142,0.00,0.00,0.00,11143,-0.56,-0.15,-0.29,11147,-0.06,0.06,-0.36,11150,-0.07,-0.03,0.03,11151,-0.05,-0.02,0.02,11152,-0.13,-0.04,-0.04,11153,-0.11,-0.04,0.01,11154,-0.23,0.01,-0.45,11155,0.01,0.04,-0.16,11156,-0.32,-0.04,-0.38,11157,-0.26,-0.06,-0.17,11158,0.01,0.02,-0.06,11159,0.01,0.01,-0.00,11160,0.05,0.02,0.02,11161,0.02,0.01,0.01,11162,-0.16,-0.05,-0.08,11163,0.00,0.00,0.00,11165,0.00,0.00,0.00,11166,-0.08,0.15,-0.78,11169,-0.01,-0.01,0.01,11171,-0.04,-0.01,-0.01,11172,-0.00,-0.00,-0.00,11173,-0.57,0.01,-1.00,11174,0.02,0.10,-0.34,11175,-0.75,-0.10,-0.80,11176,-0.51,-0.16,-0.16,11177,0.03,0.04,-0.10,11178,0.04,0.02,-0.03,11179,0.23,0.07,0.09,11180,0.05,0.01,0.02,11181,-0.12,-0.04,-0.04,11182,0.01,0.00,0.00,11185,-0.10,0.26,-1.00,11190,-0.01,-0.00,-0.00,11192,-0.27,0.11,-0.80,11193,0.18,0.32,-0.80,11194,-0.23,0.00,-0.37,11195,-0.15,-0.03,-0.10,11196,0.10,0.12,-0.27,11197,0.04,0.04,-0.07,11198,0.05,0.02,0.02,11199,0.02,0.01,0.01,11200,-0.04,-0.01,-0.02,11201,0.01,0.00,0.00,11204,-0.04,0.29,-1.34,11211,-0.16,0.14,-1.05,11212,0.21,0.37,-1.12,11213,-0.08,0.03,-0.28,11214,-0.04,-0.00,-0.06,11215,0.30,0.24,-0.47,11216,0.09,0.08,-0.15,11217,0.01,0.00,0.00,11218,0.01,0.00,0.00,11219,-0.01,-0.00,-0.01,11220,0.00,0.00,0.00,11223,0.09,0.20,-0.78,11230,-0.02,0.06,-0.35,11231,0.51,0.67,-2.28,11232,-0.01,0.02,-0.11,11233,-0.01,0.00,-0.02,11234,0.74,0.57,-1.29,11235,0.17,0.13,-0.29,11236,0.01,0.00,-0.01,11242,0.04,0.06,-0.23,11249,0.00,0.02,-0.10,11250,0.13,0.17,-0.54,11251,-0.00,0.00,-0.02,11253,0.18,0.15,-0.36,11254,0.06,0.05,-0.11,11261,0.01,0.02,-0.05,11268,-0.00,0.00,-0.01,11269,0.03,0.03,-0.10,11272,0.03,0.03,-0.08,11273,0.01,0.01,-0.03,11288,0.00,0.00,-0.02,11291,0.00,0.00,-0.01,12994,0.01,0.00,-0.00,12995,0.01,0.01,-0.01,12996,0.01,0.00,-0.01,12997,0.01,0.00,-0.00,12998,0.04,0.01,0.01,12999,0.13,0.04,0.02,13000,0.04,0.02,-0.01,13001,0.03,0.02,-0.03,13002,0.03,0.02,-0.05,13003,0.01,0.01,-0.03,13332,0.47,0.49,-1.37,13333,0.15,0.14,-0.39,13334,0.05,0.04,-0.09,13335,0.01,0.01,-0.02,13336,0.00,0.00,-0.00,13340,-0.02,-0.01,0.03,13341,-0.08,-0.06,0.12,13342,-0.37,-0.25,0.47,13343,-1.22,-0.73,1.19,13344,-1.68,-0.80,0.72,13345,-3.09,-1.25,0.33,13346,-2.62,-0.90,-0.46,13347,-3.81,-1.09,-1.59,13348,-3.54,-0.80,-2.44,13349,-2.78,-0.35,-3.12,13350,-1.39,0.16,-3.05,13351,-0.22,0.53,-2.70];
+// base64 mesh data → ArrayBuffer. Uint8Array.from(atob(s), fn) walks the string's iterator and calls fn once per byte, which took
+// ~1.5 s for the page's 4 MB of meshes; a plain loop takes a few ms (rigs.js uses this too)
+function b64(s) {
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(s).buffer;
+  const t = atob(s), n = t.length, u = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u[i] = t.charCodeAt(i);
+  return u.buffer;
+}
 const restHead = {};
 async function buildFigure() {
   // MakeHuman 1.1 base mesh + default rig and weights (CC0), body only, triangulated; units cm, faces +z.
   const man = window.FIGURE_MAN;
-  const bin = Uint8Array.from(atob(window.FIGURE_B64), c => c.charCodeAt(0)).buffer;
+  const bin = b64(window.FIGURE_B64);
   let o = 0;
   const pos = new Float32Array(bin, o, man.nv * 3); o += man.nv * 12;
   const idx = new Uint16Array(bin, o, man.nt * 3); o += man.nt * 6;
@@ -1117,7 +1125,7 @@ const BOM = [
 document.getElementById('bom').innerHTML = BOM.map(([k, n, q], i) => `<li><span class="n">${i + 1}</span><span>${n}</span><span class="q">×${q}</span></li>`).join('');
 
 function decode() {
-  const bin = Uint8Array.from(atob(window.KICKER_B64), c => c.charCodeAt(0)).buffer;
+  const bin = b64(window.KICKER_B64);
   const geos = {};
   for (const e of window.KICKER_MAN) {
     const g = new THREE.BufferGeometry();
@@ -1391,9 +1399,13 @@ function adapt(now) {
   if (perf.sum / perf.n > 45) { dpr = Math.max(1, dpr - .5); renderer.setPixelRatio(dpr); resize(); perf.at = now; }
   perf.sum = perf.n = 0;
 }
+let gx;
+const galleryOpen = () => (gx ||= document.getElementById('gx')) && gx.classList.contains('on');
 function frame(now) {
   requestAnimationFrame(frame);   // first, so one bad frame can't stop the loop for good
+  if (galleryOpen()) return;      // a project page covers the stage: its blurred backdrop can hold still, and the phone renders one scene, not two
   adapt(now);
+  if (warmQ.length) try { warmStep(); } catch (e) { warmQ.length = 0; console.warn(e); }
   try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
 }
 function frameBody() {
@@ -1535,12 +1547,73 @@ function frameBody() {
   renderer.render(scene, camera);
 }
 
+// ---------- shader warm-up ----------
+// Each build's first appearance used to stall the page while its shaders compiled: 100–300 ms on a Pixel 7, seconds on budget Android
+// GPUs. Once the first frame is up, they compile ahead of time instead. A program depends on the material's state when it is picked,
+// so the materials that are on screen when the hearth's fire light comes on (the figure and floor, which are always there, and the
+// hearth itself, see-through and solid as it fades in) are also compiled with that light.
+// Where the GPU compiles in parallel (KHR_parallel_shader_compile, desktop Chrome) it all goes at once and costs no frames. Elsewhere
+// (Android Chrome) a compile holds up the next frame, so it is one new program per frame, only while the camera is at rest.
+const warmQ = [];
+function warmShaders() {
+  const draws = new Map(), shown = new Set();   // material → a mesh drawing it; materials drawn right now
+  scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) if (!draws.has(m)) draws.set(m, o); });
+  scene.traverseVisible((o) => { if (o.material) for (const m of [].concat(o.material)) shown.add(m); });
+  const lit = new Set(), hearth = new Set();   // whatever hides a light now, and the materials under it
+  scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) lit.add(p); });
+  for (const g of lit) g.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) hearth.add(m); });
+  const all = [...draws.keys()], faded = all.filter((m) => m.transparent);
+  // run fn, then put back the program three had picked for every material: the warm-up only fills the cache, and each material still
+  // switches programs exactly when it would have without it
+  const quietly = (fn) => {
+    const props = all.map((m) => renderer.properties.get(m)), kept = props.map((p) => p.currentProgram && { ...p });
+    const was = faded.map((m) => m.transparent), seen = [...lit].map((g) => g.visible);
+    try { return fn(); } finally {
+      props.forEach((p, i) => { if (kept[i]) Object.assign(p, kept[i]); else p.__version = undefined; });
+      faded.forEach((m, i) => { m.transparent = was[i]; });
+      [...lit].forEach((g, i) => { g.visible = seen[i]; });
+    }
+  };
+  const compile = (o, solid, fire) => () => quietly(() => {
+    if (solid) for (const m of faded) m.transparent = false;
+    if (fire) for (const g of lit) g.visible = true;
+    return renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
+  });
+  // the brace's materials clip against a plane, and renderer.compile keys clipping on whatever three drew last (it sets clipping up only
+  // when it draws). So first draw a speck with one clip plane into one pixel, before a frame (which then covers it), and right after
+  // compile the brace fading in (its reveal) and solid with and without the fire (the closing shot)
+  const speck = new THREE.Scene(), dot = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ clippingPlanes: [new THREE.Plane()] }));
+  dot.frustumCulled = false; speck.add(dot);
+  const brace = () => {
+    const sc = renderer.getScissor(new THREE.Vector4()), on = renderer.getScissorTest();
+    renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true);
+    try { renderer.render(speck, camera); } finally { renderer.setScissor(sc); renderer.setScissorTest(on); }
+    for (const [solid, fire] of [[false, false], [true, false], [true, true]]) quietly(() => {
+      for (const m of Object.values(mats)) m.transparent = !solid;
+      if (fire) for (const g of lit) g.visible = true;
+      renderer.compile(kicker.unslim, camera, scene);
+    });
+    dot.geometry.dispose(); dot.material.dispose();
+  };
+  if (kicker.ready) warmQ.push(brace);
+  for (const [m, o] of draws) warmQ.push(compile(o, false, false));
+  for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
+  for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
+  // where the GPU compiles in parallel, every compile goes now (the brace waits for the frame loop, which draws its speck before a frame)
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) Promise.all(warmQ.splice(+kicker.ready).map((f) => f())).catch(() => {});
+}
+function warmStep() {   // from the frame loop, before the frame is drawn: until a new program is created, at rest only
+  if (Math.abs(sTarget - sNow) > .01 || free.on) return;
+  const n = renderer.info.programs.length;
+  for (let i = 0; i < 40 && warmQ.length && renderer.info.programs.length === n; i++) Promise.resolve(warmQ.shift()()).catch(() => {});
+}
 resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
   buildKicker(); rigBuild();
   window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; },
     scene, renderer, controls, free, get s() { return sNow; } }; // debug hook for render checks; the site editor (editor.js) reads scene, camera and s from it
   requestAnimationFrame(frame);
+  requestAnimationFrame(() => requestAnimationFrame(() => { try { warmShaders(); } catch (e) { console.warn(e); } }));
 })
   .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
 </script>
