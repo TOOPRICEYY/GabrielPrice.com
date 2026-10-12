@@ -16,23 +16,6 @@
       "section": "Gallery Smaller builds and works in progress",
       "tag": "button",
       "updatedAt": "2026-10-11T22:33:46.032Z"
-    },
-    "s0.div1.h11": {
-      "fp": "Gabriel Price",
-      "key": "s0.div1.h11",
-      "kind": "text",
-      "layout": {
-        "phone": {
-          "x": -17,
-          "y": -123
-        }
-      },
-      "name": "Title",
-      "origHtml": "Gabriel <em>Price</em>",
-      "sec": 0,
-      "section": "Portfolio Mock 01 · framing",
-      "tag": "h1",
-      "updatedAt": "2026-10-11T22:33:23.397Z"
     }
   }
 }

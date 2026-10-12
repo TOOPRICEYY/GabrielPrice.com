@@ -235,6 +235,11 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   main > section:not(.hero):not(.drive):not(.gallery) { box-sizing: border-box; min-height: 230vh; padding-block: 160vh 2vh; align-items: flex-end; }
   main > section:not(.hero):not(.drive):not(.gallery) > .card { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
   section.drive { min-height: 90vh; }
+  /* landing: name at the top, tagline and scroll hint at the bottom, the figure clear between them; svh so Safari's toolbar never covers the tagline */
+  section.hero { min-height: 100vh; min-height: 100svh; box-sizing: border-box; align-items: stretch; padding-block: calc(60px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)); }
+  .hero-wrap { gap: 10px; width: 100%; }
+  .hero-wrap h1 { font-size: clamp(48px, 15vw, 72px); translate: none !important; }   /* the layout places the name; an editor nudge would push it off the top */
+  .hero-wrap p { margin-top: auto; font-size: 16px; }
   main section.gallery { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
   .card { padding: 14px 14px 12px; gap: 8px; }
   .card h2 { font-size: 24px; }
@@ -525,7 +530,7 @@ canvas.style.touchAction = 'pan-y';
 const free = { on: false, back: 0, fromP: new THREE.Vector3(), fromT: new THREE.Vector3() };
 const resetBtn = document.getElementById('resetview');
 const hintEl = document.getElementById('viewhint');
-if (matchMedia('(hover: none)').matches) hintEl.textContent = 'Two fingers to orbit';
+if (matchMedia('(hover: none), (pointer: coarse)').matches) hintEl.textContent = 'Two fingers to orbit';
 controls.addEventListener('start', () => {
   if (!free.on) controls.target.copy(camTgt);
   free.on = true; free.back = 0; resetBtn.hidden = false; hintEl.hidden = true; canvas.classList.add('dragging');
