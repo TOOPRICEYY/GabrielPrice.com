@@ -259,8 +259,9 @@ async function flush(col, id, retry = 1) {
   }
   busy.delete(k);
   if (again.delete(k)) return flush(col, id);
-  dirty.delete(k);
+  if (ok) dirty.delete(k);           // a failed save stays dirty, so Publish never merges without it
   if (ok && !dirty.size) setStatus('saved');
+  return ok;
 }
 async function saveShot(id, shot) {
   shots.set(id, shot);
@@ -338,13 +339,12 @@ async function publish() {
     if (timers.has(k)) { clearTimeout(timers.get(k)); timers.delete(k); }
     if (dirty.has(k)) await flush('edits', '*');
     while (busy.has(k)) await new Promise((r) => setTimeout(r, 100));
-    if (dirty.has(k)) throw new Error('your latest edit did not save');
+    if (dirty.has(k)) return;        // the save failed and its error is showing; nothing is merged
     setStatus('publishing');
     const o = await api('POST', 'edits/publish');
     store.pr = null;
     setStatus(o.published ? 'published' : 'saved');
-  } catch (e) { setStatus('error', e); }
-  publishing = false;
+  } catch (e) { setStatus('error', e); } finally { publishing = false; }
 }
 async function loadServer(which = ['edits', 'notes']) {
   try {
