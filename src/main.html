@@ -496,11 +496,20 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
 <script>
 // the 3D needs three.js (an import) and WebGL. If the scene script can't start, say so instead of "Loading model…" for good:
 // the cards still scroll and read without it. A module whose import fails fires error on its script tag (no bubbling, so capture).
-window.no3D = (why) => { const el = document.getElementById('loading'); if (!el || el.hidden || el.dataset.no3d) return; el.dataset.no3d = 1;
+window.no3D = (why, late) => { const el = document.getElementById('loading'); if (!el || (el.hidden && !late) || el.dataset.no3d) return; el.dataset.no3d = 1; el.hidden = false;
   el.innerHTML = why + ' <button type="button" onclick="location.reload()">Reload</button>'; el.classList.add('no3d');
+  // what went wrong, small, so a visitor's screenshot tells us: the first script error, and how far the page got
+  const d = document.createElement('small'); d.style.cssText = 'display:block;margin-top:4px;opacity:.7;word-break:break-word';
+  d.textContent = (no3D.err ? no3D.err + ' · ' : '') + document.readyState + ' · ' + Math.round(performance.now() / 1000) + ' s · ' + (navigator.userAgent.match(/(Android [\d.]+|iPhone OS [\d_]+|Chrome\/\d+|Version\/[\d.]+)/g) || []).join(' ');
+  el.appendChild(d);
   const hint = document.getElementById('viewhint'); if (hint) hint.hidden = true; };
-addEventListener('error', (e) => { if (e.target instanceof HTMLScriptElement && e.target.type === 'module') no3D('The 3D view could not load.'); }, true);
-addEventListener('load', () => setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); }, 20000));
+addEventListener('error', (e) => {
+  if (e.target instanceof HTMLScriptElement) { no3D.err ||= 'script failed: ' + (e.target.src || e.target.type || 'inline'); if (e.target.type === 'module') no3D('The 3D view could not load.'); }
+  else if (!(e.target instanceof Element) && !window.__rig) no3D.err ||= String(e.message).slice(0, 140);
+}, true);
+addEventListener('unhandledrejection', (e) => { if (!window.__rig) no3D.err ||= String(e.reason && e.reason.message || e.reason).slice(0, 140); });
+// counted from here, not from load: a download that never finishes never fires load either
+setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); }, 25000);
 </script>
 <div id="laser" aria-hidden="true"></div>
 <div class="viewbar"><span id="viewhint">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
@@ -727,16 +736,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // the content of the page, so they always play.
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('stage');
-// some Android GPUs refuse an antialiased context; try once without it before giving up on 3D
+// Android phones get a lighter GPU load: no multisampling, a pixel ratio up to 1.5 and a smaller shadow map. A Pixel lost its WebGL
+// context partway down the page (Chrome then draws a frowning face in the canvas corner); this roughly halves the GPU memory.
+const ANDROID = /Android/i.test(navigator.userAgent);
 const renderer = (() => {
-  for (const antialias of [true, false]) { try { return new THREE.WebGLRenderer({ canvas, antialias, alpha: true }); } catch (e) { console.warn(e); } }
+  for (const antialias of ANDROID ? [false] : [true, false]) { try { return new THREE.WebGLRenderer({ canvas, antialias, alpha: true }); } catch (e) { console.warn(e); } }
   no3D('This browser could not start the 3D view (WebGL is off or unavailable).'); throw new Error('no WebGL');
 })();
-// pixel ratio: up to 2, stepped down by the frame loop when the phone can't keep up (see frame())
-const DPR_MAX = Math.min(devicePixelRatio, 2);
+// pixel ratio: up to 2 (1.5 on Android), stepped down by the frame loop when the phone can't keep up (see frame())
+// safe mode: after a lost context (this tab, or before a reload in this session) render at 1x with no shadows
+let glSafe = false; try { glSafe = sessionStorage.getItem('gp.gl.safe') === '1'; } catch {}
+const DPR_MAX = glSafe ? 1 : Math.min(devicePixelRatio, ANDROID ? 1.5 : 2);
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !glSafe;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.localClippingEnabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -747,7 +760,14 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 // a lost GPU context (common on Android when the tab goes to the background) comes back with every render target empty, so the
 // environment lighting would turn black: three re-uploads meshes and textures by itself, the environment is rebuilt here
-canvas.addEventListener('webglcontextrestored', () => { scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; });
+// If the context doesn't come back within 4 s, the GPU has given up on this page: say so (the frowning face alone explains nothing).
+// window.__glLost counts losses, for the flow recorder and for debugging.
+let glLostT = 0;
+canvas.addEventListener('webglcontextlost', () => { window.__glLost = (window.__glLost || 0) + 1; try { sessionStorage.setItem('gp.gl.safe', '1'); } catch {} clearTimeout(glLostT); glLostT = setTimeout(() => no3D('The 3D view crashed on this device.', true), 4000); });
+canvas.addEventListener('webglcontextrestored', () => { clearTimeout(glLostT);
+  glSafe = true;
+  renderer.shadowMap.enabled = false; dpr = 1; renderer.setPixelRatio(1); resize();   // a restored context comes back lighter, so it isn't lost again
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; });
 
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
 
@@ -784,7 +804,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.9));
 const key = new THREE.DirectionalLight(0xffffff, 2.2);
 key.position.set(160, 320, 220);
 key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
+key.shadow.mapSize.setScalar(ANDROID ? 1024 : 2048);
 Object.assign(key.shadow.camera, { left: -240, right: 150, top: 220, bottom: -60, near: 50, far: 900 });
 key.shadow.bias = -0.0006;
 scene.add(key);
