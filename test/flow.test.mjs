@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { startFakes } from './fake-github.mjs';
 import worker from '../worker/index.js';
-import { checkBatch, summarise, legacyFor } from '../worker/flow.js';
+import { checkBatch, summarise, legacyFor, device } from '../worker/flow.js';
 
 const ORIGIN = 'https://gabrielprice.com';
 const DAY = new Date().toISOString().slice(0, 10);
@@ -37,11 +37,11 @@ const LAYOUT = createHash('sha256').update(JSON.stringify(SECTIONS)).digest('hex
 const batch = (o = {}) => ({ sid: SID, seq: 0, day: DAY, samples: [sample(0, 0), sample(100, 0.4), sample(200, 1.2, 1)], events: [[150, 'c', 0.1, 0.2, 1, 'Reset view']],
   meta: { w: 1280, h: 800, dpr: 2, touch: false, lang: 'en-US', ref: 'news.ycombinator.com', dark: false, extra: 'dropped', v: 'abc1234', layout: LAYOUT, sections: SECTIONS }, ...o });
 // like the runtime, finish the background writes (ctx.waitUntil) before the next step looks at the bucket
-async function post(body, { origin = ORIGIN, e = env } = {}) {
+async function post(body, { origin = ORIGIN, e = env, ua = '' } = {}) {
   const pending = [];
   const req = new Request(ORIGIN + '/api/flow', {
     method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
-    headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}) },
+    headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}), ...(ua ? { 'user-agent': ua } : {}) },
   });
   Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit' } });   // what Cloudflare's edge attaches
   const r = await worker.fetch(req, e, { waitUntil: (p) => pending.push(p) });
@@ -209,6 +209,34 @@ test('ticked visits can be deleted from the dashboard, every batch of each, by t
   assert.equal((await get('/admin/api/flow/session?key=' + DAY + '/' + a)).status, 404);
   const dash = fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8');
   assert.match(dash, /type="checkbox"/); assert.match(dash, /\/admin\/api\/flow\/delete/); assert.match(dash, /'x-editor': '1'/);
+});
+
+test('each visit records its device type, model, OS and browser', async () => {
+  const UA = {
+    iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+    iphone26: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1',
+    ipadDesk: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15',
+    pixel: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+    samsung: 'Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36',
+    win: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
+  };
+  assert.deepEqual(device(UA.iphone, null, true), { dev: 'phone', os: 'iOS 17.5', browser: 'Safari 17', model: 'iPhone' });
+  assert.equal(device(UA.iphone26, null, true).os, 'iOS 26', 'Safari 26 freezes the OS in its user agent; its version tells');
+  assert.deepEqual(device(UA.ipadDesk, null, true), { dev: 'tablet', os: 'iPadOS 18.1', browser: 'Safari 18', model: 'iPad' }, 'an iPad asking for the desktop site');
+  assert.deepEqual(device(UA.ipadDesk, null, false), { dev: 'desktop', os: 'macOS', browser: 'Safari 18', model: 'Mac' });
+  assert.deepEqual(device(UA.pixel, { model: 'Pixel 8', pv: '14.0.0' }, true), { dev: 'phone', os: 'Android 14', browser: 'Chrome 129', model: 'Pixel 8' });
+  assert.equal(device(UA.pixel, null, true).os, 'Android', 'Chrome\'s frozen "Android 10; K" is not taken as the real version');
+  assert.deepEqual(device(UA.samsung, null, true), { dev: 'phone', os: 'Android 14', browser: 'Samsung Internet 26', model: 'SM-S918B' });
+  assert.equal(device(UA.win, { model: '', pv: '15.0.0' }, false).os, 'Windows 11');
+  assert.equal(device(UA.win, null, false).os, 'Windows 10/11');
+
+  const sid = 'dddddddddddddddd';
+  await post(batch({ sid, meta: { ...batch().meta, touch: true, ch: { model: 'Pixel 8', pv: '14.0.0', junk: 'x'.repeat(500) } } }), { ua: UA.pixel });
+  const stored = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body).meta;
+  assert.equal(stored.os, 'Android 14'); assert.equal(stored.model, 'Pixel 8'); assert.equal(stored.dev, 'phone'); assert.equal(stored.ch, undefined, 'the raw hints are not kept');
+  const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  assert.deepEqual([v.dev, v.model, v.os, v.browser], ['phone', 'Pixel 8', 'Android 14', 'Chrome 129']);
+  assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /getHighEntropyValues\(\['model', 'platformVersion'\]\)/);
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {

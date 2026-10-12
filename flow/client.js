@@ -18,6 +18,8 @@
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
 //          h tab hidden, z resize (w, h), e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
+//          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
+//          the Worker reads the device type, OS and browser from the user agent itself.
 (() => {
   const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
@@ -41,6 +43,10 @@
   const t0 = performance.now();
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false;
   const now = () => Math.round(performance.now() - t0);
+  // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
+  // but answered long before the first batch goes out
+  let hints = null;
+  try { navigator.userAgentData.getHighEntropyValues(['model', 'platformVersion']).then((h) => { hints = { model: h.model || '', pv: h.platformVersion || '' }; }, () => {}); } catch {}
 
   waitRig((rig) => {
     const dir = new rig.THREE.Vector3();
@@ -104,7 +110,7 @@
     const o = { sid, seq, day, samples, events };
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
       lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
-      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections };
+      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}) };
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing
@@ -184,7 +190,7 @@
     document.body.appendChild(dot);
     hud.innerHTML = '<button type="button" data-a="play">Pause</button><button type="button" data-a="speed">1×</button>'
       + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span>'
-      + '<span style="opacity:.7">' + (rec.meta ? (rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h : '') + '</span>'
+      + '<span style="opacity:.7">' + (rec.meta ? [rec.meta.model, rec.meta.os, rec.meta.browser].filter(Boolean).map((x) => String(x).replace(/[&<>"]/g, '')).concat((rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h).join(' · ') : '') + '</span>'
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]');
