@@ -141,6 +141,18 @@
       "section": "05 Drive train",
       "tag": "h2",
       "updatedAt": "2026-10-12T03:00:07.652Z"
+    },
+    "s5.div1.h21": {
+      "fp": "Every part, apart.",
+      "html": "Parts",
+      "key": "s5.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Every part, apart.",
+      "sec": 5,
+      "section": "06 Exploded view",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:00:47.274Z"
     }
   }
 }
