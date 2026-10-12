@@ -73,7 +73,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   const html = fs.readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
   const rig = /window\.__rig = \{([\s\S]*?)\};/.exec(html);
   assert.ok(rig, 'window.__rig is defined');
-  for (const name of ['THREE', 'rigs', 'camera', 'ui', 'free', 'setS(', 'get s()']) assert.ok(rig[1].includes(name), `__rig exposes ${name}`);
+  for (const name of ['THREE', 'rigs', 'camera', 'ui', 'free', 'renderer', 'setS(', 'get s()']) assert.ok(rig[1].includes(name), `__rig exposes ${name}`);
   assert.match(html, /ui\.ptr = \{ x: e\.clientX, y: e\.clientY \}; ui\.ptrT = performance\.now\(\)/, 'pointer kept in ui.ptr / ui.ptrT');
   assert.match(html, /rigs\.couch = \{[^\n]*keys: new Set\(\)/, 'couch keys are a Set');
   assert.match(html, /keys: new Set\(\), last: -1e9, knock/, 'scooter keys are a Set');
@@ -184,7 +184,13 @@ test('replays open in a frame sized to the visit, and the dashboard links there'
   const html = await page.text();
   assert.match(html, /__flowReplay/); assert.match(html, /Math\.min\(4096/, 'recorded sizes are clamped before they size the frame'); assert.match(html, /<iframe|createElement\('iframe'\)/);
   assert.match(fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8'), /\/admin\/flow\/replay\?key=/);
-  assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /__flowReplay/, 'the player looks for the frame host');
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /__flowReplay/, 'the player looks for the frame host');
+  assert.match(html, /get scale\(\)/, 'the host tells the frame how far it shrinks the visit');
+  assert.match(html, /e\[1\] === 'z'/, 'at the largest size the visit reaches, since the page reads the scale once');
+  assert.match(client, /fewerPixels\(host\.scale\)/, 'a shrunk replay renders at a lower pixel ratio, so a desktop visit fits in a phone tab');
+  assert.match(client, /defineProperty\(window, 'devicePixelRatio'/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../src/main.html', import.meta.url), 'utf8'), /setPixelRatio\(1\)|DPR_MAX = glSafe \? 1/, 'safe mode and a restored context never go above the reported pixel ratio');
 });
 
 test('ticked visits can be deleted from the dashboard, every batch of each, by the owner only', async () => {

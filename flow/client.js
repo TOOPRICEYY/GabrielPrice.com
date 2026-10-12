@@ -30,9 +30,10 @@
   const hash = location.hash;
   const BUILD = window.__flowBuild || { version: 'dev', layout: '', sections: [] };
 
+  let realDpr = 0, dprNow = 0;   // replay frames only: see fewerPixels
   if (hash.startsWith('#replay=')) {
     const host = replayHost();
-    if (host) emulate(host.meta || {});
+    if (host) { emulate(host.meta || {}); fewerPixels(host.scale); }
     waitRig(() => replay(decodeURIComponent(hash.slice(8)), host));
     return;
   }
@@ -226,6 +227,17 @@
     emulate.sheets = sheets;
   }
 
+  // The frame host shrinks the visit to fit this screen, so the page only needs that many pixels: a 2560-wide visit shown
+  // 0.15x on a 3x phone needs about 1150 across, not 5120. The page sizes its 3D view and images from devicePixelRatio,
+  // read once at start, and this runs before its module scripts, so lowering it here is all it takes.
+  // Called again once the controls under the frame take their height (the frame shrinks a little more); only ever lowers.
+  function fewerPixels(k) {
+    const real = realDpr ||= window.devicePixelRatio || 1, want = Math.max(0.25, Math.round(real * (k > 0 ? k : 1) * 100) / 100);
+    if (want >= (dprNow || real)) return false;
+    if (!dprNow) try { Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => dprNow }); } catch { return false; }
+    dprNow = want; return true;
+  }
+
   async function replay(key, host) {
     const doc = host ? window.parent.document : document;
     const hud = doc.createElement('div');
@@ -263,6 +275,10 @@
       + '<span style="opacity:.7">' + (rec.meta ? [rec.meta.model, rec.meta.os, rec.meta.browser].filter(Boolean).map((x) => String(x).replace(/[&<>"]/g, '')).concat((rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h).join(' · ') : '') + '</span>'
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
+    if (host) {   // whenever the frame's room shrinks (the bar fills in or wraps, the viewer turns the phone): render no more than shows
+      const settle = () => { if (fewerPixels(host.scale) && rig.renderer && rig.renderer.getPixelRatio() > dprNow) rig.renderer.setPixelRatio(dprNow); };
+      requestAnimationFrame(settle); new window.parent.ResizeObserver(settle).observe(window.parent.document.getElementById('stage') || host.bar);
+    }
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
     let stallFrom = 0, stallUntil = 0;
     let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9;

@@ -746,7 +746,7 @@ const renderer = (() => {
 // pixel ratio: up to 2 (1.5 on Android), stepped down by the frame loop when the phone can't keep up (see frame())
 // safe mode: after a lost context (this tab, or before a reload in this session) render at 1x with no shadows
 let glSafe = false; try { glSafe = sessionStorage.getItem('gp.gl.safe') === '1'; } catch {}
-const DPR_MAX = glSafe ? 1 : Math.min(devicePixelRatio, ANDROID ? 1.5 : 2);
+const DPR_MAX = Math.min(devicePixelRatio, glSafe ? 1 : ANDROID ? 1.5 : 2);   // never above the screen's own (a shrunk replay frame reports under 1)
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
 renderer.shadowMap.enabled = !glSafe;
@@ -766,7 +766,7 @@ let glLostT = 0;
 canvas.addEventListener('webglcontextlost', () => { window.__glLost = (window.__glLost || 0) + 1; try { sessionStorage.setItem('gp.gl.safe', '1'); } catch {} clearTimeout(glLostT); glLostT = setTimeout(() => no3D('The 3D view crashed on this device.', true), 4000); });
 canvas.addEventListener('webglcontextrestored', () => { clearTimeout(glLostT);
   glSafe = true;
-  renderer.shadowMap.enabled = false; dpr = 1; renderer.setPixelRatio(1); resize();   // a restored context comes back lighter, so it isn't lost again
+  renderer.shadowMap.enabled = false; dpr = Math.min(1, devicePixelRatio); renderer.setPixelRatio(dpr); resize();   // a restored context comes back lighter, so it isn't lost again
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; });
 
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
@@ -1393,6 +1393,7 @@ const sheetEl = document.getElementById('tb-sheet');
 const perf = { t: 0, n: 0, sum: 0, at: performance.now() };
 function adapt(now) {
   const d = now - perf.t; perf.t = now;
+  dpr = renderer.getPixelRatio();   // the visit replay player can lower it from outside
   if (document.hidden || d > 500 || now - perf.at < 4000 || dpr <= 1) return;
   perf.sum += d; perf.n++;
   if (perf.sum < 2000) return;
