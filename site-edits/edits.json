@@ -1,4 +1,50 @@
 {
   "v": 1,
-  "edits": {}
+  "edits": {
+    "gallery.div1.div2.button4": {
+      "fp": "3D printingGhetto GaugeA three-part printed gauge from the Printers Printing Printers project, with a dogbone keyed into its post.",
+      "key": "gallery.div1.div2.button4",
+      "kind": "block",
+      "layout": {
+        "phone": {
+          "x": -1,
+          "y": -24
+        }
+      },
+      "name": "Gallery card",
+      "sec": "gallery",
+      "section": "Gallery Smaller builds and works in progress",
+      "tag": "button",
+      "updatedAt": "2026-10-11T22:33:46.032Z"
+    },
+    "gallery.div1.div2.button4.div2.h31": {
+      "fp": "Ghetto Gauge",
+      "html": "Tensile Tester",
+      "key": "gallery.div1.div2.button4.div2.h31",
+      "kind": "text",
+      "name": "Card title",
+      "origHtml": "Ghetto Gauge",
+      "sec": "gallery",
+      "section": "Gallery Smaller builds and works in progress",
+      "tag": "h3",
+      "updatedAt": "2026-10-11T22:34:02.094Z"
+    },
+    "s0.div1.h11": {
+      "fp": "Gabriel Price",
+      "key": "s0.div1.h11",
+      "kind": "text",
+      "layout": {
+        "phone": {
+          "x": -17,
+          "y": -123
+        }
+      },
+      "name": "Title",
+      "origHtml": "Gabriel <em>Price</em>",
+      "sec": 0,
+      "section": "Portfolio Mock 01 · framing",
+      "tag": "h1",
+      "updatedAt": "2026-10-11T22:33:23.397Z"
+    }
+  }
 }
