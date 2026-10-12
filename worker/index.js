@@ -12,11 +12,13 @@
 //   /admin/api/shots/<id>   a note's snapshot
 //   /admin/flow, /admin/flow/replay, /admin/api/flow/*   visitor flow dashboard and replays (worker/flow.js)
 //   /api/flow               public: visitors' pages post flow batches here (worker/flow.js)
+//   /api/lb                 public: the scooter and couch leaderboards, GET the boards, POST a new best (worker/lb.js)
 
 import { accessEmail } from './access.js';
 import { getEdits, putEdits, checkEdits, publishEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
 import editorUi from './editor-ui.gen.js';
 import { flowIngest, flowAdmin } from './flow.js';
+import { lb } from './lb.js';
 
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
@@ -102,6 +104,9 @@ export default {
     }
     if (url.pathname === '/api/flow') {
       try { return await flowIngest(request, env, ctx, url); } catch (e) { console.error(e); return new Response(null, { status: 500 }); }
+    }
+    if (url.pathname === '/api/lb') {
+      try { return await lb(request, env, url); } catch (e) { console.error(e); return new Response(null, { status: 500 }); }
     }
     return env.ASSETS.fetch(request);
   },

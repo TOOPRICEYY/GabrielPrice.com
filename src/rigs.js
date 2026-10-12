@@ -61,8 +61,12 @@ const ASSYM_IN = 1;
 const COUCH_IN = 1, COUCH_HOLD = 10.05;
 // scooter course: cones every SC.gap cm down the middle of a sidewalk; the autopilot weaves x = amp·sin(π z / gap)
 const SC = { gap: 240, amp: 60, len: 1920, walkW: 180, slab: 120, nCone: 4, vAuto: 90, L: 51.2, dMax: 35 * RD,
-  rampX: -62, rampW: 34, rampL: 50, rampH: 18, hop: 200, g: 981 };   // kicker ramps beside every other cone, opposite the slalom line
+  rampX: -62, rampW: 34, rampL: 50, rampH: 18, hop: 245, g: 981 };   // kicker ramps beside every other cone, opposite the slalom line
 const STAR = { y: 96, dz: 44, r: 30, back: 6 };   // star centre height over the walk, its distance past a ramp's lip, catch radius (cm), respawn (s)
+// the scooter game, live only while the reader drives. Score = metres travelled + GAME.star per star; the walk crumbles away behind you. Speed climbs with distance;
+// falling crutches from the start, thrown balls after ballAt cm, low birds after birdAt cm; each hit costs health (hp), shown on a little body
+const GAME = { v0: 230, vGain: .03, vTop: 560, land: 70, landMax: 140, every: 5, boost: 220, boostT: 2.8, star: 10, hp: 100, edge: 98,
+  ballAt: 2500, birdAt: 6000, ahead: 560, perM: 1, fall0: 140, fallAcc: 9, fallGap: 600 };
 // exploded view: each part's offset in Fusion axes (x = rider's right, y = forward, z = up), cm, relative to its parent
 // (the wheel pulley rides in the right rear wheel, the front wheels and fork on the steering, the motor pulley on the motor)
 const SC_EX = { kneepad: [0, 0, 14], column: [0, 0, 16], basket: [0, 24, 6], fork: [0, 6, -10], wFL: [-14, 6, -10], wFR: [14, 6, -10],
@@ -372,8 +376,9 @@ function rigBuild() {
     const rs = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(SC.rampL, 0), new THREE.Vector2(SC.rampL, SC.rampH)]);
     const rg = new THREE.ExtrudeGeometry(rs, { depth: SC.rampW, bevelEnabled: false });
     rg.rotateY(-Math.PI / 2); rg.translate(SC.rampW / 2, 0, -SC.rampL / 2);          // shape x → course z, extrusion → across
+    const ramps = []; CM.ramps = ramps;
     for (let k = -SC.nCone; k < SC.nCone; k += 2) {
-      const r = new THREE.Group(); r.position.set(SC.rampX, .6, SC.gap / 2 + k * SC.gap); course.add(r);
+      const r = new THREE.Group(); r.position.set(SC.rampX, .6, SC.gap / 2 + k * SC.gap); r.userData.z = r.position.z; course.add(r); ramps.push(r);
       const m = new THREE.Mesh(rg, CM.ramp); m.castShadow = m.receiveShadow = true; r.add(m);
       const lip = new THREE.Mesh(new THREE.BoxGeometry(SC.rampW, 1.4, 2.4), CM.cone); lip.position.set(0, SC.rampH - .6, SC.rampL / 2 - 1.2); r.add(lip);
     }
@@ -390,7 +395,7 @@ function rigBuild() {
       const g = new THREE.Group(); g.position.set(SC.rampX, STAR.y, SC.gap / 2 + k * SC.gap + SC.rampL / 2 + STAR.dz); course.add(g);
       const m = new THREE.Mesh(sg, sMat.clone()); m.castShadow = true; m.material.userData.own = true; g.add(m);
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.material.userData.own = true; glow.scale.setScalar(22); g.add(glow);
-      stars.push({ g, m, glow, k });
+      g.userData.z = g.position.z; stars.push({ g, m, glow, k });
     }
     // burst pool: sparks and a ring, reused by whichever star was taken last
     const nP = 18, pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nP * 3), 3));
@@ -401,9 +406,70 @@ function rigBuild() {
     const ring = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffe2a8, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide }));
     ring.material.userData.own = true; ring.visible = false; course.add(ring);
     CM.stars = { list: stars, sparks, ring, vel: new Float32Array(nP * 3), t0: -1e9, got: {}, n: 0, combo: 0, last: -1e9 };
+    // hazards (see gameFrame): a crutch that tips into the path, a ball thrown across it, a bird flying low down one side.
+    // They live in their own group under the course, in course coordinates that do not wrap (the group is shifted by −Zw)
+    const haz = new THREE.Group(); course.add(haz);
+    const hm = (c, o) => { const x = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .5, metalness: 0, transparent: true }, o)); x.userData.own = true; return x; };
+    const HM = { alu: hm(0xc9ccd2, { metalness: .6, roughness: .35 }), rub: hm(0x2a2a2e, { roughness: .9 }), ball: hm(0xe8742a, { roughness: .6 }), seam: hm(0x3a2416),
+      bird: hm(0x3d3f4a, { roughness: .8 }), beak: hm(0xf2a33a), slab: hm(0xb9b6ae, { roughness: .95 }), trail: null };
+    const proto = {
+      crutch() {
+        const g = new THREE.Group(), fall = new THREE.Group(); g.add(fall);        // fall pivots about the rubber foot
+        const cyl = (r, h, m, x, y) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 10), m); c.position.set(x, y, 0); c.castShadow = true; fall.add(c); return c; };
+        cyl(1.3, 4, HM.rub, 0, 2); cyl(1.1, 34, HM.alu, 0, 19);
+        for (const x of [-3.2, 3.2]) cyl(.9, 104, HM.alu, x, 86);
+        const grip = cyl(1.4, 9, HM.rub, 0, 92); grip.rotation.z = Math.PI / 2;
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(16, 4, 6), HM.rub); pad.position.y = 139; pad.castShadow = true; fall.add(pad);
+        return { g, fall, len: 141 };
+      },
+      ball() {
+        const g = new THREE.Group(), b = new THREE.Mesh(new THREE.SphereGeometry(11, 20, 14), HM.ball); b.castShadow = true; g.add(b);
+        for (const r of [0, Math.PI / 2]) { const s = new THREE.Mesh(new THREE.TorusGeometry(11.05, .35, 4, 32), HM.seam); s.rotation.y = r; b.add(s); }
+        return { g, b };
+      },
+      puddle() {
+        const g = new THREE.Group(), m = new THREE.Mesh(new THREE.CircleGeometry(1, 36), hm(0x2f86d6, { roughness: .04, metalness: .1, opacity: .92, emissive: 0x1c5fa8, emissiveIntensity: .35 })); m.rotation.x = -Math.PI / 2; m.position.y = .75; m.receiveShadow = true; g.add(m);
+        const rim = new THREE.Mesh(new THREE.RingGeometry(.93, 1.06, 36), hm(0xc8ecff, { roughness: .2, opacity: .9 })); rim.position.z = .02; m.add(rim);
+        const rp = [0, 1].map(() => { const x = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 32), hm(0xe6f6ff, { opacity: 0, depthWrite: false })); x.position.z = .04; m.add(x); return x; });
+        // the duck: yellow body, head, orange bill and two dots for eyes
+        const duck = new THREE.Group(), yel = hm(0xffd23a, { roughness: .45 }), org = hm(0xff8a1e, { roughness: .5 }), blk = hm(0x1d1b22);
+        const bd = new THREE.Mesh(new THREE.SphereGeometry(5, 14, 10), yel); bd.scale.set(1, .7, 1.25); bd.position.y = 2.5; bd.castShadow = true; duck.add(bd);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(2.2, 4, 8), yel); tail.rotation.x = -2.2; tail.position.set(0, 5, -5.6); duck.add(tail);
+        const hd = new THREE.Mesh(new THREE.SphereGeometry(3.2, 12, 10), yel); hd.position.set(0, 8, 3); hd.castShadow = true; duck.add(hd);
+        const bill = new THREE.Mesh(new THREE.ConeGeometry(1.4, 3.4, 8), org); bill.rotation.x = Math.PI / 2; bill.scale.set(1.3, 1, .55); bill.position.set(0, 7.4, 6.4); duck.add(bill);
+        for (const sd of [-1, 1]) { const ey = new THREE.Mesh(new THREE.SphereGeometry(.55, 6, 5), blk); ey.position.set(sd * 1.9, 9, 5.4); duck.add(ey); }
+        g.add(duck);
+        return { g, m, rp, duck };
+      },
+      chunk() {
+        const g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(58, 6, 58), HM.slab); m.castShadow = true; g.add(m);
+        return { g, m };
+      },
+      bird() {
+        const g = new THREE.Group(), body = new THREE.Mesh(new THREE.SphereGeometry(6, 12, 8), HM.bird); body.scale.set(1, .85, 1.9); g.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(4, 10, 8), HM.bird); head.position.set(0, 3, -11); g.add(head);
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(1.5, 5, 8), HM.beak); beak.rotation.x = -Math.PI / 2; beak.position.set(0, 2.5, -16.5); g.add(beak);
+        const wings = [-1, 1].map(s => { const p = new THREE.Group(); p.position.set(s * 4, 2, 0); const wg = new THREE.Mesh(new THREE.BoxGeometry(26, .8, 10), HM.bird); wg.position.x = s * 13; p.add(wg); g.add(p); return p; });
+        return { g, wings };
+      },
+    };
+    // boost trail: points shed behind the rear wheels while boosting
+    const nT = 160, tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nT * 3), 3));
+    const tc = new Float32Array(nT * 3); for (let i = 0; i < nT; i++) new THREE.Color(i % 3 ? 0x3ff3ff : 0xff4f9a).toArray(tc, i * 3);
+    tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+    const trail = new THREE.Points(tg, new THREE.PointsMaterial({ size: 3.2, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    trail.material.userData.own = true; trail.frustumCulled = false; haz.add(trail);
+    const nS = 40, sgp = new THREE.BufferGeometry(); sgp.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nS * 3), 3));
+    const splash = new THREE.Points(sgp, new THREE.PointsMaterial({ color: 0xbfd6f2, size: 2.4, depthWrite: false, transparent: true }));
+    splash.material.userData.own = true; splash.frustumCulled = false; splash.visible = false; haz.add(splash);
+    // the walk crumbles from behind: everything on it is clipped at the crumbling edge (see gameFrame)
+    const cut = new THREE.Plane(new THREE.Vector3(0, 0, 1), 1e7);
+    for (const k of ['walk', 'seam', 'cone', 'band', 'foot', 'ramp']) { CM[k].clippingPlanes = [cut]; CM[k].clipShadows = true; }
+    CM.haz = { g: haz, mat: HM, proto, list: [], trail, tAge: new Float32Array(nT).fill(9), tVel: new Float32Array(nT * 3), tI: 0,
+      splash, sVel: new Float32Array(nS * 3), sT: -9, cut };
     rigs.scooter = { g, root, kneepad, steer, wheels: Object.values(wheels), motor, grips, ratio: wheelPulleyR / motorPulleyR, rW: wheelPulleyR, rM: motorPulleyR,
       rearY: wsJoint('scooter6', 'Rear L Wheel').origin[1], psi: 0, X: 0, Z: 0, v: 0, spin: 0, delta: 0, D, ex, box, piv, course, cones, CM,
-      keys: new Set(), last: -1e9, knock: {}, hits: 0, y: 0, vy: 0, p: 0, air: false, hop: false, jumps: 0 };
+      keys: new Set(), last: -1e9, knock: {}, hits: 0, y: 0, vy: 0, p: 0, air: false, hop: false, jumps: 0, game: gameNew() };
   }
 
   // ===== swerve couch: stand-in sofa; Fusion steering hub rings on four modules; wheel stand with a T128 and T2PM pedals =====
@@ -589,8 +655,9 @@ function rigBuild() {
       for (const sx of [-W, W]) { const p = new THREE.Mesh(new THREE.BoxGeometry(8, 170, 8), m); p.position.set(sx, 85, 0); G.add(p); }
       const bar = new THREE.Mesh(new THREE.BoxGeometry(2 * W + 8, 10, 8), m); bar.position.y = 170; G.add(bar);
       const ln = new THREE.Mesh(new THREE.PlaneGeometry(2 * W, 10), m); ln.rotation.x = -Math.PI / 2; ln.position.y = .6; G.add(ln);
-      for (let i = 0; i < 3; i++) for (const cx of [-W / 2, W / 2]) { const c = new THREE.Mesh(chevG, mc); c.position.set(cx, .7, -130 - 70 * i); G.add(c); }
-      return { G, m, mc, x, z, h, W };
+      const cg = new THREE.Group(); G.add(cg);   // the chevrons: turned round on the way back
+      for (let i = 0; i < 3; i++) for (const cx of [-W / 2, W / 2]) { const c = new THREE.Mesh(chevG, mc); c.position.set(cx, .7, -130 - 70 * i); cg.add(c); }
+      return { G, m, mc, cg, x, z, h, W };
     });
     // drift ring: a floor ring, a progress arc that fills as you go round, and the pylon in the middle
     const rm = hol(0x9a7cff, .45), pm = hol(0xff5fd2, .85), cm = hol(0xff5fd2, .5);
@@ -772,24 +839,25 @@ function rigUI() {
   ui.cwSpin.addEventListener('input', () => { rigs.couch.last = clock.elapsedTime; });
   ui.cwSpin.addEventListener('change', () => { ui.cwSpin.value = 0; });
   addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;   // typing a leaderboard tag
     const k = e.key.toLowerCase();
     if (rigs.couchOn && (k.length === 1 ? 'wasdqe '.includes(k) : k.startsWith('arrow') || k === 'shift')) {
-      const Co = rigs.couch; Co.keys.add(k); Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
-      // a quick double tap of A or D swings the steering geometry 90° round the couch (−90, 0, +90): it then drives sideways
+      const Co = rigs.couch; Co.keys.add(k); if (rigs.onDrive) rigs.onDrive(); Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
+      // (a quick double tap used to swing the steering 90° to drive sideways; Gabriel had it removed)
       const sd = k === 'a' || k === 'arrowleft' ? 1 : k === 'd' || k === 'arrowright' ? -1 : 0;
       if (sd && !e.repeat) {
         const T = clock.elapsedTime;
-        if (T - (Co.tap[sd] || -9) < CC.tap) { Co.ori = Math.max(-1, Math.min(1, Co.ori + sd)); Co.tap[sd] = -9; Co.oriUsed = (Co.oriUsed || 0) + 1; } else Co.tap[sd] = T;
+        Co.tap[sd] = T;   // (the double-tap swing to sideways steering is off: Gabriel 2026-10-12)
       }
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and handbrake here instead of scrolling
     }
     if (rigs.scootOn && (k.length === 1 ? 'wasd '.includes(k) : k.startsWith('arrow'))) {
-      const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false;
-      if (k === ' ') { if (!e.repeat) S.hop = true; } else S.keys.add(k);
+      const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false; if (rigs.onDrive) rigs.onDrive();
+      if (k === ' ') { if (!e.repeat) { S.hop = true; S.hopHeld = true; } } else S.keys.add(k);
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and hop here instead of scrolling the page
     }
   });
-  addEventListener('keyup', (e) => { rigs.couch.keys.delete(e.key.toLowerCase()); rigs.scooter.keys.delete(e.key.toLowerCase()); });
+  addEventListener('keyup', (e) => { rigs.couch.keys.delete(e.key.toLowerCase()); rigs.scooter.keys.delete(e.key.toLowerCase()); if (e.key === ' ') rigs.scooter.hopHeld = false; });
   addEventListener('blur', () => { rigs.couch.keys.clear(); rigs.scooter.keys.clear(); });
   // touch screens: an on-screen pad while the couch or the scooter can be driven. Each button sends the same key events
   // the keyboard does (◀ ▶ = A D, ▲ ▼ = W S, the action button = Shift drift on the couch, Space hop on the scooter)
@@ -822,6 +890,30 @@ function rigUI() {
     tick();
   }
   ui.scSteer.addEventListener('input', () => { rigs.scooter.last = clock.elapsedTime; rigs.scooter.useSlider = true; });
+  // scooter score panel: shown only while the reader drives (gameFrame fills it)
+  ui.schud = document.createElement('div'); ui.schud.id = 'schud'; ui.schud.setAttribute('aria-live', 'off');
+  ui.schud.innerHTML = '<div><b class="sc">0</b><span class="mu"></span></div><div class="row"><span class="pi"></span><span class="be"></span></div>';
+  // couch speed dial: 0 to 25 km/h over a 240° sweep (its top speed is 24)
+  ui.scdial = document.createElement('div'); ui.scdial.id = 'codial'; ui.scdial.setAttribute('aria-hidden', 'true');
+  { const arc = (a0, a1, r) => { const p = (a) => [60 + r * Math.cos(a), 60 + r * Math.sin(a)]; const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+    const A0 = Math.PI * 5 / 6, SW = Math.PI * 4 / 3; let ticks = '';
+    for (let v = 0; v <= 25; v += 5) { const a = A0 + SW * v / 25, c = Math.cos(a), s = Math.sin(a);
+      ticks += `<line x1="${(60 + 40 * c).toFixed(1)}" y1="${(60 + 40 * s).toFixed(1)}" x2="${(60 + 47 * c).toFixed(1)}" y2="${(60 + 47 * s).toFixed(1)}"/><text x="${(60 + 31 * c).toFixed(1)}" y="${(60 + 31 * s).toFixed(1)}">${v}</text>`; }
+    ui.scdial.innerHTML = `<svg viewBox="0 0 120 104"><path class="bg" d="${arc(A0, A0 + SW, 50)}"/><path class="fg" d="${arc(A0, A0 + SW, 50)}"/>${ticks}<line class="nd" x1="60" y1="60" x2="60" y2="20"/><circle cx="60" cy="60" r="4"/><text class="kmh" x="60" y="86">0</text><text class="u" x="60" y="98">km/h</text></svg>`;
+    ui.scdial.fg = ui.scdial.querySelector('.fg'); ui.scdial.nd = ui.scdial.querySelector('.nd'); ui.scdial.kmh = ui.scdial.querySelector('.kmh');
+    ui.scdial.len = ui.scdial.fg.getTotalLength ? 0 : 0; ui.scdial.A0 = A0; ui.scdial.SW = SW; }
+  document.body.appendChild(ui.scdial);
+  // couch score panel: big drift score, the slide in progress, best and the course target
+  ui.cohud = document.createElement('div'); ui.cohud.id = 'cohud'; ui.cohud.setAttribute('aria-live', 'off');
+  ui.cohud.innerHTML = '<span class="lb">Drift score</span><b class="sc">0</b><div class="row"><span class="dr"></span><span class="be"></span></div><div class="tg"></div>';
+  document.body.appendChild(ui.cohud);
+  document.body.appendChild(ui.schud);
+  // the little body: each part reddens with the damage it has taken and flashes when hit (seen from behind, like the rider)
+  ui.schurt = document.createElement('div'); ui.schurt.id = 'schurt'; ui.schurt.setAttribute('aria-hidden', 'true');
+  ui.schurt.innerHTML = '<canvas width="104" height="208"></canvas><div class="hp"><i></i></div>';
+  document.body.appendChild(ui.schurt);
+  ui.bloodfx = document.createElement('div'); ui.bloodfx.id = 'bloodfx'; ui.bloodfx.setAttribute('aria-hidden', 'true'); document.body.appendChild(ui.bloodfx);
+  ui.boostfx = document.createElement('div'); ui.boostfx.id = 'boostfx'; ui.boostfx.setAttribute('aria-hidden', 'true'); document.body.appendChild(ui.boostfx);
   ui.scBelt = $('scBelt');
   ui.asRead = $('asRead'); ui.laser = $('laser');
   ui.ptr = null; ui.ptrT = -1e9;
@@ -954,6 +1046,13 @@ function crutchFrame(s, dt, w) {
 // punches in on the belt, the scooter stops and comes apart, then it goes back together and the reader can drive it.
 // The autopilot is pure pursuit on the slalom line; any key (or the steering slider) takes over, and 3 s of nothing hands back.
 const SCF = { v: new THREE.Vector3(), q: new THREE.Quaternion(), a: new THREE.Vector3() };
+// ramp n (the one nominally at z = gap/2 + n·2gap): during a run each is shifted across and along the walk by a hash of n and the run's
+// seed, and about a quarter are left out; on autopilot they stand in their old line
+function rampSpot(n, seed) {
+  if (!seed) return { x: SC.rampX, dz: 0, skip: false };
+  const h = (k) => { const v = Math.sin(n * 127.1 + seed * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
+  return { x: (h(1) < .5 ? -1 : 1) * 55, dz: (h(2) - .5) * 220, skip: h(3) < .25 };   // one side or the other
+}
 // stars over the jumps: each spins and bobs over its ramp; flying through one (airborne, chest at the star) takes it with a pop,
 // a spark burst, a ring, a chime that climbs with a combo, a +1 over the spot and a small punch-in of the view. Back after STAR.back s.
 let starAudio = null;
@@ -981,11 +1080,13 @@ function starsFrame(S, T, dt, w, Zw, manual) {
   // the rider's chest in course coordinates: 28 cm ahead of the rear axle, up with the jump
   const cx = S.X + Math.sin(S.psi) * 28, cz = S.Z + Math.cos(S.psi) * 28;
   for (const st of Q.list) {
-    const zG = st.g.position.z + Zw, n = Math.round((zG - SC.gap / 2 - SC.rampL / 2 - STAR.dz) / SC.gap);
+    const nR = Math.round((st.g.userData.z + Zw - SC.gap / 2 - SC.rampL / 2 - STAR.dz) / (2 * SC.gap)), sp = rampSpot(nR, S.game.on ? S.game.seed : 0);
+    st.g.position.x = sp.x; st.g.position.z = st.g.userData.z + sp.dz;
+    const zG = st.g.position.z + Zw, n = nR * 2 + (S.game.seed || 0) * 1000;
     const got = Q.got[n], age = got != null ? T - got : 1e9;
     if (got != null && age > STAR.back) delete Q.got[n];
-    if (got == null && manual && S.air && S.y > SC.rampH * .5 && Math.abs(cx - SC.rampX) < STAR.r && Math.abs(cz - zG) < STAR.r * 1.3) {
-      Q.got[n] = T; Q.n++; Q.combo = T - Q.last < 6 ? Q.combo + 1 : 0; Q.last = T;
+    if (got == null && manual && S.air && S.y > SC.rampH * .5 && !sp.skip && Math.abs(cx - sp.x) < STAR.r && Math.abs(cz - zG) < STAR.r * 1.3) {
+      Q.got[n] = T; Q.n++; Q.combo = T - Q.last < 6 ? Q.combo + 1 : 0; Q.last = T; S.game.stars++;
       // burst at this star
       const pos = Q.sparks.geometry.attributes.position.array;
       for (let i = 0; i < pos.length; i += 3) {
@@ -996,7 +1097,7 @@ function starsFrame(S, T, dt, w, Zw, manual) {
       Q.sparks.geometry.attributes.position.needsUpdate = true; Q.t0 = T; Q.ring.position.copy(st.g.position);
       rigs.kick = -.6;
       starChime(Q.combo);
-      starPop(Q.combo ? '★ ×' + (Q.combo + 1) : '★ +1', st.g.getWorldPosition(new THREE.Vector3()).add(R3.u.set(0, 14, 0)));
+      gameStar(S, T, st.g.getWorldPosition(new THREE.Vector3()).add(R3.u.set(0, 14, 0)));
     }
     // idle spin and bob; taken: a quick swell and shrink while it flies up; back: it grows in
     const ag = Q.got[n] != null ? T - Q.got[n] : 1e9;
@@ -1005,7 +1106,7 @@ function starsFrame(S, T, dt, w, Zw, manual) {
     else if (ag < STAR.back) { sc = 0; o = 0; }
     else if (ag < STAR.back + .5) { const f = (ag - STAR.back) / .5; sc = 1 + .25 * Math.sin(f * Math.PI) * (1 - f); }
     sc = Math.max(0, sc);
-    st.g.visible = sc > .01 && w > .002;
+    st.g.visible = sc > .01 && w > .002 && !sp.skip;
     st.m.rotation.y = reduced ? 0 : T * 1.2 + st.k; st.m.position.y = (reduced ? 0 : Math.sin(T * 1.6 + st.k) * 1.5) + lift;
     st.m.scale.setScalar(sc); st.glow.position.y = st.m.position.y; st.glow.scale.setScalar(22 * sc);
     st.m.material.opacity = .85 * o * w; st.glow.material.opacity = .35 * o * w;
@@ -1022,11 +1123,326 @@ function starsFrame(S, T, dt, w, Zw, manual) {
     Q.ring.quaternion.copy(camera.quaternion).premultiply(S.course.getWorldQuaternion(R3.q).invert());   // face the camera
   }
 }
+// ----- the scooter game: score, combo, best, boosts and barriers; it runs only while the reader drives -----
+const BEST_KEY = 'gp.scooter.best';
+let bestLoaded = null;
+function gameBest(v) {
+  try { if (v != null) localStorage.setItem(BEST_KEY, String(v)); else if (bestLoaded == null) bestLoaded = +(localStorage.getItem(BEST_KEY) || 0) || 0; } catch (e) { }
+  if (v != null) bestLoaded = v; return bestLoaded || 0;
+}
+function gameNew() { return { on: false, t0: 0, z0: 0, dist: 0, score: 0, stars: 0, hp: GAME.hp, dmg: { head: 0, torso: 0, armL: 0, armR: 0, legL: 0, legR: 0 },
+  seed: 1 + Math.floor(Math.random() * 997), ragT: null, ragFall: false, zc: -1e9, chunkZ: -1e9, slipUntil: -1e9, boostUntil: -1e9, boostT0: -1e9, vb: 0, airT0: 0, wasAir: false, downUntil: -1e9, next: { crutch: 0, ball: 0, bird: 0 }, hurtT: -1e9, hud: '' }; }
+function gameScore(G) { return Math.floor(G.dist / 100) * GAME.perM + G.stars * GAME.star; }
+function gameStar(S, T, wp) {
+  const G = S.game; if (!G.on) return;
+  G.stars++; starPop('★ +' + GAME.star, wp);
+  if (G.stars % GAME.every === 0) gameBoost(S, T);
+}
+function gameBoost(S, T) {
+  const G = S.game; G.boostUntil = T + GAME.boostT; G.boostT0 = T; S.v = Math.max(S.v, 0) + GAME.boost * .7;
+  const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = 'Boost!';
+  el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+  starChime(8); whoosh();
+}
+// a short filtered-noise rush for the boost
+function whoosh() {
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    const A = starAudio, t = A.currentTime, n = A.sampleRate * .9, buf = A.createBuffer(1, n, A.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = A.createBufferSource(), f = A.createBiquadFilter(), g = A.createGain(); src.buffer = buf; f.type = 'bandpass'; f.Q.value = 1.4;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2600, t + .35); f.frequency.exponentialRampToValueAtTime(700, t + .9);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + .9);
+    src.connect(f).connect(g).connect(A.destination); src.start(t); src.stop(t + .9);
+  } catch (e) { }
+}
+// a hit: lose health on the part that was struck, slow down, flash the little body; at zero health the run is over
+function gameHurt(S, T, part, amt, label, fall) {
+  const G = S.game; if (!G.on || T < G.downUntil || (T - G.hurtT < .5 && !fall)) return;
+  G.hurtT = T; G.hp = Math.max(0, G.hp - amt); G.mini = true; G.dmg[part] = Math.min(1, G.dmg[part] + amt / 45); G.lastPart = part;
+  G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud();
+  starPop(label, S.g.localToWorld(R3.u.set(0, 120, 0)));
+  if (G.hp <= 0) {
+    G.downUntil = T + 3.4; G.ragT = T; G.ragV = Math.max(160, Math.abs(S.v) / .35); G.ragSide = Math.random() < .5 ? -1 : 1; G.ragFall = !!fall; S.v = fall ? 0 : .5 * G.ragV; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc);
+    const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = (fall ? 'Fell · ' : 'Wiped out · ') + sc;
+    el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+  }
+}
+// wipe-out: the rider is thrown off the front, tumbles face-down with flailing limbs, bounces and lies there; the scooter tips over.
+// A scripted fall over the pose the rig just solved (no physics engine): it blends out at the end as the next run starts.
+const RAG = { q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), a: new THREE.Vector3(),
+  limbs: [['lArm', [0, 0, 1], 1.9, 2.4, 1.2], ['rArm', [0, 0, 1], -1.9, -2.4, 1.2], ['lFore', [0, 1, 0], 1.3, 2.9, .5], ['rFore', [0, 1, 0], -1.3, 3.1, -.5],
+    ['lUp', [1, 0, 0], -1.0, 2.2, -.4], ['rUp', [1, 0, 0], 1.1, 2.5, .3], ['lLeg', [1, 0, 0], 1.2, 3.3, .9], ['rLeg', [1, 0, 0], 1.4, 2.8, .5],
+    ['spine1', [1, 0, 0], .5, 2.6, -.25], ['neck', [1, 0, 0], .7, 4.0, -.3], ['head', [0, 0, 1], .5, 3.4, .2]] };
+const easeOutBack = (x) => { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+function ragdoll(S, T, w) {
+  const G = S.game, a = T - G.ragT;
+  if (a > 3.4 || !G.on) { G.ragT = null; return; }
+  const r = (1 - ease(clamp01((a - 3.0) / .4))) * w, sd = G.ragSide;
+  // limbs: a big flail that dies away into a sprawl (each bone's own axis, amplitude, rate, final offset)
+  for (const [k, ax, amp, rate, rest] of RAG.limbs) {
+    const b = bones[k]; if (!b) continue;
+    const ang = (amp * Math.sin(a * rate * 6 + amp) * Math.exp(-a * 2.6) + rest * ease(clamp01(a / .8))) * r;
+    b.quaternion.multiply(RAG.q.setFromAxisAngle(RAG.a.fromArray(ax), ang));
+  }
+  figure.updateMatrixWorld(true);
+  // the body: launched forward and up, pitched face-down about the hips with a roll to one side, then a bounce and a little slide
+  const piv = wpos(bones.hips), hip0 = piv.y;
+  const t1 = .55, air = a < t1 ? 300 * a - 545 * a * a : a < .85 ? 40 * Math.sin((a - t1) / .3 * Math.PI) : 0;
+  const fwd = Math.min(260, G.ragV * .7) * (1 - Math.exp(-a * 2.4));
+  const pitch = (Math.PI / 2 - .12) * easeOutBack(clamp01(a / .75)), roll = sd * (.6 * ease(clamp01(a / .9)) + .25 * Math.sin(a * 9) * Math.exp(-a * 3)), yaw = sd * .5 * ease(clamp01(a / 1.2));
+  RAG.q.setFromEuler(RAG.e.set(pitch * r, yaw * r, roll * r, 'YXZ'));
+  RAG.p.copy(figure.position).sub(piv).applyQuaternion(RAG.q).add(piv);
+  figure.position.lerp(RAG.p, 1); figure.quaternion.premultiply(RAG.q);
+  figure.position.y += (Math.max(0, air) - (hip0 - 16) * ease(clamp01(a / .6))) * r;
+  figure.position.z += fwd * r; figure.position.x += sd * 30 * ease(clamp01(a / 1)) * r;
+  if (G.ragFall) { const d = 300 * Math.max(0, a - .3) ** 2; figure.position.y -= d * r; S.g.position.y -= 1.4 * d * r; S.g.rotation.x += .9 * ease(clamp01(a / .8)) * r; }   // off the crumbled edge: down into the void
+  figure.updateMatrixWorld(true);
+  // the scooter goes over on its side
+  S.g.rotation.z = -sd * (Math.PI / 2 - .25) * clamp01(easeOutBack(clamp01(a / .5))) * r;
+}
+// the little body: a mini of the mannequin, seen from behind, with its own copy of the skeleton. Damage cripples it rather than
+// colouring it: a hurt leg buckles at the knee and turns in, a hurt arm hangs limp, a hurt torso hunches and lists, a hurt head lolls.
+// Each entry: bone, local axis, angle (rad) at full damage of the part; a hit also gives the whole body a shudder.
+const MINI = { cripple: {
+  legL: [['upperleg01.L', [1, 0, 0], -.45], ['upperleg01.L', [0, 0, 1], -.25], ['lowerleg01.L', [1, 0, 0], .95], ['foot.L', [0, 1, 0], .7]],
+  legR: [['upperleg01.R', [1, 0, 0], -.45], ['upperleg01.R', [0, 0, 1], .25], ['lowerleg01.R', [1, 0, 0], .95], ['foot.R', [0, 1, 0], -.7]],
+  armL: [['upperarm01.L', [0, 0, 1], -.55], ['upperarm01.L', [1, 0, 0], .35], ['lowerarm01.L', [1, 0, 0], .8], ['wrist.L', [1, 0, 0], .9]],
+  armR: [['upperarm01.R', [0, 0, 1], .55], ['upperarm01.R', [1, 0, 0], .35], ['lowerarm01.R', [1, 0, 0], .8], ['wrist.R', [1, 0, 0], .9]],
+  torso: [['spine03', [1, 0, 0], .35], ['spine01', [1, 0, 0], .3], ['spine03', [0, 0, 1], .2]],
+  head: [['neck01', [1, 0, 0], .45], ['head', [0, 0, 1], .5], ['neck01', [0, 0, 1], .25]] }, q: new THREE.Quaternion(), a: new THREE.Vector3() };
+function miniBuild() {
+  if (MINI.r || !figureMesh) return MINI.r;
+  const cv = ui.schurt.querySelector('canvas'); if (!cv) return null;
+  try { MINI.r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); } catch (e) { return null; }
+  MINI.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); MINI.r.setSize(52, 104, false);
+  const src = figureMesh.skeleton, root = src.bones[0].clone(), byName = {};
+  root.traverse(b => { if (b.isBone) { byName[b.name] = b; b.userData.rest = b.quaternion.clone(); } });
+  const skel = new THREE.Skeleton(src.bones.map(b => byName[b.name]), src.boneInverses);
+  const g = new THREE.BufferGeometry(); for (const k of ['position', 'normal', 'skinIndex', 'skinWeight']) if (figureMesh.geometry.attributes[k]) g.setAttribute(k, figureMesh.geometry.attributes[k]);
+  if (!g.attributes.normal) g.computeVertexNormals(); g.computeBoundingBox();
+  const mesh = new THREE.SkinnedMesh(g, new THREE.MeshLambertMaterial({ color: 0xf4f3f8, flatShading: true })); mesh.add(root); mesh.bind(skel, figureMesh.bindMatrix); mesh.frustumCulled = false;
+  const sc = new THREE.Scene(), body = new THREE.Group(); body.add(mesh); sc.add(body, new THREE.HemisphereLight(0xffffff, 0x8888a0, 1.7));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.3); dl.position.set(-1, 2, 2); sc.add(dl);
+  const bb = g.boundingBox, cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2, h = bb.max.y - bb.min.y;
+  const cam = new THREE.OrthographicCamera(-h * .27, h * .27, h * .54, -h * .54, -1000, 1000); cam.position.set(cx, cy + h * .05, bb.max.z + h); cam.lookAt(cx, cy, 0);   // from the front: it faces you
+  Object.assign(MINI, { byName, sc, cam, body, cy, cur: {} });
+  return MINI.r;
+}
+function miniDraw(G, T) {
+  if (!miniBuild()) return false;
+  let moving = false;
+  for (const b of Object.values(MINI.byName)) b.quaternion.copy(b.userData.rest);
+  for (const part in MINI.cripple) {
+    const want = Math.min(1, (G.dmg[part] || 0) * 1.6), c = MINI.cur[part] = (MINI.cur[part] || 0) + (want - (MINI.cur[part] || 0)) * .25;   // eases into the new injury
+    if (Math.abs(want - c) > .002) moving = true;
+    for (const [bn, ax, ang] of MINI.cripple[part]) { const b = MINI.byName[bn]; if (b) b.quaternion.multiply(MINI.q.setFromAxisAngle(MINI.a.fromArray(ax), ang * c)); }
+  }
+  const fl = Math.max(0, 1 - (T - G.hurtT) / .5);
+  MINI.body.rotation.z = fl > 0 && !reduced ? Math.sin(T * 60) * .07 * fl : 0;
+  MINI.r.render(MINI.sc, MINI.cam);
+  return moving || fl > 0;
+}
+function splashAt(H, S, T) {
+  const pa = H.splash.geometry.attributes.position.array;
+  for (let i = 0; i < pa.length; i += 3) {
+    const sd = Math.random() < .5 ? -1 : 1; pa[i] = S.X + sd * 14; pa[i + 1] = 2; pa[i + 2] = S.Z + Math.random() * 50;
+    H.sVel[i] = sd * (40 + Math.random() * 120); H.sVel[i + 1] = 120 + Math.random() * 200; H.sVel[i + 2] = S.v * .4 + (Math.random() - .5) * 60;
+  }
+  H.sT = T;
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    const A = starAudio, t = A.currentTime, n = A.sampleRate * .35, buf = A.createBuffer(1, n, A.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = A.createBufferSource(), f = A.createBiquadFilter(), g = A.createGain(); src.buffer = buf; f.type = 'lowpass'; f.frequency.value = 1400; g.gain.value = .08;
+    src.connect(f).connect(g).connect(A.destination); src.start(t);
+  } catch (e) { }
+}
+function hazGet(H, kind) {
+  let h = H.list.find(x => !x.on && x.kind === kind);
+  if (!h) { h = Object.assign(H.proto[kind](), { kind }); H.g.add(h.g); H.list.push(h); }
+  h.on = true; h.g.visible = true; h.t0 = clock.elapsedTime; h.hit = false; h.passed = false; return h;
+}
+function gameFrame(S, T, dt, w, Zw, manual, L) {
+  const G = S.game, H = S.CM.haz;
+  H.g.position.z = -Zw;
+  for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
+  // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
+  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
+  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
+  if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
+  if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
+  const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;
+  G.vb *= Math.pow(.35, dt);
+  // landing a jump: a speed kick
+  if (S.air && !G.wasAir) G.airT0 = T;
+  if (!S.air && G.wasAir && G.on && T - G.airT0 > .12) G.vb = Math.min(GAME.landMax, G.vb + GAME.land);
+  G.wasAir = S.air;
+  // ----- the walk crumbles from behind, faster and faster; caught by the edge, you fall -----
+  const H0 = S.CM.haz;
+  if (G.on && T >= G.downUntil) G.zc += (GAME.fall0 + GAME.fallAcc * (T - G.t0)) * dt;
+  const zc = G.on ? G.zc : -1e9;
+  S.course.updateMatrixWorld(true);
+  const nrm = R3.u.set(0, 0, 1).transformDirection(S.course.matrixWorld), pt = S.course.localToWorld(R3.v.set(0, 0, Math.max(-1e6, zc - Zw)));
+  H0.cut.setFromNormalAndCoplanarPoint(nrm, pt);
+  if (G.on) while (G.chunkZ < zc - 30) {                   // the slabs that go: three tiles across, tumbling down
+    G.chunkZ += 60;
+    for (const x of [-60, 0, 60]) { const h = hazGet(H0, 'chunk'); h.z = G.chunkZ; h.x = x; h.vy = -Math.random() * 60; h.spin = (Math.random() - .5) * 4; h.g.position.set(x, -2.4, h.z); h.g.rotation.set(0, 0, 0); }
+  }
+  if (G.on && T >= G.downUntil && S.Z < zc + 4) gameHurt(S, T, 'legL', 999, 'Fell', true);
+  const v = Math.max(120, S.v), rz = S.Z + 28, live = G.on && T >= G.downUntil && w > .6;
+  if (live) {
+    const lvl = clamp01(G.dist / 12000);                      // 0 at the start, 1 after 120 m
+    const spawnZ = S.Z + Math.min(GAME.ahead, Math.max(380, v * 1.7));
+    const clear = (z) => H.list.every(h => !h.on || Math.abs(h.z - z) > 110);
+    if (T > G.next.crutch && clear(spawnZ)) {
+      const h = hazGet(H, 'crutch'); h.side = Math.random() < .5 ? -1 : 1; h.z = spawnZ; h.ang = 0; h.state = 0;
+      h.g.position.set(h.side * (GAME.edge + 52), .6, h.z);   // lying, it reaches just past the middle h.g.rotation.set(0, 0, 0); h.fall.rotation.set(0, 0, 0);
+      G.next.crutch = T + 3.6 - 1.6 * lvl + Math.random() * 1.2;
+    }
+    // a ball is held at the side for a moment, then thrown so it crosses the walk about when the rider gets there
+    const bSide = Math.random() < .5 ? -1 : 1, bSpd = 380 + 160 * lvl, bZ = S.Z + 28 + v * (.55 + (bSide * 150 - S.X) * bSide / bSpd);
+    if (G.dist > GAME.ballAt && T > G.next.ball && clear(bZ)) {
+      const h = hazGet(H, 'ball'); h.side = bSide; h.state = 0; h.spd = bSpd; h.peak = 115 + Math.random() * 35; h.wind = .55;
+      h.z = bZ; h.g.position.set(h.side * 150, 100, h.z);
+      G.next.ball = T + 5 - 2.4 * lvl + Math.random() * 1.5;
+    }
+    if (T > (G.next.puddle || 0) && clear(spawnZ + 40)) {          // puddles: slick, not sore
+      const h = hazGet(H, 'puddle'); h.r = 22 + Math.random() * 20; h.x = (Math.random() < .5 ? -1 : 1) * 50; h.z = spawnZ + 40;
+      h.g.position.set(h.x, 0, h.z); h.m.scale.set(h.r, h.r * (.6 + Math.random() * .3), 1); h.m.rotation.z = Math.random() * 3; h.dx = -h.x / 50 * h.r * .35; h.dz = (Math.random() - .5) * h.r * .3; h.dvy = 0; h.dy = 0;
+      G.next.puddle = T + 3 + Math.random() * 3 - 1.2 * lvl;
+    }
+    if (G.dist > GAME.birdAt && T > G.next.bird && clear(spawnZ + 80)) {
+      const h = hazGet(H, 'bird'); h.side = Math.random() < .5 ? -1 : 1; h.x = h.side * (32 + Math.random() * 30); h.z = spawnZ + 80; h.y = 125 + Math.random() * 30;
+      h.spd = 300 + 150 * lvl; h.g.position.set(h.x, h.y, h.z); h.g.rotation.set(0, 0, 0); chirp();
+      G.next.bird = T + 6 - 2.5 * lvl + Math.random() * 2;
+    }
+  }
+  const xs = [S.X - 14, S.X, S.X + 14];
+  for (const h of H.list) {
+    if (!h.on) continue;
+    const age = T - h.t0;
+    if (h.kind === 'chunk') {
+      h.vy -= 981 * dt; h.g.position.y += h.vy * dt; h.g.rotation.x += h.spin * dt; h.g.rotation.z += h.spin * .6 * dt;
+      if (h.g.position.y < -400) { h.on = false; h.g.visible = false; }
+      continue;
+    }
+    if (h.kind === 'puddle') {
+      // through it with the wheels down: a splash and a skid (the bars go light and the back steps out for a moment)
+      const sy = h.m.scale.y, inP = (x, z) => ((x - h.x) / h.r) ** 2 + ((z - h.z) / sy) ** 2 < 1;
+      if (live && !h.hit && !S.air && (inP(S.X, S.Z) || inP(S.X + Math.sin(S.psi) * L, S.Z + Math.cos(S.psi) * L))) {
+        h.hit = true; G.slipUntil = T + .9; G.slipDir = Math.random() < .5 ? -1 : 1; S.v *= .75; splashAt(H, S, T); starPop('Splash', S.g.localToWorld(R3.u.set(0, 120, 0))); h.dvy = 150;   // the duck goes flying
+      }
+      { const a = T - h.t0; h.rp.forEach((x, i) => { const f = (a * .55 + i * .5) % 1; x.scale.setScalar(.15 + .8 * f); x.material.opacity = .55 * (1 - f) * w; });
+        h.dvy -= 600 * dt; h.dy = Math.max(0, h.dy + h.dvy * dt); if (h.dy === 0 && h.dvy < 0) h.dvy = 0;
+        h.duck.position.set(h.dx + Math.sin(a * .7) * 3, .8 + Math.sin(a * 2.6) * .5 + h.dy, h.dz); h.duck.rotation.set(Math.sin(a * 2.1) * .08 + (h.dy > 0 ? a * 9 : 0), a * .5, Math.sin(a * 2.6 + 1) * .1); }
+      if (h.z < S.Z - 260) { h.on = false; h.g.visible = false; }
+      if (!G.on) { h.on = false; h.g.visible = false; }
+      continue;
+    }
+    if (h.kind === 'crutch') {
+      // it wobbles, then tips into the path once the rider is close; it lies across the walk from its side to past the middle
+      if (!h.state && h.z - rz < v * 1.15 + 60) { h.state = 1; h.tf = T; }
+      const f = h.state ? clamp01((T - h.tf) / .6) : 0;
+      h.ang = h.state ? f * f * (Math.PI / 2 - .04) : Math.sin(age * 9) * .04;
+      h.fall.rotation.z = h.side * h.ang + (f >= 1 ? h.side * Math.sin((T - h.tf - .6) * 30) * .03 * Math.max(0, 1 - (T - h.tf - .6) * 4) : 0);
+      // height of the crutch above the walk where the rider is, if it reaches there
+      let top = -1;
+      for (const x of xs) { const hx = (h.g.position.x - x) * h.side; if (hx < 0) continue; const s = hx / Math.max(.05, Math.sin(h.ang)); if (s <= h.len) top = Math.max(top, s * Math.cos(h.ang) + 3); }
+      const low = top >= 0 && top < 14, zHit = low ? (h.z > S.Z - 10 && h.z < S.Z + L + 10) : Math.abs(h.z - rz) < 18;
+      if (live && !h.hit && top >= 0 && zHit) {
+        const rel = top - S.y;
+        if (rel > 0 && rel < 175) { h.hit = true; const part = rel < 55 ? (h.side > 0 ? 'legL' : 'legR') : rel < 125 ? (Math.random() < .5 ? 'torso' : (h.side > 0 ? 'armL' : 'armR')) : 'head';
+          gameHurt(S, T, part, rel < 14 ? 15 : rel > 125 ? 30 : 22, rel < 14 ? 'Tripped' : 'Bonk'); }
+      }
+      if (live && !h.hit && !h.passed && h.z < S.Z - 10) { h.passed = true; if (top >= 0) starPop('Cleared', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (h.z < S.Z - 260) { h.on = false; h.g.visible = false; }
+    } else if (h.kind === 'ball') {
+      const tt = age - h.wind;
+      if (tt < 0) { h.g.position.y = 100 + Math.abs(Math.sin(age * 8)) * 8; h.b.rotation.x += dt * 2; }
+      else {
+        const fx = tt * h.spd, f = fx / 300;
+        h.g.position.x = h.side * (150 - fx); h.g.position.y = f < 1 ? 100 + (h.peak - 100) * 4 * f * (1 - f) + 60 * f * (1 - f) : Math.max(11, 100 - (f - 1) * 300);
+        h.b.rotation.z -= h.side * dt * 14;
+        const dx = Math.abs(h.g.position.x - S.X), dz = Math.abs(h.z - rz), rel = h.g.position.y - S.y;
+        if (live && !h.hit && dx < 24 && dz < 26 && rel > 40 && rel < 180 - 70 * (S.duck || 0)) { h.hit = true; gameHurt(S, T, rel > 140 ? 'head' : rel > 95 ? (h.side > 0 ? 'armL' : 'armR') : 'torso', rel > 140 ? 30 : 20, 'Oof'); }
+        if (f > 1.6) { h.on = false; h.g.visible = false; }
+      }
+      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; starPop('Dodged', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (h.z < S.Z - 300) { h.on = false; h.g.visible = false; }
+    } else {
+      h.z -= h.spd * dt; h.g.position.set(h.x + Math.sin(age * 3) * 4, h.y + Math.sin(age * 5) * 5, h.z);
+      for (const [i, wg] of h.wings.entries()) wg.rotation.z = (i ? -1 : 1) * Math.sin(age * 22) * .7;
+      const dx = Math.abs(h.x - S.X), dz = Math.abs(h.z - rz), rel = h.y - S.y;
+      if (live && !h.hit && dx < 28 && dz < 24 && rel > 60 && rel < 190 - 80 * (S.duck || 0)) { h.hit = true; gameHurt(S, T, rel > 135 ? 'head' : (h.x > S.X ? 'armL' : 'armR'), rel > 135 ? 30 : 22, 'Squawk'); }
+      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; if (dx < 70) starPop('Close one', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (h.z < S.Z - 300) { h.on = false; h.g.visible = false; }
+    }
+    if (!G.on) { h.on = false; h.g.visible = false; }
+  }
+  { const sp = H.splash, a = T - H.sT, pa = sp.geometry.attributes.position.array; sp.visible = a < .7 && w > .05;
+    if (sp.visible) { for (let i = 0; i < pa.length; i += 3) { H.sVel[i + 1] -= 900 * dt; for (let c = 0; c < 3; c++) pa[i + c] += H.sVel[i + c] * dt; } sp.geometry.attributes.position.needsUpdate = true; sp.material.opacity = (1 - a / .7) * .9 * w; } }
+  // ----- boost juice: a wider view, a shake, streaks round the edge of the screen and a trail off the wheels -----
+  if (boost > 0) rigs.kick = Math.max(rigs.kick || 0, 11 * boost + 4 * (1 - bIn) * boost);
+  const stage = ui.stage || (ui.stage = document.getElementById('stage'));
+  if (stage) stage.style.transform = boost > 0 && !reduced ? `translate(${(Math.random() - .5) * 3 * boost}px, ${(Math.random() - .5) * 3 * boost}px)` : '';
+  // close to dying: a faint bloodshot edge that beats like a pulse, stronger the lower the health
+  if (ui.bloodfx) { const low = G.on ? clamp01((35 - G.hp) / 30) : 0, beat = reduced ? 1 : .8 + .2 * Math.pow(Math.max(0, Math.sin(T * (4 + 4 * low))), 6);
+    ui.bloodfx.style.opacity = (low * beat * w * .6).toFixed(3); }
+  if (ui.boostfx) { ui.boostfx.style.opacity = (boost * w).toFixed(3); ui.boostfx.classList.toggle('on', boost > 0); }
+  const tr = H.trail, tp = tr.geometry.attributes.position.array;
+  if (boost > 0 && w > .1) for (let n = 0; n < 4; n++) {
+    const i = H.tI = (H.tI + 1) % H.tAge.length, sd = n % 2 ? 1 : -1;
+    tp[i * 3] = S.X + Math.cos(S.psi) * sd * 16 + (Math.random() - .5) * 4; tp[i * 3 + 1] = S.y + 4 + Math.random() * 6; tp[i * 3 + 2] = S.Z - Math.sin(S.psi) * sd * 16 - 4;
+    H.tVel[i * 3] = (Math.random() - .5) * 30; H.tVel[i * 3 + 1] = 20 + Math.random() * 40; H.tVel[i * 3 + 2] = -(Math.random() * 40); H.tAge[i] = 0;
+  }
+  let any = false;
+  for (let i = 0; i < H.tAge.length; i++) { if (H.tAge[i] > .6) { tp[i * 3 + 1] = -999; continue; } any = true; H.tAge[i] += dt; for (let c = 0; c < 3; c++) tp[i * 3 + c] += H.tVel[i * 3 + c] * dt; }
+  tr.visible = any && !reduced; tr.geometry.attributes.position.needsUpdate = true; tr.material.opacity = .85 * w;
+  // ----- score panel and the little body -----
+  const hud = ui.schud; if (!hud) return;
+  const show = w > .02 && rigs.scootOn;
+  hud.style.opacity = show ? Math.min(1, w) : 0; ui.schurt.style.opacity = show ? Math.min(1, w) : 0;
+  hud.classList.toggle('boost', boost > 0);
+  const sc = G.on ? G.score : (G.final || 0), best = Math.max(gameBest(), sc);
+  const toGo = boost > 0 ? 0 : GAME.every - (G.stars % GAME.every), pips = '★'.repeat(GAME.every - toGo) + '☆'.repeat(toGo);
+  const txt = sc + '|' + best + '|' + pips + '|' + Math.floor(G.dist / 100) + '|' + G.hp + '|' + Object.values(G.dmg).join();
+  if (txt !== G.hud) {
+    G.hud = txt;
+    hud.querySelector('.sc').textContent = sc;
+    hud.querySelector('.mu').textContent = Math.floor(G.dist / 100) + ' m';
+    hud.querySelector('.be').textContent = '· Best ' + best;
+    hud.querySelector('.pi').textContent = pips;
+    ui.schurt.querySelector('.hp i').style.width = G.hp + '%';
+    G.mini = true;
+  }
+  if (G.hurtT === T) { ui.schurt.classList.remove('hurt'); void ui.schurt.offsetWidth; ui.schurt.classList.add('hurt'); }
+  if (show && G.mini) G.mini = miniDraw(G, T);
+  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0);
+}
+function chirp() {
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = starAudio.currentTime;
+    for (const k of [0, .12]) { const o = starAudio.createOscillator(), g = starAudio.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(2400, t + k); o.frequency.exponentialRampToValueAtTime(3600, t + k + .06);
+      g.gain.setValueAtTime(0, t + k); g.gain.linearRampToValueAtTime(.025, t + k + .01); g.gain.exponentialRampToValueAtTime(.0005, t + k + .09);
+      o.connect(g).connect(starAudio.destination); o.start(t + k); o.stop(t + k + .1); }
+  } catch (e) { }
+}
+function crashThud() {
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = starAudio.currentTime, o = starAudio.createOscillator(), g = starAudio.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(45, t + .25);
+    g.gain.setValueAtTime(.08, t); g.gain.exponentialRampToValueAtTime(.0005, t + .3); o.connect(g).connect(starAudio.destination); o.start(t); o.stop(t + .32);
+  } catch (e) { }
+}
 function scooterFrame(s, dt, w) {
   const S = rigs.scooter; fade(S.g, w); fade(S.course, w);
   rigs.ghost = 0; rigs.scootOn = false;
   if (w <= 0) { ui.callouts3.style.opacity = 0; return; }
-  const T = clock.elapsedTime, RW = 10.16, L = SC.L, kneeH = +ui.scKnee.value;
+  const T = clock.elapsedTime, RW = 10.16, L = SC.L, kneeH = +ui.scKnee.value; S.T = T;   // S.T: the rig clock, for render checks
   const e = ease(win(s, 10.55, 10.85, 11.3, 11.6));                 // exploded
   const moving = 1 - win(s, 10.4, 10.7, 11.35, 11.65);               // it rolls to a stop before it comes apart
   rigs.ghost = win(s, 10.5, 10.8, 11.35, 11.6);                     // the rider goes see-through while it is apart
@@ -1034,13 +1450,18 @@ function scooterFrame(s, dt, w) {
   ui.scKneeOut.textContent = (kneeH > 0 ? '+' : '') + kneeH + ' cm';
   // driver: keys (or the slider) if touched in the last 3 s, else the autopilot
   const K = S.keys; if (K.size) S.last = T;                    // a held key keeps it yours
-  const manual = rigs.scootOn && T - S.last < 3;
+  const manual = rigs.scootOn && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
   let vT, dT;
   if (manual) {
     const fwd = K.has('w') || K.has('arrowup'), back = K.has('s') || K.has('arrowdown');
     const left = K.has('a') || K.has('arrowleft'), right = K.has('d') || K.has('arrowright');
-    vT = fwd ? 160 : back ? -60 : S.useSlider ? SC.vAuto : 0;
-    dT = left ? SC.dMax : right ? -SC.dMax : S.useSlider ? +ui.scSteer.value * RD : 0;   // rider's left is world +x
+    const G = S.game, bst = T < G.boostUntil, vMax = Math.min(GAME.vTop, GAME.v0 + G.dist * GAME.vGain);   // the further you get, the faster
+    vT = fwd || bst ? vMax + G.vb + (bst ? GAME.boost : 0) : S.useSlider ? SC.vAuto : 0; S.duckT = back ? 1 : 0;   // down ducks (under birds and high balls)   // a boost carries you even off the gas
+    if (T < G.downUntil) vT = 0;                                                                    // wiped out: it rolls to a stop
+    // at speed the bars turn less, so the turn rate v·tan δ / L stays near 1.8 rad/s and fast runs stay controllable
+    const dLim = Math.min(SC.dMax, Math.atan(1.8 * L / Math.max(1, Math.abs(S.v))));
+    dT = left ? dLim : right ? -dLim : S.useSlider ? +ui.scSteer.value * RD : 0;   // rider's left is world +x
+    if (T < G.slipUntil) dT = dT * .25 + G.slipDir * dLim * .9 * Math.sin((G.slipUntil - T) / .9 * Math.PI);   // skidding in a puddle
   } else {
     // pure pursuit: aim the rear axle at a point on the slalom line Ld ahead; δ = atan(2 L sin α / Ld)
     const Ld = 90, zt = S.Z + Ld, xt = SC.amp * Math.sin(Math.PI * zt / SC.gap);
@@ -1081,6 +1502,15 @@ function scooterFrame(s, dt, w) {
   solve2(bones.rUp, bones.rLeg, bones.rFoot, Kn.clone().add(new THREE.Vector3(0, .5, -l2)), wpos(bones.rUp).add(new THREE.Vector3(0, -10, 60)), w);
   const hipL = wpos(bones.lUp);
   solve2(bones.lUp, bones.lLeg, bones.lFoot, new THREE.Vector3(hipL.x + 3, 9.5 + up, hipL.z + 6), hipL.clone().add(new THREE.Vector3(0, -10, 60)), w);
+  // ducking: the spine folds forward over the bars, the neck tips the head back up to watch the walk
+  S.duck = (S.duck || 0) + (((manual && S.duckT) || 0) - (S.duck || 0)) * (1 - Math.pow(.0005, dt));
+  if (S.duck > .005 && w > 0) {
+    const ax = new THREE.Vector3(Math.cos(S.psi), 0, -Math.sin(S.psi)), pq = new THREE.Quaternion(), dq = new THREE.Quaternion();
+    for (const [k, a] of [['spine', .42], ['spine1', .58], ['spine2', .5], ['neck', -.75]]) {
+      const b = bones[k]; if (!b || !b.parent) continue; b.parent.getWorldQuaternion(pq);
+      b.quaternion.premultiply(dq.setFromAxisAngle(ax.clone().applyQuaternion(pq.invert()), a * S.duck * w)); b.updateMatrixWorld(true);
+    }
+  }
   // hands close on the grips (index fingers toward the stem, palms behind and over the bar); they let go while it is apart
   const gw = w * (1 - e);
   if (gw > 0) {
@@ -1089,26 +1519,45 @@ function scooterFrame(s, dt, w) {
     grasp('L', gl, gr.clone().sub(gl), 1.5, gw, wpos(bones.lArm).add(new THREE.Vector3(35, -25, -25)), 1, cHat);
     grasp('R', gr, gl.clone().sub(gr), 1.5, gw, wpos(bones.rArm).add(new THREE.Vector3(-35, -25, -25)), 1, cHat);
   }
+  S.g.rotation.z = 0;
+  if (S.game.ragT != null) ragdoll(S, T, w);
+  // while the reader drives: the view swings round behind the scooter (beside it on wide screens, clear of the card on the right)
+  const cw = smooth(clamp01(S.starW || 0)) * w * (1 - e);
+  if (cw > .001) {
+    const C = rigs.chase, P = S.g.position, off = innerWidth > 720 ? -70 : 0;
+    C.p.set(P.x + off, 330, P.z - 420); C.t.set(P.x + off * .4, 30, P.z + 260); C.fov = 6; C.w = Math.max(C.w, cw);
+  }
   // roll: track the scooter's pose on the course (rear axle X, Z, heading ψ) with the bicycle model ψ' = v·tan δ / L,
   // then hold the scooter still on screen and move the course and floor by the inverse of that pose
   S.psi += S.v * Math.tan(S.delta) / L * dt;
   S.X += Math.sin(S.psi) * S.v * dt; S.Z += Math.cos(S.psi) * S.v * dt;
+  if (Math.abs(S.X) > GAME.edge) { S.X = Math.sign(S.X) * GAME.edge; S.v *= Math.pow(.25, dt); }    // the curb: a wheel can drop off the walk, no more
   // ramps and hops: the walk's height under the rear axle and the front wheel (a ramp is a wedge rising H over its length along +z)
-  const P2r = 2 * SC.gap, rampAt = (x, z) => {
-    const lz = (((z - SC.gap / 2 + SC.rampL / 2) % P2r) + P2r) % P2r;            // from the foot of the nearest ramp
-    return Math.abs(x - SC.rampX) < SC.rampW / 2 && lz < SC.rampL ? lz / SC.rampL : -1;
+  const P2r = 2 * SC.gap, seed = S.game.on ? S.game.seed : 0, rampAt = (x, z) => {
+    const n0 = Math.round((z - SC.gap / 2) / P2r);
+    for (let n = n0 - 1; n <= n0 + 1; n++) {
+      const p = rampSpot(n, seed); if (p.skip) continue;
+      const lz = z - (SC.gap / 2 + n * P2r + p.dz - SC.rampL / 2);                 // from the foot of ramp n
+      if (Math.abs(x - p.x) < SC.rampW / 2 && lz >= 0 && lz < SC.rampL) return lz / SC.rampL;
+    }
+    return -1;
   };
   const fR = rampAt(S.X, S.Z), fF = rampAt(S.X + Math.sin(S.psi) * L, S.Z + Math.cos(S.psi) * L);
   const gR = Math.max(0, fR) * SC.rampH, gF = Math.max(0, fF) * SC.rampH;
-  if (S.hop && !S.air && moving > .9) { S.air = true; S.vy = Math.max(S.vy, 0) + SC.hop; S.jumps++; }
+  if (S.hop && !S.air && moving > .9) { S.air = true; S.vy = Math.max(S.vy, 0) + SC.hop; S.jumps++; S.dbl = false; S.cut = !manual; }
+  else if (S.hop && S.air && !S.dbl && manual && moving > .9) {          // double jump: one more kick in the air, nose up, with a chirp
+    S.dbl = true; S.vy = Math.max(S.vy, 0) + SC.hop * .95; S.p += .25; S.cut = false; S.jumps++; starChime(4);
+    starPop('Double!', S.g.localToWorld(R3.u.set(0, 120, 0)));
+  }
   S.hop = false;
   if (S.air) {
+    if (!S.cut && !S.hopHeld && S.vy > 0) { S.vy *= .5; S.cut = true; }   // let go early: a short hop
     S.vy -= SC.g * dt; S.y += S.vy * dt;
     S.p += (-.04 - S.p) * (1 - Math.pow(.2, dt));                                // the nose drops a little in the air
-    if (S.y <= gR && S.vy <= 0) { S.y = gR; S.vy = 0; S.air = false; }
+    if (S.y <= gR && S.vy <= 0) { S.y = gR; S.vy = 0; S.air = false; S.dbl = false; }
   } else if (gR < S.y - .5) {
     // off the lip: launch with the climb rate, plus the kick of the lip (pure geometry would only give a couple of cm at these speeds)
-    S.air = true; S.vy = Math.max(S.vy, 0) + .8 * Math.abs(S.v) * Math.sin(S.p); S.jumps++;
+    S.air = true; S.vy = Math.max(S.vy, 0) + .8 * Math.abs(S.v) * Math.sin(S.p); S.jumps++; S.cut = true;
   } else {
     S.vy = dt > 1e-4 ? (gR - S.y) / dt : 0; S.y = gR;
     const pT = fR >= 0 ? Math.atan(SC.rampH / SC.rampL) : Math.asin(Math.min(1, gF / L));   // on the ramp: its slope; else the front wheel's climb
@@ -1148,7 +1597,12 @@ function scooterFrame(s, dt, w) {
     if (!f) { c.tip.position.set(0, 0, 0); c.body.position.set(0, 0, 0); c.tip.quaternion.identity(); }
   }
   S.starW = (S.starW || 0) + ((manual ? 1 : 0) - (S.starW || 0)) * (1 - Math.pow(.02, dt));   // stars only while the reader drives
+  for (const rp of S.CM.ramps) {
+    const n = Math.round((rp.userData.z + Zw - SC.gap / 2) / P2), p = rampSpot(n, seed);
+    rp.position.x = p.x; rp.position.z = rp.userData.z + p.dz; rp.visible = !p.skip;
+  }
   starsFrame(S, T, dt, w * S.starW, Zw, manual);
+  gameFrame(S, T, dt, w * S.starW, Zw, manual, L);
   // readouts
   const rpm = Math.abs(S.v) / RW / (2 * Math.PI) * 60, R = Math.abs(S.delta) > .005 ? L / Math.tan(Math.abs(S.delta)) : Infinity;
   ui.scBelt.textContent = 'Wheel ' + Math.round(rpm) + ' rpm · motor ' + Math.round(rpm * S.ratio) + ' rpm · pulleys ' + (2 * S.rM * 10).toFixed(0) + ' and ' +
@@ -1193,6 +1647,7 @@ function courseFrame(Co, dt, w) {
     A.g.position.set(p.x + Math.sin(hf) * st0 * (Co.sp < -5 ? -1 : 1), 1.2, p.z + Math.cos(hf) * st0 * (Co.sp < -5 ? -1 : 1)); A.g.rotation.y = Co.sp < -5 ? ang + Math.PI : ang; A.shaft.scale.z = len; A.head.position.z = len;
     A.spin.position.set(p.x, 1.2, p.z); A.spin.rotation.y = Co.g.rotation.y + Co.oriS + Co.dl; A.spinM.userData.k = .5 * clamp01(Math.abs(Co.tk) / .4); A.spin.scale.x = Co.tk < 0 ? -1 : 1; }
   C.gates.forEach((G, j) => { const cur = j === C.i % (n + 1) && !onRing, nxt = j === (C.i + 1) % (n + 1); G.m.userData.k = cur ? .95 : nxt ? .4 : .12; G.mc.userData.k = cur ? .7 * (.6 + .4 * Math.sin(T * 6)) : 0; G.m.color.setHex(cur ? 0xff5fd2 : 0x00e0ff); const pa = G.pulse ? T - G.pulse : 9; G.G.scale.setScalar(1 + (pa < .6 ? .35 * Math.sin(pa / .6 * Math.PI) : 0)); if (pa < .6) G.m.userData.k = 1; });
+  const back = C.i === 0 && C.done; C.gates.forEach((G) => { G.cg.rotation.y = back ? Math.PI : 0; });   // heading home: chevrons point back the way you came
   C.rm.userData.k = onRing ? .8 : .25; C.cm.userData.k = onRing ? .9 : .3;
   fade(C.g, w);
   if (!onRing) {
@@ -1254,10 +1709,110 @@ function juiceFrame(Co, dt, w) {
 function driftHud(Co, dt) {
   const T = clock.elapsedTime, sl = Math.abs(Co.slip) / RD, drifting = sl > 10 && Math.abs(Co.sp) > 90;
   if (drifting) { Co.dT += dt; Co.grT = 0; Co.combo = Math.min(5, 1 + Math.floor(Co.dT / 1.5)); Co.dS += sl * Math.abs(Co.sp) * dt * .02 * Co.combo; }
-  else if (Co.dS > 0) { Co.grT += dt; if (Co.grT > .6) { Co.score += Math.round(Co.dS); Co.bank = Math.round(Co.dS); Co.bankT = T; Co.dS = 0; Co.dT = 0; Co.combo = 1; } }
-  const kmh = Math.round(Math.abs(Co.sp) * .036);
-  return kmh + ' km/h' + (Co.dS > 0 ? ' · DRIFT ×' + Co.combo + ' ' + Math.round(Co.dS).toLocaleString() : T - Co.bankT < 2.5 ? ' · +' + Co.bank.toLocaleString() + '!' : '') +
-    (Co.score ? ' · score ' + Co.score.toLocaleString() : '') + ' · ';
+  else if (Co.dS > 0) { Co.grT += dt; if (Co.grT > .6) { Co.score += Math.round(Co.dS); lbSubmit('co', Co.score); Co.bank = Math.round(Co.dS); Co.bankT = T; Co.dS = 0; Co.dT = 0; Co.combo = 1; } }
+  return Co.dS > 0 ? 'Drift ×' + Co.combo + ' +' + Math.round(Co.dS).toLocaleString() : T - Co.bankT < 2.5 ? '+' + Co.bank.toLocaleString() + '!' : '';
+}
+// ----- live leaderboards (scooter: distance + stars; couch: drift score) -----
+// On claude.ai the artifact's db holds one doc per player, lb/<their id> {tag, sc, co}; everyone reads, each writes only their own.
+// On the hosted site the Worker's /api/lb does the same job. A tag of up to 10 characters names you; it lives in this browser.
+const LB = { el: null, mode: null, rows: { sc: [], co: [] }, mine: { sc: 0, co: 0 }, tag: '', db: null, me: null, api: null, pend: {}, busy: false, drawn: '', a: 0 };
+function lbTag(v) { try { if (v != null) localStorage.setItem('gp.tag', v); return localStorage.getItem('gp.tag') || ''; } catch (e) { return v || ''; } }
+function lbId() { try { let id = localStorage.getItem('gp.lbid'); if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('gp.lbid', id); } return id; } catch (e) { return 'anon'; } }
+function lbInit() {
+  if (LB.el) return; LB.tag = lbTag();
+  const el = LB.el = document.createElement('div'); el.id = 'lboard'; el.setAttribute('aria-label', 'Leaderboard');
+  el.innerHTML = '<div class="hd"><b>Leaderboard</b><span class="lv">live</span></div><ol></ol><div class="you"></div><label class="tg">Your tag <input maxlength="10" autocomplete="off" spellcheck="false" placeholder="name"></label>';
+  document.body.appendChild(el);
+  const inp = el.querySelector('input'); inp.value = LB.tag;
+  inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^A-Za-z0-9 ._-]/g, '').slice(0, 10); });
+  inp.addEventListener('change', () => { LB.tag = lbTag(inp.value.trim()); if (LB.tag.length) { if (LB.mine.sc) LB.pend.sc = LB.mine.sc; if (LB.mine.co) LB.pend.co = LB.mine.co; lbFlush(); } });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+  const C = window.claude;
+  if (C && C.use) {
+    Promise.all([C.use('db'), C.use('user')]).then(async ([db, user]) => {
+      if (!db || !user) return;
+      try { LB.me = await user.id(); } catch (e) { return; }
+      LB.db = db;
+      try { const d = await db.doc('lb/' + LB.me).get(); if (d.exists) { const b = d.data(); LB.mine.sc = +b.sc || 0; LB.mine.co = +b.co || 0; if (!LB.tag && b.tag) { LB.tag = lbTag(b.tag); inp.value = LB.tag; } } } catch (e) {}
+      for (const k of ['sc', 'co']) db.collection('lb').orderBy(k, 'desc').limit(10).onSnapshot((snap) => {
+        LB.rows[k] = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => +x[k] > 0).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x[k], you: x.id === LB.me }));
+        LB.drawn = ''; lbDraw();
+      }, () => {});
+      lbFlush();
+    });
+  } else if (/^https?:$/.test(location.protocol)) {
+    LB.api = '/api/lb'; LB.me = lbId(); lbPoll();
+  }
+}
+function lbPoll() {
+  if (!LB.api) return;
+  fetch(LB.api + '?id=' + encodeURIComponent(LB.me), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j) { LB.api = null; return; }
+    for (const k of ['sc', 'co']) LB.rows[k] = (j[k] || []).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x.score || 0, you: !!x.you }));   // the Worker marks your own row; it never sends ids
+    LB.drawn = ''; lbDraw();
+  }).catch(() => { LB.api = null; });
+  clearTimeout(LB.pt); LB.pt = setTimeout(lbPoll, LB.mode ? 15000 : 60000);
+}
+// a new personal best: remember it and send it (one write at a time)
+function lbSubmit(k, score) {
+  score = Math.round(score); if (!(score > LB.mine[k])) return;
+  LB.mine[k] = score; LB.pend[k] = score; lbFlush();
+}
+async function lbFlush() {
+  if (LB.busy || !Object.keys(LB.pend).length) return;
+  const tag = LB.tag || '???';
+  if (LB.db && LB.me) {
+    LB.busy = true; LB.pend = {};
+    try { await LB.db.doc('lb/' + LB.me).set({ tag, sc: LB.mine.sc, co: LB.mine.co }); } catch (e) { if (e && e.code === 'invalid_argument') { LB.ro = true; LB.drawn = ''; lbDraw(); } }   // view-only visitors can read the board, not post
+    LB.busy = false; if (Object.keys(LB.pend).length) lbFlush();
+  } else if (LB.api) {
+    LB.busy = true; const p = LB.pend; LB.pend = {};
+    for (const k of Object.keys(p)) { try { await fetch(LB.api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ game: k, id: LB.me, tag, score: p[k] }) }); } catch (e) {} }
+    LB.busy = false; lbPoll();
+  } else LB.pend = {};
+}
+function lbDraw() {
+  const el = LB.el; if (!el || !LB.mode) return;
+  const k = LB.mode, rows = LB.rows[k], key = k + '|' + LB.tag + '|' + LB.mine[k] + '|' + rows.map(x => x.tag + x.score + (x.you ? '*' : '')).join();
+  if (key === LB.drawn) return; LB.drawn = key;
+  el.querySelector('.hd b').textContent = k === 'sc' ? 'Top riders' : 'Top drifters';
+  el.querySelector('.lv').hidden = !(LB.db || LB.api);
+  const ol = el.querySelector('ol'); ol.replaceChildren();
+  if (!rows.length) { const li = document.createElement('li'); li.className = 'em'; li.textContent = LB.db || LB.api ? 'No scores yet. Be first.' : 'Scores show here when you are signed in.'; ol.appendChild(li); }
+  rows.forEach((x, i) => { const li = document.createElement('li'); li.className = x.you ? 'me' : ''; const t = document.createElement('span'); t.textContent = (i + 1) + '. ' + x.tag; const s = document.createElement('b'); s.textContent = x.score.toLocaleString(); li.append(t, s); ol.appendChild(li); });
+  const you = el.querySelector('.you'), inTop = rows.some(x => x.you);
+  you.textContent = LB.ro ? (LB.mine[k] ? 'Your best ' + LB.mine[k].toLocaleString() + '. ' : '') + 'This link can view the board but not post to it.' : LB.mine[k] && !inTop ? 'Your best ' + LB.mine[k].toLocaleString() : ''; you.hidden = !you.textContent;
+  el.querySelector('.tg').hidden = !(LB.db || LB.api) || !!LB.ro;
+}
+// shown beside whichever game you are playing, once you have taken over
+function lbShow(k, a) {
+  if (!LB.el) lbInit();
+  if (a > .5 && LB.mode !== k) { LB.mode = k; LB.drawn = ''; lbDraw(); if (LB.api) lbPoll(); }
+  if (a <= .5 && LB.mode === k) LB.mode = null;
+  const o = LB.mode ? 1 : 0; if (LB.a !== o) { LB.a = o; LB.el.classList.toggle('on', !!o); }
+}
+function couchBest(v) { try { if (v != null) localStorage.setItem('gp.couch.best', v); return +localStorage.getItem('gp.couch.best') || 0; } catch (e) { return v || 0; } }
+// the couch's score panel (top middle) and speed dial (bottom right; top right on touch screens)
+function couchHud(Co, show, live, target) {
+  const H = ui.cohud, D = ui.scdial; if (!H) return;
+  if (show || LB.mode === 'co') lbShow('co', show ? 1 : 0);
+  if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
+  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) return;
+  if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
+  if (Co.score > (Co.best ?? (Co.best = couchBest()))) Co.best = couchBest(Co.score);
+  const txt = Co.score + '|' + live + '|' + target + '|' + Co.best;
+  if (txt !== H.txt) {
+    if (H.sc0 != null && Co.score > H.sc0) { H.classList.remove('pulse'); void H.offsetWidth; H.classList.add('pulse'); }
+    H.txt = txt; H.sc0 = Co.score;
+    H.querySelector('.sc').textContent = Co.score.toLocaleString(); H.querySelector('.dr').textContent = live;
+    H.querySelector('.be').textContent = 'Best ' + Co.best.toLocaleString(); H.querySelector('.tg').textContent = target;
+    H.classList.toggle('live', Co.dS > 0);
+  }
+  const kmh = Math.abs(Co.sp) * .036, f = clamp01(kmh / 25), a = D.A0 + D.SW * f;
+  D.nd.setAttribute('transform', `rotate(${(a * 180 / Math.PI + 90).toFixed(1)} 60 60)`);
+  if (!D.L) { try { D.L = D.fg.getTotalLength(); D.fg.style.strokeDasharray = D.L; } catch (e) { D.L = 1; } }
+  D.fg.style.strokeDashoffset = (D.L * (1 - f)).toFixed(1); const k = Math.round(kmh); if (D.k !== k) { D.k = k; D.kmh.textContent = k; }
+  D.classList.toggle('boost', Co.dS > 0);
 }
 // just-in-time tips while you drive: each one waits for you to try it, then the next
 const TIPS = [
@@ -1273,6 +1828,36 @@ const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
 const TIPS_T = ['▲ to go, ◀ ▶ to steer, ▼ to brake', , 'Hold Drift through a turn: it keeps the gas on and lets the back end slide',
   'Drifting! Steer the other way to hold the slide, let go of Drift to grip', 'Double-tap ◀ or ▶: the steering swings 90° and the couch drives sideways',
   'Double-tap the other way to swing it back', 'Stop, let go of ▲, and hold ◀ or ▶ to spin on the spot like a tank'];
+// big cues for the couch: 3, 2, 1, GO when you take the wheel, then DRIFT when you are turning fast without it, "Keep going"
+// while you slide, the points when it grips again; each pops up big in the middle, then shrinks off into the top-left corner
+function bigCue(text, sub, quick) {
+  let el = rigs.cueEl;
+  if (!el) { el = rigs.cueEl = document.createElement('div'); el.id = 'bigcue'; el.setAttribute('aria-live', 'polite'); el.innerHTML = '<b></b><span></span>'; document.body.appendChild(el); }
+  el.firstChild.textContent = text; el.lastChild.textContent = sub || '';
+  el.className = ''; void el.offsetWidth; el.className = quick ? 'quick' : 'pop';
+}
+function couchCues(Co, Tn, drive, st) {
+  const el = rigs.cueEl;
+  if (!drive) { if (Co.cue && el) el.className = 'gone'; Co.cue = null; Co.goT = null; return; }
+  if (Co.goT == null) { Co.goT = Tn + 2.4; Co.cue = 'count'; Co.cn = 4; Co.turnT = 0; }
+  if (Tn < Co.goT) { const n = Math.ceil((Co.goT - Tn) / .8); if (n !== Co.cn) { Co.cn = n; bigCue(String(n), '', true); } return; }
+  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? '▲ to drive' : 'W to drive'); return; }
+  // after GO the cues follow the course: DRIFT at the roundabout, Keep going while you slide round it, Return to start once the
+  // lap is done, and the lap time when you cross gate 1. A slide has to hold .25 s to count and lapse .8 s to end, so they don't flicker.
+  const C = rigs.course, n = CC.gates.length, sl = Math.abs(Co.slip) / RD, raw = sl > 10 && Math.abs(Co.sp) > 90;
+  Co.dHold = raw ? Math.max(0, Co.dHold || 0) + .016 : Math.min(0, Co.dHold || 0) - .016;
+  if (Co.dHold > .25) Co.dOn = true; else if (Co.dHold < -.8) Co.dOn = false;
+  if (C.flash && Co.lapCue !== C.flash) {          // over the line: the lap time
+    Co.lapCue = C.flash; Co.cue = 'ready'; const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
+    bigCue(tm(C.last), C.best === C.last ? 'new best lap' : 'lap · best ' + tm(C.best)); return;
+  }
+  if (C.i === n) {                                  // on the roundabout
+    if (Co.dOn && Co.cue !== 'keep') { Co.cue = 'keep'; bigCue('Keep drifting', 'all the way round'); }
+    else if (!Co.dOn && Co.cue !== 'drift' && (Co.cue !== 'keep' || Co.dHold < -.8)) { Co.cue = 'drift'; bigCue('DRIFT', TOUCH ? 'hold Drift' : 'hold Shift'); }
+  } else if (C.i === 0 && C.done) {                 // lap done: back to the start
+    if (Co.cue !== 'home') { Co.cue = 'home'; bigCue('Return to start', 'through gate 1'); }
+  } else if (Co.cue === 'keep' || Co.cue === 'drift' || Co.cue === 'home') Co.cue = 'ready';
+}
 function tipFrame(Co, dt, show, hud) {
   let el = rigs.tipEl;
   if (!el) {
@@ -1288,7 +1873,7 @@ function tipFrame(Co, dt, show, hud) {
   el.style.left = (innerWidth > 720 ? 460 + (innerWidth - 460) / 2 : innerWidth / 2) + 'px';
   Co.tutT += dt;
   if (Co.tut < TIPS.length && TIPS[Co.tut][1](Co, Co.tutT)) { Co.tut++; Co.tutT = 0; }
-  if (el.tipN !== Co.tut) { el.tipN = Co.tut; el.firstChild.innerHTML = Co.tut < TIPS.length ? (TOUCH && TIPS_T[Co.tut]) || TIPS[Co.tut][0] : ''; el.firstChild.style.display = Co.tut < TIPS.length ? '' : 'none'; }
+  if (el.tipN !== -2) { el.tipN = -2; el.firstChild.style.display = 'none'; }   // the step-by-step tips gave way to the big cues (couchCues)
   el.lastChild.textContent = hud;
 }
 function couchFrame(s, dt, w) {
@@ -1296,7 +1881,7 @@ function couchFrame(s, dt, w) {
   // the street, until it pulls in by the fire; the grid fades under the asphalt
   const wSt = w * (1 - smooth(seg(s, 10.1, 10.5)));
   fade(rigs.street.g, wSt); floorGrid.material.opacity = .32 * (1 - .85 * wSt);
-  if (w <= 0) { fade(rigs.course.g, 0); if (rigs.tipEl) rigs.tipEl.style.opacity = 0; return; }
+  if (w <= 0) { fade(rigs.course.g, 0); if (rigs.tipEl) rigs.tipEl.style.opacity = 0; couchHud(Co, false); if (Co.cue) couchCues(Co, 0, false); return; }
   Co.t += dt;
   const pk = smooth(seg(s, 10.2, 10.7));             // parking: 0 = free driving, 1 = stopped in front of the hearth
   const wDrive = w * (1 - smooth(seg(s, 10.45, 10.8)));  // hands and feet on the controls until he sits back
@@ -1307,10 +1892,12 @@ function couchFrame(s, dt, w) {
   // pulls in behind for a third-person view. Left alone for 3 s, it goes back to showing off what a holonomic base can do.
   const drive = rigs.couchOn && Tn - Co.kLast < 3;
   Co.dr += ((drive ? 1 : 0) - Co.dr) * (1 - Math.pow(.15, dt));
+  couchCues(Co, Tn, drive && w > .5, (K.has('a') || K.has('arrowleft') || K.has('d') || K.has('arrowright')) ? 1 : 0);
   const ch0 = Math.cos(Co.h), sh0 = Math.sin(Co.h);
   if (drive) {
     const has = (a, b) => K.has(a) || K.has(b);
-    const thr = (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0), st = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
+    const st = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
+    const thr = Co.goT != null && Tn < Co.goT ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);   // held on the line until GO
     const hb = K.has(' ');                                                // handbrake: the rear lets go
     Co.df += ((K.has('shift') ? 1 : 0) - Co.df) * (1 - Math.pow(.02, dt));   // Shift: drift mode (oversteer, loose rear); otherwise it grips
     // steering frame: the body stays put while the modules re-aim, so the direction of travel swings with it (with some speed lost)
@@ -1385,7 +1972,7 @@ function couchFrame(s, dt, w) {
     if (innerWidth > 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
-  { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); tipFrame(Co, dt, wc > .5, driftHud(Co, dt) + courseFrame(Co, dt, wc)); }
+  { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); const live = driftHud(Co, dt), tg = courseFrame(Co, dt, wc); tipFrame(Co, dt, false, ''); couchHud(Co, wc > .5, live, tg); }
   // the wheel turns with the spin rate (it is what he steers with), within the T128's lock
   const stT = Co.dr > .5 ? Co.dl * 2.4 : Co.sw / WMAX * 1.3;            // driving, the T128 turns with the steering angle (+ = counterclockwise to him = left)
   Co.steer += (Math.max(-1.2, Math.min(1.2, stT)) - Co.steer) * (1 - Math.pow(.01, dt));

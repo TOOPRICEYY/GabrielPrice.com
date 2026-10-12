@@ -247,6 +247,93 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 .starpop { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--f-mono); font-weight: 500; font-size: 13px; letter-spacing: .08em;
   color: var(--graphite); opacity: .8; animation: starpop .9s ease-out forwards; }
 @keyframes starpop { 0% { opacity: 0; transform: translate(-50%, -40%); } 20% { opacity: .8; } 100% { opacity: 0; transform: translate(-50%, -140%); } }
+.starpop.big { font-size: 26px; letter-spacing: .2em; text-transform: uppercase; color: var(--cobalt); opacity: 1; }
+/* scooter score panel (built in rigs.js), only while the reader drives */
+#schud { position: fixed; z-index: 24; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); opacity: 0; pointer-events: none;
+  display: grid; justify-items: center; gap: 2px; padding: 6px 14px; background: var(--sheet); border: 1px solid var(--rule); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  font-family: var(--f-mono); color: var(--graphite); transition: opacity .3s; font-variant-numeric: tabular-nums; }
+#schud .sc { font-size: 26px; font-weight: 500; line-height: 1.1; display: inline-block; transition: transform .12s; }
+#schud .mu { margin-left: 10px; font-size: 13px; color: var(--graphite-2); }
+#schud .row { display: flex; gap: 12px; font-size: 11px; letter-spacing: .08em; color: var(--graphite-2); }
+#schud .pi { color: var(--cobalt); letter-spacing: .15em; }
+#schud.boost { border-color: var(--cobalt); box-shadow: 0 0 18px color-mix(in srgb, var(--cobalt) 45%, transparent); }
+@media (max-width: 720px) { #schud { top: calc(56px + env(safe-area-inset-top, 0px)); } }
+#schud.boost .sc { color: var(--cobalt); text-shadow: 0 0 12px var(--neon); }
+/* the little body (top right, under the view buttons): parts redden with damage, flash when hit */
+#schurt { position: fixed; z-index: 24; right: 16px; top: calc(56px + env(safe-area-inset-top, 0px)); width: 52px; box-sizing: content-box; opacity: 0; pointer-events: none; transition: opacity .3s;
+  padding: 8px 8px 6px; background: var(--sheet); border: 1px solid var(--rule); display: grid; gap: 5px; }
+#schurt canvas { width: 52px; height: 104px; display: block; }
+#schurt.hurt { animation: hurtshake .3s; }
+@keyframes hurtshake { 25% { translate: -3px 0; } 50% { translate: 3px 0; } 75% { translate: -2px 0; } }
+#schurt .hp { height: 4px; background: var(--vellum-2); border: 1px solid var(--rule); }
+#schurt .hp i { display: block; height: 100%; width: 100%; background: var(--red); transition: width .3s; }
+/* couch speed dial: bottom right (top right on touch screens, where the pad isn't) */
+#codial { position: fixed; z-index: 24; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: 132px; opacity: 0; pointer-events: none; transition: opacity .3s;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 60px 60px 10px 10px; padding: 4px 4px 0; }
+#codial svg { display: block; width: 100%; overflow: visible; }
+#codial .bg, #codial .fg { fill: none; stroke-width: 5; stroke-linecap: round; }
+#codial .bg { stroke: var(--vellum-2); } #codial .fg { stroke: var(--cobalt); transition: stroke .2s; }
+#codial line { stroke: var(--graphite-2); stroke-width: 1.2; } #codial line.nd { stroke: var(--sun); stroke-width: 2.6; stroke-linecap: round; }
+#codial circle { fill: var(--graphite); }
+#codial text { font-family: var(--f-mono); font-size: 8px; fill: var(--graphite-2); text-anchor: middle; dominant-baseline: central; }
+#codial .kmh { font-family: var(--f-display); font-size: 20px; font-weight: 700; fill: var(--graphite); }
+#codial .u { font-size: 7px; letter-spacing: .14em; }
+#codial.boost { box-shadow: 0 0 18px color-mix(in srgb, var(--neon) 60%, transparent); } #codial.boost .fg { stroke: var(--neon); }
+@media (hover: none), (pointer: coarse) { #codial { right: 12px; bottom: auto; top: calc(56px + env(safe-area-inset-top, 0px)); width: 84px; } }
+/* couch score panel: top middle, only while the reader drives */
+#cohud { position: fixed; z-index: 24; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity .3s;
+  display: grid; justify-items: center; gap: 2px; padding: 6px 22px 8px; max-width: min(420px, calc(100vw - 32px)); box-sizing: border-box; text-align: center;
+  background: var(--sheet); border: 1px solid var(--rule); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family: var(--f-mono); color: var(--graphite); font-variant-numeric: tabular-nums; }
+#cohud .lb { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--graphite-2); }
+#cohud .sc { font-family: var(--f-display); font-size: 52px; font-weight: 700; line-height: .95; letter-spacing: -.02em; display: inline-block; transition: transform .12s; }
+#cohud.pulse .sc { animation: copulse .35s ease-out; } @keyframes copulse { 40% { transform: scale(1.18); color: var(--cobalt); } }
+#cohud .row { display: flex; gap: 12px; font-size: 12px; letter-spacing: .08em; color: var(--graphite-2); }
+#cohud .dr { color: var(--cobalt); font-weight: 500; } #cohud .dr:empty { display: none; }
+#cohud .tg { font-size: 11px; color: var(--graphite-2); text-wrap: balance; }
+#cohud.live { border-color: var(--cobalt); box-shadow: 0 0 18px color-mix(in srgb, var(--cobalt) 45%, transparent); }
+@media (hover: none), (pointer: coarse) { #cohud { top: calc(56px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 220px); min-width: 150px; padding: 4px 12px 6px; } #cohud .sc { font-size: 38px; } }
+/* live leaderboard: middle left while you play (below the score row on touch screens) */
+#lboard { position: fixed; z-index: 24; left: 16px; top: 50%; transform: translateY(-50%); width: 220px; box-sizing: border-box; padding: 8px 10px 10px; opacity: 0; pointer-events: none; transition: opacity .3s;
+  background: var(--sheet); border: 1px solid var(--rule); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family: var(--f-mono); font-size: 12px; color: var(--graphite); font-variant-numeric: tabular-nums; }
+#lboard.on { opacity: 1; pointer-events: auto; }
+#lboard .hd { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--graphite-2); margin-bottom: 6px; }
+#lboard .hd b { font-weight: 500; color: var(--graphite); }
+#lboard .lv { color: var(--cobalt); letter-spacing: .14em; } #lboard .lv::before { content: '● '; animation: lbpulse 1.6s ease-in-out infinite; }
+@keyframes lbpulse { 50% { opacity: .25; } }
+#lboard ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+#lboard li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 4px; } #lboard li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lboard li b { font-weight: 500; }
+#lboard li.me { background: color-mix(in srgb, var(--cobalt) 14%, transparent); color: var(--cobalt); }
+#lboard li.em { color: var(--graphite-2); font-size: 11px; }
+#lboard .you { margin-top: 6px; font-size: 11px; color: var(--cobalt); }
+#lboard .tg { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
+#lboard input { width: 9em; min-width: 0; font: 500 12px var(--f-mono); letter-spacing: .04em; text-align: center; padding: 2px 4px; color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); }
+@media (hover: none), (pointer: coarse) { #lboard { left: 12px; top: calc(170px + env(safe-area-inset-top, 0px)); transform: none; width: 168px; font-size: 11px; padding: 6px 8px 8px; } #lboard li:nth-child(n+4) { display: none; } }
+/* couch: big cues (3, 2, 1, GO, DRIFT, Keep going); each pops up in the middle and then shrinks off to the top-left corner */
+#bigcue { position: fixed; z-index: 30; left: 50%; top: 38%; transform-origin: 0 0; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; text-align: center;
+  display: grid; justify-items: center; color: var(--graphite); }
+#bigcue b { font-family: var(--f-display); font-weight: 800; font-size: clamp(56px, 11vw, 132px); line-height: .9; letter-spacing: -.03em; text-shadow: 0 4px 24px color-mix(in srgb, var(--cobalt) 35%, transparent); }
+#bigcue span { font-family: var(--f-mono); font-size: 14px; letter-spacing: .2em; text-transform: uppercase; color: var(--cobalt); margin-top: 6px; }
+#bigcue.pop { animation: cuepop 1.5s cubic-bezier(.2, .8, .2, 1) forwards; }
+#bigcue.quick { animation: cuequick .78s ease-out forwards; }
+#bigcue.gone { opacity: 0; transition: opacity .3s; }
+@keyframes cuepop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  55% { left: 50%; top: 38%; transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { left: 16px; top: calc(70px + env(safe-area-inset-top, 0px)); transform: translate(0, 0) scale(.32); opacity: .9; } }
+@keyframes cuequick { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(.85); } }
+@media (prefers-reduced-motion: reduce) { #bigcue.pop, #bigcue.quick { animation-duration: .01s; } }
+/* low health: a thin bloodshot vignette (veins reaching in from the edges) */
+#bloodfx { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+  background: repeating-conic-gradient(from 7deg at 50% 50%, rgba(170, 10, 20, .55) 0deg .35deg, transparent .6deg 4.3deg, rgba(170, 10, 20, .35) 4.5deg 4.7deg, transparent 5deg 11deg),
+    radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(150, 0, 15, .28) 82%, rgba(110, 0, 10, .55) 100%);
+  mask-image: radial-gradient(ellipse at 50% 50%, transparent 48%, #000 92%); -webkit-mask-image: radial-gradient(ellipse at 50% 50%, transparent 48%, #000 92%); }
+/* boost: speed streaks closing in round the edge of the screen */
+#boostfx { position: fixed; inset: -10%; z-index: 1; pointer-events: none; opacity: 0;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, color-mix(in srgb, var(--neon) 55%, transparent) 0deg .7deg, transparent 1.2deg 7deg),
+    radial-gradient(ellipse at 50% 50%, transparent 38%, color-mix(in srgb, var(--sun) 22%, transparent) 75%);
+  mask-image: radial-gradient(ellipse at 50% 50%, transparent 32%, #000 70%); -webkit-mask-image: radial-gradient(ellipse at 50% 50%, transparent 32%, #000 70%); }
+#boostfx.on { animation: streaks .25s linear infinite; }
+@keyframes streaks { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.06) rotate(1.5deg); } }
+@media (prefers-reduced-motion: reduce) { #boostfx.on { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .starpop { animation-duration: .01s; } }
 .alsolist li { border: 1px solid var(--rule); padding: 3px 8px; background: var(--sheet); }
 .card .media { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
@@ -447,8 +534,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars.</h2>
-      <p class="touchonly">Use the pad at the bottom: ◀ ▶ to steer, ▲ to ride, Hop to jump. Take over and hit a ramp flat out to catch its star.</p>
-      <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop. Take over and hit a ramp flat out to catch its star.</p>
+      <p class="touchonly">Use the pad at the bottom: ◀ ▶ to steer, ▲ to ride, ▼ to duck, Hop to jump. Take over to play: outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
+      <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>D</kbd> to ride, <kbd>S</kbd> to duck, <kbd>Space</kbd> to hop, again in the air to double jump. Take over to play: outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
       <div class="jsonly" hidden><div class="readout" id="scRead"></div><div class="ctl">
         <label class="kbonly">Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
         <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
@@ -481,7 +568,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="krow"><kbd class="wide" data-k="shift">Shift</kbd><span>drift</span></div>
     </div>
     <p class="keyhint">Take the wheel. Or keep scrolling.</p>
-    <p class="keyhint touchonly">Drive with the pad below. Tap ◀ or ▶ twice to swing the wheels sideways. Or keep scrolling.</p>
+    <p class="keyhint touchonly">Drive with the pad below. Or keep scrolling.</p>
   </section>
 
   <section class="right" data-s="15">
@@ -1169,6 +1256,7 @@ function frame() {
   try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
 }
 function frameBody() {
+  rigs.onDrive = returnToPath;   // driving the couch or the scooter hands the camera back to the chase view (rigs.js loads after this script's top)
   if (scrollY !== seenY) onScroll();
   const dt = Math.min(clock.getDelta(), .05);
   sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
