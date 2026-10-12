@@ -79,8 +79,8 @@ camKeys.splice(camKeys.length - 1, 1,
   [14.25, [95, 200, 430], [-40, 62, 10], 0, 30],   // drive-ready section (s 14): the chase view takes over, this only holds the way back
   [14.75, [370, 190, 10], [40, 62, 250], 0, -45], [15.25, [370, 190, 10], [40, 62, 250], 0, -45],
   // Assym up close (solid, turning back and forth), then pulled back a little for the exploded view
-  [15.75, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
-  [16.25, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
+  [15.75, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9, 1.4],
+  [16.25, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9, 1.4],
   [16.75, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
   [17.25, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
   [18, [0, 100, 480], [0, 94, 0], 0, 60]);

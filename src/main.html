@@ -228,6 +228,51 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   .card { width: 100%; }
   .titleblock { display: none; }
 }
+/* phones: each scene gets a clear screen first, then its card rises from the bottom and docks there as a compact sheet
+   while the 3D view (lifted into the top half by the camera's view offset) keeps playing above it; it fades as it leaves */
+@media (max-width: 720px) {
+  main > section:not(.hero):not(.drive):not(.gallery) { box-sizing: border-box; min-height: 230vh; padding-block: 160vh 2vh; align-items: flex-end; }
+  main > section:not(.hero):not(.drive):not(.gallery) > .card { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  section.drive { min-height: 90vh; }
+  main section.gallery { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
+  .card { padding: 14px 14px 12px; gap: 8px; }
+  .card h2 { font-size: 24px; }
+  .card p { font-size: 13px; line-height: 1.35; }
+  .lead.tall video, .lead.tall img { height: 26vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
+  .lead video, .lead img { max-height: 21vh; }
+  .log li { width: 52px; } .log li.l { width: 112px; } .log li.q { width: 70px; }
+  .log img, .log video { height: 68px; }
+  .log figcaption { font-size: 9px; }
+  .bom { grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 10.5px; }
+  .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
+  .bom .n { width: 16px; height: 16px; font-size: 9px; }
+  .spec { font-size: 11px; }
+}
+@media (max-width: 720px) and (max-height: 720px) {   /* small phones: the docked card must stay under half the screen */
+  .card h2 { font-size: 21px; }
+  .card.vid > p { display: none; }
+  .lead video, .lead img { max-height: 19vh; }
+  .lead.tall video, .lead.tall img { height: 24vh; }
+  .log li { width: 44px; } .log li.l { width: 96px; } .log li.q { width: 60px; }
+  .log img, .log video { height: 56px; }
+}
+/* phones held sideways (short and wide): side cards stay beside the figure, so squeeze them to fit the height */
+@media (max-height: 520px) and (min-width: 721px) {
+  .card, .card.vid { width: min(400px, 46vw); padding: 12px; gap: 6px; }
+  .card h2 { font-size: 22px; }
+  .card p { font-size: 12.5px; line-height: 1.35; }
+  .card.vid > p { display: none; }
+  .lead video, .lead img { max-height: 40vh; }
+  .lead.tall video, .lead.tall img { height: 50vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
+  .log li { width: 44px; } .log li.l { width: 96px; } .log li.q { width: 60px; }
+  .log img, .log video { height: 54px; }
+  .log figcaption { font-size: 9px; }
+  .bom { grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 10px; }
+  .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
+  .bom .n { width: 16px; height: 16px; font-size: 9px; }
+  .titleblock { display: none; }
+  section { min-height: 160vh; }
+}
 </style>
 
 <canvas id="stage" aria-hidden="true"></canvas>
@@ -237,8 +282,6 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 <svg id="callouts2" aria-hidden="true"></svg>
 <svg id="callouts3" aria-hidden="true"></svg>
 <div id="loading">Loading model…</div>
-<figure id="proof" aria-hidden="true"><img src="photos/kicker_build_black.webp" alt=""><figcaption><span>Fig. 07 · as built</span><span>Black PLA · v2</span></figcaption></figure>
-<div id="proofscan" aria-hidden="true"><span>Render ▸ Built</span></div>
 <div id="laser" aria-hidden="true"></div>
 <div class="viewbar"><span id="viewhint">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
 <div class="titleblock" aria-hidden="true">
@@ -483,6 +526,7 @@ canvas.style.touchAction = 'pan-y';
 const free = { on: false, back: 0, fromP: new THREE.Vector3(), fromT: new THREE.Vector3() };
 const resetBtn = document.getElementById('resetview');
 const hintEl = document.getElementById('viewhint');
+if (matchMedia('(hover: none)').matches) hintEl.textContent = 'Two fingers to orbit';
 controls.addEventListener('start', () => {
   if (!free.on) controls.target.copy(camTgt);
   free.on = true; free.back = 0; resetBtn.hidden = false; hintEl.hidden = true; canvas.classList.add('dragging');
@@ -971,7 +1015,12 @@ function keyWorld(k, P, T) {
   P.set(...k[1]); T.set(...k[2]); if (k[3]) { P.add(devAnchor); T.add(devAnchor); }
   // k[4]: sideways pan in cm on wide screens, so the subject clears the card (positive = subject right of centre)
   if (k[4] && innerWidth >= 720) { const f = _sh.copy(T).sub(P); f.set(-f.z, 0, f.x).normalize().multiplyScalar(-k[4]); P.add(f); T.add(f); }
-  else if (k[4]) { P.sub(T).multiplyScalar(1.35).add(T); T.y -= .14 * P.distanceTo(T); }   // phones: narrow view, card at the bottom: back off, lift the subject into the top half
+  else if (innerWidth < 720 && (k[4] || k[3])) {
+    // phones: the view is ~2.4x narrower than on a laptop, so back off (close-ups more), and drop the device close-ups' sideways
+    // card-clearing offset (the card is at the bottom); the view offset in the frame loop lifts the subject above the docked card
+    if (k[3]) { P.z -= k[2][2]; T.z -= k[2][2]; }
+    P.sub(T).multiplyScalar(k[5] || (P.distanceTo(T) < 160 ? 2.1 : 1.5)).add(T);   // k[5]: per-key phone back-off where backing off would put the figure in the way
+  }
 }
 function applyCam(s) {
   const [i, j, f] = sampleKeys(camKeys, s);
@@ -1030,14 +1079,26 @@ function readScroll() {
   }
   sTarget = centers.length - 1;
 }
-addEventListener('scroll', () => { readScroll(); returnToPath(); }, { passive: true });
+// phones: a docked card fades out as it scrolls up off its dock, so it never sits over the 3D view for long
+const sheets = [...document.querySelectorAll('main > section:not(.hero):not(.drive):not(.gallery) > .card')];
+function fadeSheets() {
+  const ph = innerWidth < 720, H = innerHeight;
+  for (const c of sheets) {
+    if (!ph) { if (c.style.opacity) { c.style.opacity = ''; c.style.pointerEvents = ''; } continue; }
+    const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - 14 - r.height - r.top) / (H * .28)));
+    c.style.opacity = o.toFixed(3); c.style.pointerEvents = o < .4 ? 'none' : '';
+  }
+}
+addEventListener('scroll', () => { readScroll(); returnToPath(); fadeSheets(); }, { passive: true });
 
+let camVO = -1;
 function resize() {
+  camVO = -1;
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
   camera.fov = w < 720 ? 42 : 30; camera.updateProjectionMatrix();
 }
-addEventListener('resize', () => { resize(); readScroll(); });
+addEventListener('resize', () => { resize(); readScroll(); fadeSheets(); });
 
 function themeColors() {
   clayMat.color.copy(tok('--clay')); jointMat.color.copy(tok('--joint'));
@@ -1058,7 +1119,6 @@ const clock = new THREE.Clock();
 let phase = 0;
 const wp = new THREE.Vector3(), wc = new THREE.Vector3();
 const sheetEl = document.getElementById('tb-sheet');
-const proofEl = document.getElementById('proof'), scanEl = document.getElementById('proofscan');
 function frame() {
   const dt = Math.min(clock.getDelta(), .05);
   sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
@@ -1076,6 +1136,10 @@ function frame() {
   applyCam(s);
   if (rigs.chase && rigs.chase.w > 0) { camPos.lerp(rigs.chase.p, rigs.chase.w); camTgt.lerp(rigs.chase.t, rigs.chase.w); }   // third-person drive (couch)
   { const fv = (innerWidth < 720 ? 42 : 30) + (rigs.chase ? (rigs.chase.fov || 0) * rigs.chase.w : 0); if (Math.abs(camera.fov - fv) > .01) { camera.fov = fv; camera.updateProjectionMatrix(); } }   // the view opens up with speed
+  { // phones: the card docks over the bottom half, so shift the picture up: the subject sits ~28% down the screen (none in the hero or the drive)
+    const vo = innerWidth < 720 ? .25 * smooth(seg(s, .5, 1)) * (1 - (rigs.chase ? rigs.chase.w : 0)) : 0;
+    if (Math.abs(vo - camVO) > 1e-4) { camVO = vo; if (vo) camera.setViewOffset(innerWidth, innerHeight, 0, vo * innerHeight, innerWidth, innerHeight); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+  }
   if (free.on && !free.back) {
     controls.update();
   } else if (free.back) {
@@ -1093,17 +1157,6 @@ function frame() {
   lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 17.3, 17.9)));
   constr.visible = lineMat.opacity > .002;
 
-  // proof: wipe the as-built photo in over the render once the parts are back together
-  {
-    const w = smooth(seg(s, 5.95, 6.2)), out = 1 - smooth(seg(s, 6.55, 6.8));
-    const vis = w * out;
-    proofEl.style.opacity = vis > 0.001 ? 1 : 0;
-    proofEl.style.clipPath = `inset(0 0 0 ${((1 - w) * 100).toFixed(2)}%)`;
-    if (out < 1) proofEl.style.opacity = out;
-    const r = proofEl.getBoundingClientRect();
-    scanEl.style.left = (r.left + (1 - w) * r.width - 1) + 'px';
-    scanEl.style.opacity = (w > 0.001 && w < 0.999) ? out : 0;
-  }
   if (kicker.ready) {
     const { parts, rail, footTilt } = kicker;
     // reveal: sweep a clip plane down the leg while fading in

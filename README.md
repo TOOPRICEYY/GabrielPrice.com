@@ -67,3 +67,6 @@ Gabriel: "remove maybe 90% of your describing text and sliders. The videos shoul
 
 ## Drive-ready stretch (v53)
 `section.drive` (data-s 14) follows the Not So Lazy Boy card. rigs.js holds the couch timeline there (`COUCH_IN`, `COUCH_HOLD`), and `rigs.chasePre` pulls the camera into the chase view. Keycaps light from keydown; arrow keys map to WASD. Later sections and camKeys are shifted +1 (gallery = 18).
+
+## Phone layout (v55)
+At ≤720px wide, every card section (not hero, drive or gallery) is 230vh with 160vh of top padding, so each scene gets a clear screen first. The card is `position: sticky; bottom` and docks as a compact sheet at the bottom; `fadeSheets()` in main.html fades it as it scrolls up off its dock. The camera gets `setViewOffset` (0.25 of the height, not in the hero or the chase view) so the subject sits in the top half. In `keyWorld`, phones back off ×1.5 (×2.1 for close-ups under 160 cm, and device keys drop their sideways z offset); `k[5]` on a camKey overrides that back-off (CatZoom up close uses 1.4). Short landscape screens (≤520px tall) and small phones (≤720px tall) have their own card squeeze blocks. The floating "Fig. 07 as built" photo was removed (editor note #1).
