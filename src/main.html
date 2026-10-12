@@ -145,6 +145,35 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outlin
 .strip img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; border: 1px solid var(--rule); }
 .strip figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .strip figcaption b { display: block; color: var(--cobalt); font-weight: 500; letter-spacing: .08em; }
+/* build log: a dated row of photos and clips in build order; scrolls sideways, tap to open large */
+.log { display: flex; gap: 8px; margin: 0; padding: 0 0 6px; list-style: none; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.log li { flex: none; scroll-snap-align: start; width: 108px; }
+.log li.l { width: 232px; } .log li.q { width: 144px; }
+.log figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.log img, .log video { width: 100%; height: 144px; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
+.log figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
+.log figcaption b { display: block; color: var(--cobalt); font-weight: 500; letter-spacing: .08em; }
+/* drive-ready section: no card, just the keys, lit while held */
+section.drive { min-height: 110vh; flex-direction: column; justify-content: flex-end; align-items: flex-start; padding: 0 0 12vh 4vw; gap: 14px; pointer-events: none; }
+.keys { display: grid; justify-items: center; gap: 8px; }
+.krow { display: flex; gap: 8px; align-items: center; }
+.keys kbd { min-width: 54px; height: 54px; display: grid; place-items: center; font-size: 18px; font-weight: 500; color: var(--graphite); background: var(--sheet); border: 1px solid var(--rule); border-bottom-width: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: background .08s, color .08s, transform .08s; }
+.keys kbd.wide { min-width: 120px; }
+.keys kbd.on { background: var(--cobalt); color: var(--vellum); transform: translateY(2px); }
+.krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
+@media (hover: none) { section.drive .keys, section.drive .keyhint { display: none; } }
+/* lead clip: the card's main story, full card width */
+.card.vid { width: min(480px, 100%); }
+.lead { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.lead video, .lead img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
+.lead.tall video, .lead.tall img { aspect-ratio: 4 / 5; max-height: 58vh; }
+.lead figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
+.lead figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
+#lb { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: rgba(12, 14, 30, .82); padding: 4vh 4vw; cursor: zoom-out; }
+#lb.on { display: grid; }
+#lb img, #lb video { max-width: 100%; max-height: 84vh; display: block; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+#lb video { width: min(92vw, 1100px); background: #000; }
+#lb p { margin: 10px 0 0; font-family: var(--f-mono); font-size: 12px; color: #e8eaf6; text-align: center; }
 .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
 .media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .media img, .media video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); }
@@ -182,6 +211,12 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 .modtable b { display: block; color: var(--cobalt); font-weight: 500; }
 .readout { font-family: var(--f-mono); font-size: 12px; color: var(--cobalt); font-variant-numeric: tabular-nums; min-height: 1.5em; }
 .alsolist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
+/* the gallery is the last scroll stop (s 17): on wide screens it is a two-column panel on the left so the figure stays in view beside it */
+@media (min-width: 1100px) {
+  main section.gallery { display: flex; align-items: center; }
+  main section.gallery .gal-wrap { width: min(620px, 50vw); }
+  main section.gallery .gal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .alsolist li { border: 1px solid var(--rule); padding: 3px 8px; background: var(--sheet); }
 .card .media { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 @media (max-width: 720px) {
@@ -215,9 +250,9 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 <main>
   <section class="hero" data-s="0">
     <div class="hero-wrap">
-      <div class="eyebrow">Portfolio <b>Mock 01 · framing</b></div>
+      <div class="eyebrow">Portfolio <b>Engineer · Builder</b></div>
       <h1>Gabriel <em>Price</em></h1>
-      <p>Designer and engineer. I build machines that work with the body, and model every part of them before they exist.</p>
+      <p>I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.</p>
       <div class="scrollhint">Scroll to start ↓</div>
     </div>
   </section>
@@ -226,7 +261,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">02 <b>About</b></div>
       <h2>Start from the body.</h2>
-      <p>Placeholder copy. A short paragraph about who you are, where you work, and the kind of problems you like. The figure shifts stance with each section so it can point at what the page is talking about.</p>
+      <p>I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scooter and a couch that drives. Each one starts as a Fusion 360 model and ends up printed, wired and tested on me.</p>
     </div>
   </section>
 
@@ -234,13 +269,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">03 <b>Project · Anti-thetis</b></div>
       <h2>The Kicker</h2>
-      <p>A powered ankle exoskeleton. A calf shell carries a brushless motor and a planetary gearbox, which drive a rack along an aluminium rail to push the shoe cup around the ankle.</p>
-      <dl class="spec">
-        <dt>Joint</dt><dd>Ankle revolute, 1 DOF</dd>
-        <dt>Motor</dt><dd>Tarot 5010 brushless</dd>
-        <dt>Reduction</dt><dd>1-stage planetary, 4 planets</dd>
-        <dt>Output</dt><dd>24T pinion on rack, 2020 V-slot</dd>
-      </dl>
+      <p>A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.</p>
     </div>
   </section>
 
@@ -248,7 +277,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">04 <b>Fit</b></div>
       <h2>Built around one leg.</h2>
-      <p>The shell is shaped from a scan of my own left calf, so the load path runs through soft tissue I measured, not an average.</p>
+      <p>The calf shell is shaped from a scan of my own leg.</p>
     </div>
   </section>
 
@@ -257,8 +286,6 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">05 <b>Drive train</b></div>
       <h2>Motor to ankle, in four steps.</h2>
       <div class="chain"><span>Motor</span><span>Sun gear</span><span>4 planets → carrier</span><span>Pinion → rack</span><span>Shoe cup</span></div>
-      <p>The ring gear is fixed to the housing, so the carrier turns slower than the sun and with more torque. The pinion on the carrier walks the rack along the rail, and the rail pushes the toe side of the shoe cup.</p>
-      <p class="note">Gear motion in this mock is driven from the ankle angle with estimated ratios.</p>
     </div>
   </section>
 
@@ -271,78 +298,63 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   </section>
 
   <section data-s="6">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">07 <b>Built</b></div>
       <h2>Then I built it.</h2>
-      <p>The model you just watched come apart is the one I printed, wired and wore. Every body came straight out of the Fusion 360 design, in its real position.</p>
-      <ul class="strip">
-        <li><figure><img src="photos/kicker_prototype_clear_worn_thumb.webp" alt="Clear PETG prototype of the Kicker worn on a bare leg over a sneaker"><figcaption><b>v1</b>Clear PETG, first fit on the leg</figcaption></figure></li>
-        <li><figure><img src="photos/kicker_build_black_thumb.webp" alt="Black PLA Kicker standing on its own, motor stator and V-wheels visible"><figcaption><b>v2</b>Black PLA, motor and rail fitted</figcaption></figure></li>
-        <li><figure><img src="photos/kicker_worn_with_knee_crop_thumb.webp" alt="Black Kicker worn with thigh cuffs and a knee hinge"><figcaption><b>v3</b>Worn with the knee module</figcaption></figure></li>
-      </ul>
+      <p>From the first print to the one I wear now.</p>
+      <figure class="lead"><video muted loop playsinline preload="none" poster="photos/kicker_bench_poster.jpg" data-src="photos/kicker_bench.mp4" aria-label="The Kicker motor and gearbox running on a bench while a laptop plots the run"></video><figcaption><b>Jul 2026</b>Bench test · 3× speed</figcaption></figure>
+      <ol class="log">
+        <li class="p"><figure><img loading="lazy" src="photos/kicker_proto_white_worn_thumb.webp" data-full="photos/kicker_proto_white_worn.webp" alt="Gabriel wearing the first white-printed Kicker on his leg beside a car, battery and controller on his belt"><figcaption><b>May 2026</b>First print</figcaption></figure></li>
+        <li class="p"><figure><img loading="lazy" src="photos/kicker_prototype_clear_worn_thumb.webp" data-full="photos/kicker_prototype_clear_worn.webp" alt="Clear PETG prototype of the Kicker worn on a bare leg over a sneaker"><figcaption><b>v1</b>Clear PETG</figcaption></figure></li>
+        <li class="p"><figure><img loading="lazy" src="photos/kicker_build_black_thumb.webp" data-full="photos/kicker_build_black.webp" alt="Black PLA Kicker standing on its own, motor stator and V-wheels visible"><figcaption><b>v2</b>Black PLA</figcaption></figure></li>
+        <li class="p"><figure><img loading="lazy" src="photos/kicker_worn_with_knee_crop_thumb.webp" data-full="photos/kicker_worn_with_knee_crop.webp" alt="Black Kicker worn with thigh cuffs and a knee hinge"><figcaption><b>v3</b>With the knee module</figcaption></figure></li>
+      </ol>
     </div>
   </section>
 
   <section class="right" data-s="7">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">08 <b>Exoleg · Full leg</b></div>
       <h2>Then it has to walk.</h2>
-      <p>This is the whole brace from Fusion: the Kicker at the ankle, two die springs along the rail, a knee hinge on a pair of 45 mm bearings, and two cuffs around the thigh. The hinge follows the knee through every step.</p>
-      <p class="more">The knee is nearly straight when the heel lands, bends about 18° to soak up the hit, straightens, then folds to about 60° so the toes clear the floor. The Kicker can only point the foot down, so it does the push-off at the end of stance.</p>
-      <svg id="gait" viewBox="0 0 320 120" role="img" aria-label="Knee flexion angle over one gait cycle; drag to scrub"></svg>
-      <div class="readout" id="gaitRead"></div>
-      <div class="btnrow"><button id="walkBtn" type="button" aria-pressed="true">Walk</button></div>
-      <div class="media">
-        <figure><img loading="lazy" src="photos/legexo_front_thumb.webp" alt="The full-leg exo worn: thigh cuffs, the knee hinge and the Kicker at the ankle"><figcaption><b>Worn</b>Cuffs, hinge, Kicker</figcaption></figure>
-        <figure><img loading="lazy" src="photos/kicker_worn_with_knee_crop_thumb.webp" alt="Close view of the knee hinge on the leg above the black Kicker"><figcaption><b>Detail</b>Hinge on the knee line</figcaption></figure>
-      </div>
-      <p class="note">Model: Assembled BRace v6 with The Kicker v22. Drag the plot to scrub the stride. The curve is an average adult profile, not a measurement of me.</p>
+      <p>The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.</p>
+      <figure class="lead"><video muted loop playsinline preload="none" poster="photos/exoleg_hero_poster.jpg" data-src="photos/exoleg_hero.mp4" aria-label="Gabriel straps the exoleg on by a lake, then runs past the camera in it"></video><figcaption><b>Oct 2026</b>Strapping in at 10×, then running at ½ speed</figcaption></figure>
+      <ol class="log">
+        <li class="p"><figure><img loading="lazy" src="photos/legexo_front_thumb.webp" data-full="photos/legexo_front.webp" alt="The full-leg exo worn: thigh cuffs, the knee hinge and the Kicker at the ankle"><figcaption><b>Worn</b>Cuffs, hinge, Kicker</figcaption></figure></li>
+        <li class="l"><figure><video muted loop playsinline preload="none" poster="photos/exoleg_stride_poster.jpg" data-src="photos/exoleg_stride.mp4" aria-label="Close view of the braced leg walking past, the knee hinge folding with the knee"></video><figcaption><b>Stride</b>0.6× speed</figcaption></figure></li>
+        <li class="l"><figure><video muted loop playsinline preload="none" poster="photos/exoleg_path_poster.jpg" data-src="photos/exoleg_path.mp4" aria-label="Wide shot of Gabriel running along the lakeside path in the exoleg"></video><figcaption><b>Path</b>Real time</figcaption></figure></li>
+      </ol>
+      <div class="jsonly" hidden><svg id="gait" viewBox="0 0 320 120" role="img" aria-label="Knee flexion angle over one gait cycle; drag to scrub"></svg><div class="readout" id="gaitRead"></div><div class="btnrow"><button id="walkBtn" type="button" aria-pressed="true">Walk</button></div></div>
     </div>
   </section>
 
   <section data-s="8">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
       <h2>Water, on crutches.</h2>
-      <p>On crutches both hands are busy, so you can't carry a drink. Water Break is a printed helical cage that hooks onto the two rails of a standard aluminium crutch, below the hand grip. A water bottle drops into it.</p>
-      <p>The walk is the one-crutch gait: the crutch and the left foot go forward together, then the right foot steps through past them.</p>
-      <p>The bottle swings with the crutch but the water doesn't. Gravity sets the surface, so all the swing can do is make it slosh. The cap stays on, so nothing spills.</p>
-      <div class="formula">tan φ = r·α / g <small>φ = surface tilt in the bottle, r = bottle's distance from the armpit, α = the crutch's angular acceleration</small></div>
-      <div class="ctl">
+      <p>A printed cage that clips between the crutch rails and holds a water bottle.</p>
+      <figure class="lead tall"><img loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
+      <div class="jsonly" hidden><div class="readout" id="crRead"></div><div class="ctl">
         <label>Stride swing <input id="crSwing" type="range" min="0" max="20" step="1" value="12"><output id="crSwingOut">12°</output></label>
-      </div>
-      <div class="readout" id="crRead"></div>
-      <div class="media">
-        <figure><img loading="lazy" src="photos/crutch_cupholder_thumb.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In a lecture hall, in use</figcaption></figure>
-      </div>
-      <p class="note">Model: Water Break, from Fusion. The crutch and bottle are stand-ins sized to its hooks. The slosh is a damped spring on top of first-order physics, not a fluid simulation.</p>
+      </div></div>
     </div>
   </section>
 
   <section class="right" data-s="9">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
       <h2>A knee scooter with a belt drive.</h2>
-      <p>Knee scooters are slow on purpose. This one has a C6374 outrunner under the deck driving the rear right wheel through an HTD 3M belt, a throttle on the bars, and a basket because it still has to be useful. The left leg stays free; the right knee rides the pad.</p>
-      <p>Here it weaves a line of cones down the sidewalk by itself. The belt is on this side, inside the rear right wheel.</p>
-      <div class="media">
-        <figure><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
-        <figure><img loading="lazy" src="photos/scooter_parked_thumb.webp" alt="The finished knee scooter parked on a porch, blue rear wheels"><figcaption><b>Built</b>Basket and all</figcaption></figure>
-      </div>
-      <p class="note">Model: Scooter Asm v6. Wheels, steering and the knee pad move on their Fusion joints; the motor turns at the belt ratio. The sidewalk and cones are stand-ins.</p>
+      <p>A motorized knee scooter: a C6374 motor under the deck, belted to the rear wheel.</p>
+      <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
     </div>
   </section>
 
   <section data-s="10">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">11 <b>QuadFather · Belt drive</b></div>
       <h2>Fast motor, slow wheel.</h2>
-      <p>An outrunner like the C6374 makes its power at high speed and low torque, and a scooter wheel wants the opposite. The belt trades one for the other. A small pulley on the motor drives a big one bolted to the wheel, so the motor turns several times for each turn of the wheel and the wheel gets that many times the torque.</p>
-      <div class="formula">n<sub>motor</sub> = (r<sub>wheel</sub> / r<sub>motor</sub>) · n<sub>wheel</sub> · τ<sub>wheel</sub> ≈ (r<sub>wheel</sub> / r<sub>motor</sub>) · τ<sub>motor</sub> <small>n = speed, τ = torque, r = pulley radius (measured across the model's pulleys, flanges included). A toothed belt loses a few percent, so the torque gain is a little under the ratio.</small></div>
-      <div class="readout" id="scBelt"></div>
-      <div class="media">
-        <figure><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
-      </div>
+      <p>A small pulley on the motor turns a big one on the wheel, trading speed for torque.</p>
+      <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
+      <div class="jsonly" hidden><div class="readout" id="scBelt"></div></div>
     </div>
   </section>
 
@@ -350,9 +362,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">12 <b>Inside QuadFather</b></div>
       <h2>Twelve parts, pulled apart.</h2>
-      <p>It rolls to a stop and comes apart. The motor lifts off its mount, the belt slides off both pulleys, the wheel pulley comes out of the rear right wheel, and the battery pack drops out of the frame.</p>
       <ol class="bom" id="bom3"></ol>
-      <p class="note">Model: Scooter Asm v6. Each part moves along its own offset; the rider goes see-through so the parts behind show.</p>
     </div>
   </section>
 
@@ -360,77 +370,67 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars.</h2>
-      <p>Left alone, it keeps weaving the cones. Press a key and it is yours. With a 51 cm wheelbase the turning circle falls straight out of the geometry.</p>
-      <div class="formula">R = L / tan δ <small>L = 51.2 cm (rear axle to front axle in the model), δ = steering angle</small></div>
-      <div class="ctl">
+      <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop.</p>
+      <div class="jsonly" hidden><div class="readout" id="scRead"></div><div class="ctl">
         <label>Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
         <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
-      </div>
-      <div class="readout" id="scRead"></div>
-      <p class="note">Drive with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys, or steer with the slider; <kbd>Space</kbd> hops, high enough to clear a cone. The ramps beside the cones are kickers to jump off; the autopilot weaves the other way and never touches them. Leave it for 3 seconds and the autopilot takes it back to the cones. A cone you hit falls over and stands back up.</p>
+      </div></div>
     </div>
   </section>
 
   <section data-s="13">
-    <div class="card">
+    <div class="card vid">
       <div class="eyebrow">14 <b>Not So Lazy Boy</b></div>
       <h2>A couch that drives sideways.</h2>
-      <p>A full-size sofa on four swerve modules. Each corner has its own drive motor and its own steering motor, so the couch can slide in any direction and spin at the same time. I drive it from the seat with a Thrustmaster T128 wheel and its pedals on a wheel stand.</p>
-      <p>Every module solves one line of vector math: its wheel has to move at the couch's velocity plus what the spin adds at that corner.</p>
-      <div class="formula">v<sub>i</sub> = v + ω × r<sub>i</sub> <small>v = couch velocity, ω = spin rate, r<sub>i</sub> = corner position from the centre</small></div>
-      <div class="modtable" id="modtable"></div>
-      <div class="ctl">
+      <p>A full-size sofa on powered wheels, driven from the seat with a racing wheel and pedals. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to drive, <kbd>Shift</kbd> to drift.</p>
+      <figure class="lead"><video muted loop playsinline preload="none" poster="photos/couch_campus_poster.jpg" data-src="photos/couch_campus.mp4" aria-label="The couch driving through a crowd on a campus walkway at sunset with four people on it"></video><figcaption><b>On campus</b>Four aboard · real time</figcaption></figure>
+      <ol class="log">
+        <li class="p"><figure><video muted loop playsinline preload="none" poster="photos/couch_module_poster.jpg" data-src="photos/couch_module.mp4" aria-label="A hub-motor wheel on a swivel caster plate spinning on the bench"></video><figcaption><b>Aug 2025</b>First drive wheel</figcaption></figure></li>
+        <li class="l"><figure><img loading="lazy" src="photos/couch_wiring_day_thumb.webp" data-full="photos/couch_wiring_day.webp" alt="The couch tipped on its back in a driveway with wheels fitted while friends wire it up, laptop and tools on the ground"><figcaption><b>Build</b>Wiring day</figcaption></figure></li>
+        <li class="l"><figure><img loading="lazy" src="photos/couch_underside_thumb.webp" data-full="photos/couch_underside.webp" alt="Underside of the couch: two hub-motor wheels, two casters, motor controllers and a battery between the frame rails"><figcaption><b>Early</b>Two hub motors, two casters</figcaption></figure></li>
+        <li class="l"><figure><img loading="lazy" src="photos/wheelstand_couch_thumb.webp" data-full="photos/wheelstand_couch.webp" alt="The couch on a driveway beside its wheel stand with the wheel and pedals"><figcaption><b>Now</b>Wheel and pedals</figcaption></figure></li>
+      </ol>
+      <div class="jsonly" hidden><div class="ctl">
         <label>Spin ω <input id="cwSpin" type="range" min="-1" max="1" step="0.01" value="0"><output id="cwSpinOut">0</output></label>
-      </div>
-      <p class="note">Drive it like a car with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows and the camera drops in behind you: the front modules hold Ackermann angles, the rear ones stay straight, and it grips like a normal car. Hold <kbd>Shift</kbd> to drift: the steering oversteers and the back end steps out. <kbd>Space</kbd> is the handbrake. Off the throttle, <kbd>A</kbd> and <kbd>D</kbd> spin it on the spot like a tank, and a faint arrow on the floor shows where the steering points. Double-tap <kbd>A</kbd> or <kbd>D</kbd> and the steering swings 90° round the couch, so it drives sideways like a car; while you drive, the street bends left into a roundabout, and two gates plus a drift lap round the roundabout make a timed lap. Leave it and it goes back to showing off sideways moves only a swerve base can do; the spin slider drives that. Past 90° a module reverses its wheel instead of steering all the way round. The red steering rings are the hub from Fusion (Steering hub v9). The wheel and pedals are modelled from Thrustmaster's published dimensions; the sofa, stand and wheels are stand-ins, and the street is a simulation. Scroll on and it drives to the fire.</p>
-      <div class="media">
-        <figure><img loading="lazy" src="photos/wheelstand_couch_thumb.webp" alt="The couch on a driveway beside its wheel stand with the wheel and pedals"><figcaption><b>Built</b>Couch, wheel and pedals</figcaption></figure>
-      </div>
+      </div><div class="modtable" id="modtable"></div></div>
     </div>
   </section>
 
-  <section class="right" data-s="14">
+  <section class="drive" data-s="14" aria-label="Drive the couch">
+    <div class="keys" aria-hidden="true">
+      <div class="krow"><kbd data-k="w">W</kbd></div>
+      <div class="krow"><kbd data-k="a">A</kbd><kbd data-k="s">S</kbd><kbd data-k="d">D</kbd></div>
+      <div class="krow"><kbd class="wide" data-k="shift">Shift</kbd><span>drift</span></div>
+    </div>
+    <p class="keyhint">Take the wheel. Or keep scrolling.</p>
+  </section>
+
+  <section class="right" data-s="15">
     <div class="card">
       <div class="eyebrow">15 <b>CatZoom</b></div>
       <h2>A lamp that plays with the cat.</h2>
-      <p>CatZoom stands on the mantel. An MG996R servo in the base turns everything above it through its full 180°, and a 9 g servo tilts the laser through a horn and a push rod. Two angles put the dot on the floor wherever you point.</p>
-      <p>Move your cursor across the floor. The cat does the rest, goes round the couch and the hearth to get there, and jumps up onto the cushions when the dot lands on the couch.</p>
-      <div class="formula">pan = atan2(Δx, Δz) · tilt = atan(h / d) <small>Δx, Δz and d = from the lamp to your cursor on the floor, h = the laser's height. The crank arm is 2.4 cm. The model's horn hole is 1.2 cm out, which capped the tilt near 30°; on the outer hole of a long horn, 2.3 cm out, it reaches about 69°, so the dot lands within about 0.4 h of the lamp. Point at the mantel or the hearth and it tips right down onto them. The pan stops at ±90°, along the mantel either way: any further and the laser would face the brick. Swung wide, it lifts the beam just enough to clear the end of the shelf.</small></div>
-      <div class="readout" id="asRead"></div>
-      <p class="note">Model: Assym Restore v7, from Fusion. The pivots come from the holes in the model; the joint limits are worked out from the linkage, not documented. The mantel is a stand-in. On a phone, touch and drag.</p>
+      <p>A laser lamp for the cat. Point at the floor and the cat goes after the dot.</p>
+      <div class="jsonly" hidden><div class="readout" id="asRead"></div></div>
     </div>
   </section>
 
-  <section data-s="15">
+  <section data-s="16">
     <div class="card">
       <div class="eyebrow">16 <b>Up close</b></div>
       <h2>CatZoom, at play.</h2>
-      <p>Before it comes apart, a slow look at it whole. Here it plays the way it does for the cat: the base stays put while the pan servo darts the head a little to each side and the tilt servo flicks the laser up and down, holding and wiggling the dot between moves, so you can watch the shade, the slot and the linkage work.</p>
-      <p class="note">Solid, as modelled: Assym Restore v7 from Fusion. The moves are a scripted imitation of play, not a recording.</p>
+      <p>The base stays put while the head darts and flicks the dot.</p>
     </div>
   </section>
 
-  <section class="right" data-s="16">
+  <section class="right" data-s="17">
     <div class="card">
       <div class="eyebrow">17 <b>Inside CatZoom</b></div>
       <h2>Thirteen parts, seen through.</h2>
-      <p>The shade, cap and base turn translucent, so the internals show through them. The MG996R pan servo sits on the base with its spline in it, the 9 g tilt servo stands in its housing and pushes the laser's crank through the rod, the ESP32-CAM faces forward under the laser, and two 3 W speakers sit inside the base.</p>
       <ol class="bom" id="bom2"></ol>
-      <p class="note">Model: Assym Restore v7. The ESP32-CAM's board parts are simple blocks in the model, so they show as blocks here too.</p>
     </div>
   </section>
 
-  <section data-s="17">
-    <div class="card">
-      <div class="eyebrow">18 <b>Next</b></div>
-      <h2>Still on the bench.</h2>
-      <p>These are in Fusion and not finished yet.</p>
-      <ul class="alsolist"><li>Flying Bike</li><li>Pipe organ</li><li>ShoppingKart · Honda GX390</li><li>Printers Printing Printers</li><li>Slide Table</li><li>Torque tester</li></ul>
-      <div class="links"><span>gabrielprice.com</span><span>GitHub · TOOPRICEYY</span></div>
-    </div>
-  </section>
-
-  <section class="gallery" id="gallery" aria-labelledby="gallery-h">
+  <section class="gallery" id="gallery" data-s="18" aria-labelledby="gallery-h">
     <div class="gal-wrap">
       <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
       <h2 id="gallery-h">More from the bench.</h2>
@@ -1090,7 +1090,7 @@ function frame() {
   }
   if (Array.isArray(window.__cam)) { camera.position.fromArray(window.__cam[0]); camera.lookAt(_p1.fromArray(window.__cam[1])); } // debug hook for render checks
   // construction overlay: only in the opening hero and the closing shot
-  lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 16.3, 16.9)));
+  lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 17.3, 17.9)));
   constr.visible = lineMat.opacity > .002;
 
   // proof: wipe the as-built photo in over the render once the parts are back together
@@ -1109,7 +1109,7 @@ function frame() {
     // reveal: sweep a clip plane down the leg while fading in
     // worn only in its own sections: it comes off as the crutch scene fades in, stays off for the later builds, and sweeps
     // back on (the same clip plane down the leg) for the closing shot
-    const rev0 = smooth(seg(s, 1.45, 2.35)), revEnd = smooth(seg(s, 16.2, 16.9)), rev = s > 12 ? revEnd : rev0;
+    const rev0 = smooth(seg(s, 1.45, 2.35)), revEnd = smooth(seg(s, 17.2, 17.9)), rev = s > 12 ? revEnd : rev0;
     clip.constant = -(70 - rev * 80);
     const worn = Math.max(rev0 * (1 - smooth(seg(s, 7.5, 7.78))), revEnd);
     const op = clamp01(worn * 1.6);
@@ -1213,5 +1213,26 @@ buildFigure().then(() => {
   requestAnimationFrame(frame);
 })
   .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
+</script>
+<script>
+// drive-ready keys light up while held
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); document.querySelectorAll(`.keys kbd[data-k="${k === 'arrowup' ? 'w' : k === 'arrowdown' ? 's' : k === 'arrowleft' ? 'a' : k === 'arrowright' ? 'd' : k}"]`).forEach(b => b.classList.add('on')); });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); document.querySelectorAll('.keys kbd.on').forEach(b => { if (b.dataset.k === k || /^arrow/.test(k) || k === 'shift') b.classList.remove('on'); }); });
+addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
+// build log lightbox: tap a photo or clip in a .log row to see it large; tap again or Esc to close
+(() => {
+  const lb = document.createElement('div'); lb.id = 'lb'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', 'Build photo'); document.body.appendChild(lb);
+  const close = () => { lb.classList.remove('on'); lb.innerHTML = ''; };
+  lb.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') close(); }); addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.addEventListener('click', e => {
+    const m = e.target.closest('.log img, .log video, .lead img, .lead video'); if (!m) return;
+    const cap = m.closest('figure').querySelector('figcaption'), fig = document.createElement('figure'); fig.style.margin = 0;
+    let el;
+    if (m.tagName === 'IMG') { el = new Image(); el.src = m.dataset.full || m.src; el.alt = m.alt; }
+    else { el = document.createElement('video'); Object.assign(el, { src: m.dataset.src, muted: true, loop: true, playsInline: true, autoplay: true, controls: true }); }
+    fig.append(el); if (cap) { const p = document.createElement('p'), b = cap.querySelector('b'); p.textContent = (b ? b.textContent + '  ' : '') + [...cap.childNodes].filter(n => n !== b).map(n => n.textContent).join(''); fig.append(p); }
+    lb.innerHTML = ''; lb.append(fig); lb.classList.add('on');
+  });
+})();
 </script>
 <script type="module">/*GALLERY*/</script>

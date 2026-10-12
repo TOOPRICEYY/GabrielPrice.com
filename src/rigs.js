@@ -56,6 +56,9 @@ const CD = { L: 64, zr: -32, dMax: 32 * RD, vLock: 220, acc: 560, drag: .85, bra
 const SCOOT_SH = 3;
 // Assym Restore has an up-close section (solid, turning back and forth) between in use and exploded: the exploded view and the close sit ASSYM_IN later
 const ASSYM_IN = 1;
+// a drive-ready section after the couch card (chase view, key prompt): the couch timeline holds at COUCH_HOLD through it, and the
+// parking, hearth and Assym scenes after it sit COUCH_IN sections later
+const COUCH_IN = 1, COUCH_HOLD = 10.05;
 // scooter course: cones every SC.gap cm down the middle of a sidewalk; the autopilot weaves x = amp·sin(π z / gap)
 const SC = { gap: 240, amp: 60, len: 1920, walkW: 180, slab: 120, nCone: 4, vAuto: 90, L: 51.2, dMax: 35 * RD,
   rampX: -62, rampW: 34, rampL: 50, rampH: 18, hop: 200, g: 981 };   // kicker ramps beside every other cone, opposite the slalom line
@@ -73,13 +76,14 @@ camKeys.splice(camKeys.length - 1, 1,
   [10.75, [-190, 195, -210], [-10, 45, 12], 0, -44], [11.25, [-190, 195, -210], [-10, 45, 12], 0, -44],
   [11.75, [-195, 265, -305], [-6, 40, 70], 0, -40], [12.25, [-195, 265, -305], [-6, 40, 70], 0, -40],
   [12.75, [95, 200, 430], [-40, 62, 10], 0, 30], [13.25, [95, 200, 430], [-40, 62, 10], 0, 30],
-  [13.75, [370, 190, 10], [40, 62, 250], 0, -45], [14.25, [370, 190, 10], [40, 62, 250], 0, -45],
+  [14.25, [95, 200, 430], [-40, 62, 10], 0, 30],   // drive-ready section (s 14): the chase view takes over, this only holds the way back
+  [14.75, [370, 190, 10], [40, 62, 250], 0, -45], [15.25, [370, 190, 10], [40, 62, 250], 0, -45],
   // Assym up close (solid, turning back and forth), then pulled back a little for the exploded view
-  [14.75, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
-  [15.25, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
-  [15.75, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
-  [16.25, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
-  [17, [0, 100, 480], [0, 94, 0], 0, 60]);
+  [15.75, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
+  [16.25, [ASSYM_AT.x - 56, ASSYM_AT.y + 26, ASSYM_AT.z - 80], [ASSYM_AT.x, ASSYM_AT.y + 9, ASSYM_AT.z], 0, 9],
+  [16.75, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
+  [17.25, [ASSYM_AT.x - 72, ASSYM_AT.y + 38, ASSYM_AT.z - 104], [ASSYM_AT.x, ASSYM_AT.y + 21, ASSYM_AT.z], 0, -26],
+  [18, [0, 100, 480], [0, 94, 0], 0, 60]);
 
 // a pose layered over the keyed one (the walk is procedural, not a keyframe)
 const poseMix = { w: 0, pose: {} };
@@ -786,7 +790,9 @@ const PARK = { x: 0, z: 110 };                      // where the couch stops, he
 function rigFrame(s, dt) {
   if (!rigs.ready) return;
   const T = clock.elapsedTime;
-  const sL = s - SCOOT_SH;                           // the couch and hearth scenes keep their old timings on this shifted scroll
+  const sL0 = s - SCOOT_SH;                          // the couch and hearth scenes keep their old timings on this shifted scroll
+  const sL = sL0 <= COUCH_HOLD ? sL0 : Math.max(COUCH_HOLD, sL0 - COUCH_IN);   // ...held still through the drive-ready section
+  rigs.chasePre = win(s, 13.3, 13.6, 14.05, 14.3);  // drive-ready: the chase view without touching a key
   const wWalk = walkWeight(s), wCr = win(s, 7.5, 7.78, 8.22, 8.5), wSc = win(s, 8.5, 8.78, 12.22, 12.5), wCo = win(sL, 9.5, 9.78, 12.45 + ASSYM_IN, 12.85 + ASSYM_IN);
   rigs.couchOn = wCo > .5 && sL < 10.3;
   curlHand('L', .18); curlHand('R', .18);
@@ -1193,7 +1199,8 @@ function couchFrame(s, dt, w) {
     Co.x += Co.vx * dt; Co.z += Co.vz * dt; Co.dist += Math.abs(Co.sp) * dt;
     Co.u = Co.sp * Math.cos(sl); Co.v = -Co.sp * Math.sin(sl);
   } else {
-    if (Tn - Co.last > 3 && !reduced) { vx = .7 * Math.cos(Co.t * .5); vz = .7 * Math.sin(Co.t * .5); om = .55 * Math.sin(Co.t * .23); }   // circle while turning: only a holonomic base does this
+    const q = 1 - (rigs.chasePre || 0);                // drive-ready: it settles, square to the street, waiting for a key
+    if (Tn - Co.last > 3 && !reduced) { vx = .7 * q * Math.cos(Co.t * .5); vz = .7 * q * Math.sin(Co.t * .5); om = .55 * q * Math.sin(Co.t * .23); }   // circle while turning: only a holonomic base does this
     if (Co.dr < .02) Co.h = Math.atan2(Math.sin(Co.h), Math.cos(Co.h));
     const mg = Math.hypot(vx, vz); if (mg > 1) { vx /= mg; vz /= mg; }
     Co.vx += (vx * VMAX - .6 * Co.x - Co.vx) * k; Co.vz += (vz * VMAX - .6 * Co.z - Co.vz) * k; Co.w += (om * WMAX - .5 * Co.h - Co.w) * k;
@@ -1229,12 +1236,12 @@ function couchFrame(s, dt, w) {
     if (Co.dr < .01) Co.cy = H;
     const sy = Math.sin(Co.cy), cy = Math.cos(Co.cy);
     const spd01 = clamp01(Math.abs(Co.sp) / CD.vTop), back = 720 - 140 * spd01;           // it pulls in a little as speed builds (the FOV opens)
-    C.p.set(P.x - sy * back, 330 - 60 * spd01, P.z - cy * back); C.t.set(P.x + sy * 260, 30, P.z + cy * 260); C.w = smooth(Co.dr) * w * (1 - pk);
+    C.p.set(P.x - sy * back, 330 - 60 * spd01, P.z - cy * back); C.t.set(P.x + sy * 260, 30, P.z + cy * 260); C.w = Math.max(smooth(Co.dr), rigs.chasePre || 0) * w * (1 - pk);
     C.fov = JU.fov * spd01 * spd01;
     // shake while sliding hard, from a few sines so it reads as rumble rather than jitter
     const sh = clamp01((Math.abs(Co.slip) - 6 * RD) / (30 * RD)) * spd01 * 6, Tc = clock.elapsedTime;
     C.p.x += sh * Math.sin(Tc * 37.1) * Math.cos(Tc * 13.3); C.p.y += sh * .7 * Math.sin(Tc * 41.7 + 1); C.t.y += sh * .4 * Math.sin(Tc * 29.3 + 2);
-    if (innerWidth >= 720) { const px = cy * 120, pz = -sy * 120; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
+    if (innerWidth >= 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
   { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); tipFrame(Co, dt, wc > .5, driftHud(Co, dt) + courseFrame(Co, dt, wc)); }

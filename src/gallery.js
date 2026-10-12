@@ -26,29 +26,29 @@ const PROJECTS = [
     slide: { parts: ['Component9', 'Component10', 'Component7', 'Component8', 'Latch v5:1+Component1'], by: [22, 0, 0], half: ['Component17'] },
     props: sideTableProps, anim: () => sideTableProps.anim?.(),
     text: {
-      open: ['Slide the top.', 'Lift the latch and the top board, marble slab and all, runs sideways on a pair of drawer slides, opening the box underneath where the books and odds and ends live. The tea rides along on top.'],
-      hero: ['A bedside table, cut from flat stock.', 'Each side is two pine plates laminated together. A pine top board carries a white marble slab, and a box shelf with a latched front sits between the sides.'],
-      explode: ['Fifteen parts.', 'Pulled apart along the way they stack: the slab and top lift off, the rails and their drawer slides rise, and the four side plates spread out.'],
-      build: ['How it goes together.', 'Keep scrolling and the parts go back in, bottom first: the side plates, the shelf, the rails and their drawer slides, the latch, the top board, and the marble slab last.'],
-      specs: ['Bedside Table Rev.2', 'Description, photos and build notes still to come.'] } },
+      open: ['Slide the top.', 'It runs sideways on two drawer slides to open the box.'],
+      hero: ['Slide Table.', 'A bedside table cut from flat pine, with a marble top.'],
+      explode: ['Fifteen parts.', ''],
+      build: ['Back together.', ''],
+      specs: ['Slide Table', 'Pine plates, a marble slab and two drawer slides.'] } },
   { id: 'holdfast', title: 'Holdfast', kind: 'Software', ph: 'holdfast',
     blurb: 'A Screen Time controller for iPhone, Mac and Windows. Changing a rule, or buying more time, means typing a passage first.',
     chapters: [{ key: 'hero', cam: [24, 8, 4.0], spin: .5 }, { key: 'try', cam: [0, 4, 3.6] }, { key: 'passage', cam: [-26, 6, 3.6], side: 'right' }, { key: 'specs', cam: [-34, 10, 4.0], spin: .5 }],
     text: {
-      hero: ['Holdfast.', 'A Screen Time controller I built for my own phone and laptop. You choose what to block and when. Changing a rule, or getting more time, means typing out a passage first: deliberate friction, not a password.'],
-      try: ['Try it.', 'This is the real Holdfast interface, the same React bundle the apps load, running its built-in demo data right here. Open a group, paint a schedule, start from a preset. Nothing leaves this page and nothing is enforced.'],
-      passage: ['More time costs words.', 'An extra hour takes one passage. The second hour takes twice as many words, the third four times as many. Check Passage marks every word: green matches, red is wrong or extra, faded red was left out.'],
-      specs: ['Holdfast', 'On iPhone it drives Apple\'s Screen Time frameworks. On a Mac a network-extension web filter matches every connection by name, so changing DNS doesn\'t get around it. The Windows service is still experimental.'] },
+      hero: ['Holdfast.', 'Screen Time control where changing a rule means typing a passage first.'],
+      try: ['Try it.', 'The real interface, running on demo data.'],
+      passage: ['More time costs words.', 'Each extra hour doubles the passage.'],
+      specs: ['Holdfast', 'iPhone, Mac and Windows.'] },
     specs: `<dl class="spec"><dt>iPhone</dt><dd>FamilyControls, ManagedSettings, DeviceActivity</dd><dt>Mac</dt><dd>Network Extension content filter</dd><dt>Windows</dt><dd>Filtering Platform service (experimental)</dd><dt>Interface</dt><dd>React + TypeScript, one bundle for all three</dd></dl>
       <div class="gx-hf"><img src="holdfast/icon.webp" alt="Holdfast app icon: a blue path escaping a black labyrinth"><img src="holdfast/phone.webp" alt="Holdfast dashboard on a phone"></div>` },
   { id: 'mittenmade', title: 'MittenMade', kind: 'Woodcraft shop', ph: 'mittenmade',
     blurb: 'Michigan, carved in wood: topographic state pieces, ornaments and custom family signs, sold at mittenmade.shop.',
     chapters: [{ key: 'hero', cam: [-18, 10, 3.0], spin: .6 }, { key: 'relief', cam: [62, 4, 2.7], side: 'right' }, { key: 'products', cam: [-40, 14, 3.2] }, { key: 'specs', cam: [20, 10, 3.0], spin: .6 }],
     text: {
-      hero: ['MittenMade.', 'My woodcraft shop. I love making things and I love this state, so I put the two together: Michigan, carved in wood, both peninsulas and the land in between.'],
-      relief: ['Carved from the map.', 'The surface follows the state\'s terrain, so light raking across it picks out the ridges and valleys. Turn it and watch the grain and the relief change.'],
-      products: ['What I make.', 'Freestanding topographic Michigans, ornaments small enough for the tree, and family signs with the state carved beside your name.'],
-      specs: ['MittenMade', 'Sold through my own site and on Etsy.'] },
+      hero: ['MittenMade.', 'My shop: Michigan, carved in wood.'],
+      relief: ['Carved from the map.', ''],
+      products: ['What I make.', ''],
+      specs: ['MittenMade', ''] },
     products: `<div class="gx-gal"><figure><img loading="lazy" src="mittenmade/oak.webp" alt="A freestanding carved oak Michigan, lit pink and red"><figcaption><b>Oak</b>Freestanding state</figcaption></figure>
       <figure><img loading="lazy" src="mittenmade/ornament.webp" alt="A carved Michigan ornament hanging in a pine tree with a red ribbon"><figcaption><b>Ornament</b>For the tree</figcaption></figure>
       <figure><img loading="lazy" src="mittenmade/sign.webp" alt="An oak family sign with a carved Michigan beside the name The Richards"><figcaption><b>Custom</b>Family sign</figcaption></figure></div>`,
@@ -60,11 +60,21 @@ const PROJECTS = [
     explode: [['Body2', [0, 10, 0]], ['Body1', [0, -2, 0]], ['Vertical Dogbone', [-10, 4, 0]]],
     mat: (k) => k.includes('Dogbone') ? 'accent' : 'print',
     text: {
-      hero: ['Ghetto Gauge.', 'A small printed gauge: a base with a post, a cap whose sleeve slides over the post, and a dogbone that keys the two together.'],
-      explode: ['Three parts.', 'The cap lifts off the post and the dogbone slides out of its slot.'],
-      build: ['How it goes together.', 'The dogbone drops into the slot in the post, then the cap slides down over both.'],
-      cut: ['Cut through the middle.', 'A plane slices the gauge so you can see the sleeve over the post and the dogbone in between.'],
-      specs: ['GhettoGauge v22', 'What it measures, photos and print settings still to come.'] } },
+      hero: ['Ghetto Gauge.', 'A small printed gauge in three parts.'],
+      explode: ['Three parts.', ''],
+      build: ['Back together.', ''],
+      cut: ['Cut through.', ''],
+      specs: ['GhettoGauge v22', 'Base, cap and dogbone, all printed.'] } },
+  { id: 'desk', title: 'Pedestal Desk', kind: 'Furniture', ph: 'desk',
+    blurb: 'A height-adjustable desk from construction lumber: a post on cross feet, and a top on a sleeve that slides along it.',
+    chapters: [{ key: 'hero', cam: [32, 14, 3.0], spin: .6 }, { key: 'open', cam: [78, 8, 2.9], side: 'right' }, { key: 'specs', cam: [-28, 16, 3.1], spin: .6 }],
+    slide: { parts: ['Sleeve', 'Collar', 'Top', 'Bolt'], by: [0, 18, 0] },   // the top and its sleeve ride up the post in the 'open' chapter
+    text: {
+      hero: ['Pedestal Desk.', 'A height-adjustable desk from 2×4s, for working outside.'],
+      open: ['Raise it.', 'The top slides up the post to standing height.'],
+      specs: ['Pedestal Desk', ''] },
+    specs: `<dl class="spec"><dt>Built</dt><dd>July 2026</dd><dt>Stock</dt><dd>Pine 2×4s, a 4×4 post, a pine top</dd><dt>Adjust</dt><dd>Sleeve slides on the post, bolt holds the height</dd></dl>
+      <div class="gx-hf"><img src="photos/pedestal_desk.webp" alt="The pedestal desk in a yard with a laptop, a drill and printed parts on its top"></div>` },
   { id: 'flyingbike', title: 'Flying Bike', kind: 'In progress', model: 'flyingbike', soon: true,
     blurb: 'Coming soon.', mat: () => 'neon' },
 ];
@@ -292,6 +302,15 @@ function sideTableProps(parts) {
 const MM_OUTLINE = [[-15.59,25.68],[-15.59,25.62],[-15.3,25.56],[-15.22,25.45],[-14.7,25.24],[-14.44,24.93],[-14.32,24.55],[-13.89,24.24],[-12.45,23.72],[-11.18,23.4],[-8.79,22.36],[-8.27,22.42],[-7.78,22.19],[-6.86,21.96],[-6.77,21.87],[-6.83,21.35],[-5.68,20.89],[-5.59,20.66],[-5.56,20.12],[-5.68,20.06],[-5.71,19.57],[-5.91,19.14],[-5.85,19.02],[-5.56,18.88],[-5.13,18.9],[-5.13,18.79],[-5.53,18.36],[-5.53,18.16],[-5.24,17.75],[-4.9,17.52],[-4.76,17.58],[-4.58,17.95],[-4.03,18.59],[-3.0,20.43],[-2.68,20.66],[-2.51,20.92],[-2.39,20.92],[-2.28,20.69],[-1.93,20.61],[-1.59,20.89],[-1.5,21.15],[-1.35,21.3],[-0.78,21.38],[-0.75,21.21],[-0.98,21.04],[-1.38,20.46],[-1.04,20.2],[-0.89,20.2],[-0.61,20.58],[0.2,21.12],[0.4,21.59],[0.55,21.73],[0.84,21.84],[1.41,21.87],[1.7,21.76],[1.96,21.76],[2.22,21.9],[2.8,21.9],[3.26,22.33],[3.6,22.54],[3.98,22.54],[5.01,22.31],[5.48,22.1],[5.62,21.96],[5.62,20.92],[5.3,20.86],[5.3,20.49],[5.16,20.32],[4.9,20.2],[4.76,19.94],[4.78,19.48],[4.96,19.22],[5.33,18.93],[5.33,18.79],[4.99,18.65],[4.38,18.62],[3.92,18.18],[3.83,18.04],[3.8,16.74],[3.57,16.14],[3.26,15.82],[2.94,15.85],[2.77,16.05],[2.77,16.25],[3.0,16.92],[3.0,17.2],[2.82,17.49],[2.82,17.72],[2.94,17.95],[2.65,17.78],[2.54,17.35],[2.25,17.15],[2.13,16.69],[1.99,16.57],[1.7,16.57],[1.5,16.48],[1.15,16.17],[1.12,15.56],[1.07,15.48],[0.43,15.24],[0.4,15.01],[0.52,14.76],[0.52,14.41],[0.29,13.46],[-0.03,12.71],[-0.63,12.05],[-0.35,11.47],[-0.32,11.12],[-0.69,10.09],[-0.69,9.71],[-0.52,9.16],[0.4,6.95],[0.17,4.01],[0.12,3.98],[0.06,3.54],[-0.37,2.74],[-1.07,1.84],[-1.44,1.01],[-1.79,0.66],[-1.9,0.63],[-1.9,0.55],[-1.59,0.52],[-1.5,0.4],[-0.86,0.35],[5.5,0.23],[7.49,0.12],[7.52,0.03],[9.11,0.03],[9.14,0.12],[11.33,0.14],[11.61,0.43],[11.84,0.86],[12.31,1.21],[12.59,1.59],[12.74,2.56],[12.85,2.88],[13.14,3.17],[13.6,3.31],[13.86,3.52],[13.89,4.09],[14.12,4.44],[14.12,4.73],[14.27,4.87],[14.64,4.93],[14.7,4.76],[14.99,4.58],[15.19,4.67],[15.36,5.45],[15.48,6.74],[15.16,7.38],[14.73,9.54],[14.15,11.44],[13.89,11.9],[13.4,12.16],[13.08,12.22],[12.31,11.82],[11.96,11.76],[11.76,11.53],[11.61,11.47],[11.47,11.01],[11.33,10.84],[11.18,10.46],[10.86,10.32],[10.43,9.77],[9.68,9.94],[9.34,10.23],[9.37,10.78],[9.57,11.47],[9.77,11.64],[10.17,11.7],[10.61,11.96],[10.72,12.1],[10.75,12.54],[10.89,12.8],[11.33,13.05],[11.61,13.4],[11.82,14.55],[11.87,15.45],[11.73,15.99],[11.44,16.34],[11.3,16.4],[11.27,16.63],[11.44,16.95],[11.7,16.97],[11.79,17.09],[11.47,17.72],[11.38,18.07],[11.12,18.44],[10.66,18.53],[10.17,18.85],[9.88,18.88],[9.45,19.28],[9.22,19.34],[8.82,19.31],[8.5,19.83],[8.24,20.06],[7.23,20.2],[6.51,20.78],[6.4,21.79],[6.48,21.96],[6.8,22.19],[7.03,22.19],[7.81,21.84],[8.18,21.96],[8.65,21.96],[9.45,21.84],[9.57,21.93],[9.48,22.19],[9.11,22.45],[9.02,22.77],[8.9,22.88],[8.41,23.05],[8.44,23.26],[8.18,24.12],[7.93,24.5],[7.64,24.61],[7.38,24.5],[7.29,24.38],[7.03,24.35],[6.66,24.55],[6.08,24.47],[5.3,24.64],[5.22,24.78],[5.22,25.3],[5.42,25.71],[5.3,26.08],[4.27,26.08],[3.8,25.76],[3.46,25.68],[0.84,25.62],[0.26,25.22],[-0.32,25.01],[-0.98,24.41],[-1.1,24.41],[-1.47,24.64],[-1.96,24.55],[-2.39,25.01],[-2.59,25.01],[-2.94,24.78],[-3.66,24.81],[-3.89,25.27],[-4.21,25.62],[-4.67,26.43],[-5.16,26.8],[-5.48,26.92],[-6.43,27.06],[-6.77,27.03],[-6.89,26.8],[-7.03,26.8],[-7.06,26.95],[-6.92,27.09],[-6.8,27.09],[-6.8,27.18],[-6.69,27.26],[-6.71,27.32],[-7.29,26.95],[-7.52,26.89],[-7.64,26.74],[-7.78,26.77],[-7.67,27.26],[-7.29,27.75],[-6.22,28.88],[-5.88,29.05],[-5.53,29.37],[-5.01,29.39],[-4.9,29.48],[-4.99,29.77],[-5.48,29.91],[-5.5,30.0],[-6.22,30.0],[-6.25,29.91],[-6.83,29.83],[-7.52,29.57],[-7.95,29.08],[-9.39,28.21],[-9.68,27.75],[-9.88,27.64],[-10.46,27.61],[-10.75,27.23],[-11.04,27.09],[-11.79,26.89],[-13.0,26.89],[-13.92,26.17],[-14.44,25.99],[-15.16,25.97]], MM_W = 31.18;
 // built-in visuals for projects with no Fusion model: Holdfast's monitor and phone (textured with its real interface), and a stand-in mitten
 function placeholder(P) {
+  // Pedestal Desk: blocks sized from the photo (cm, y up): crossed 2×4 feet, a 4×4 post, a two-board sleeve with a front collar, and the top
+  if (P.ph === 'desk') {
+    const box = (k, w, h, d, x, y, z, mat = MATS.pine) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); g.computeBoundingBox(); return { mesh: new THREE.Mesh(g, mat), k, name: k.replace(/ \d$/, ''), c: g.boundingBox.getCenter(new THREE.Vector3()), lo: g.boundingBox.min.y }; };
+    const bolt = new THREE.CylinderGeometry(.6, .6, 20, 16); bolt.rotateZ(Math.PI / 2); bolt.translate(0, 62, 2); bolt.computeBoundingBox();
+    return [box('Foot 1', 72, 3.8, 8.9, 0, 1.9, 0), box('Foot 2', 8.9, 3.8, 72, 0, 5.7, 0), box('Post', 8.9, 72, 8.9, 0, 43.6, 0),
+      box('Sleeve 1', 3.8, 40, 8.9, -6.35, 78, 0), box('Sleeve 2', 3.8, 40, 8.9, 6.35, 78, 0),
+      box('Collar 1', 16.5, 8.9, 3.8, 0, 62, 6.35), box('Collar 2', 16.5, 8.9, 3.8, 0, 80, 6.35),
+      box('Top', 80, 2, 55, 0, 99, 0), { mesh: new THREE.Mesh(bolt, MATS.steel), k: 'Bolt', name: 'Bolt', c: bolt.boundingBox.getCenter(new THREE.Vector3()), lo: 61 }];
+  }
   if (P.ph === 'holdfast') {
     const side = MATS.print, scrMat = new THREE.MeshBasicMaterial({ color: 0xffffff }), phMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const scr = new THREE.Mesh(new THREE.BoxGeometry(34, 21.25, 1.2), [side, side, side, side, scrMat, side]); scr.geometry.translate(0, 17, 0);
@@ -333,7 +352,7 @@ function chapterHTML(P, c, i) {
   const [h, p] = P.text[c.key] || ['', ''];
   let extra = '';
   if (c.key === 'explode') extra = `<ol class="bom">${M.groups.map((g, j) => `<li><span class="n">${j + 1}</span><span>${g}</span><span class="q">×${M.parts.filter(q => q.name === g).length}</span></li>`).join('')}</ol>`;
-  if (c.key === 'try') return `<div class="gx-ch wide"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2><p>${p}</p></div>
+  if (c.key === 'try') return `<div class="gx-ch wide"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2>${p ? `<p>${p}</p>` : ''}</div>
     <div class="gx-app"><iframe title="Holdfast interface in demo mode" data-src="holdfast/index.html?preview=1"></iframe></div></div>`;
   if (c.key === 'passage') extra = `<div class="gx-pass"><div class="gx-ladder">${['1 hour · 1×', '2nd · 2×', '3rd · 4×', '4th · 8×'].map((x, j) => `<span${j ? '' : ' class="on"'}>${x}</span>`).join('')}</div>
     <div class="gx-pass-exp">${PASSAGE}</div><div class="gx-pass-box" aria-live="off"></div><div class="gx-pass-res"></div></div>`;
@@ -342,9 +361,9 @@ function chapterHTML(P, c, i) {
   else if (c.key === 'specs') {
     const s = M.size, doc = P.model ? window.GAL_MAN[P.model].doc : null;
     extra = (doc ? `<dl class="spec"><dt>Model</dt><dd>${doc}, from Fusion</dd><dt>Size</dt><dd>${s.x.toFixed(1)} × ${s.z.toFixed(1)} × ${s.y.toFixed(1)} cm</dd><dt>Parts</dt><dd>${M.parts.length}</dd></dl>` : '')
-      + `<div class="gx-photos"><div>Photo</div><div>Photo</div><div>Photo</div></div>`;
+      ;
   }
-  return `<div class="gx-ch${c.side === 'right' ? ' right' : ''}"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2><p>${p}</p>${extra}</div></div>`;
+  return `<div class="gx-ch${c.side === 'right' ? ' right' : ''}"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2>${p ? `<p>${p}</p>` : ''}${extra}</div></div>`;
 }
 function openProject(id, from) {
   P = PROJECTS.find(p => p.id === id); if (!P || P.soon) return;
