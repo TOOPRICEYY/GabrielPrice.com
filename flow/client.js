@@ -89,8 +89,12 @@
     const v = e.target, sec = v.closest && v.closest('section[data-s]');
     events.push([now(), 'v', sec ? +sec.dataset.s : -1, (v.getAttribute('aria-label') || '').slice(0, 60)]);
   }, { capture: true, passive: true });
-  let rz = 0;
-  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => events.push([now(), 'z', innerWidth, innerHeight]), 500); }, { passive: true });
+  // one z event per burst (a rotation or a URL bar sliding fires several), stamped when the burst began, with the final size
+  let rz = 0, rzT = -1;
+  addEventListener('resize', () => {
+    if (rzT < 0) rzT = now();
+    clearTimeout(rz); rz = setTimeout(() => { events.push([rzT, 'z', innerWidth, innerHeight]); rzT = -1; }, 500);
+  }, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); } });
   addEventListener('pagehide', flush);
 
@@ -167,7 +171,7 @@
       }
       rec = await res.json();
     }
-    const S = rec.samples || [], E = rec.events || [];
+    const S = rec.samples || [], E = (rec.events || []).slice().sort((x, y) => x[0] - y[0]);
     if (!S.length) { hud.textContent = 'That visit has no samples.'; return; }
     const rig = window.__rig, dur = S[S.length - 1][0];
     // recorded on another set of sections: move each sample's section to the section with the same title on this page
@@ -199,7 +203,10 @@
       if (playing) head = Math.min(dur, head + Math.max(0, dt) * speed);   // the first frame can start a touch before prev
       while (i < S.length - 2 && S[i + 1][0] <= head) i++;
       while (i > 0 && S[i][0] > head) i--;
-      const a = S[i], b = S[Math.min(i + 1, S.length - 1)], k = b[0] > a[0] ? Math.max(0, Math.min(1, (head - a[0]) / (b[0] - a[0]))) : 0;
+      // a sample is kept only when something changed, so across a gap the state held still until the tick before b:
+      // hold a until then and move only over that last tick (a fling after a pause is a jump, not a slow drift)
+      const a = S[i], b = S[Math.min(i + 1, S.length - 1)], ta = Math.max(a[0], b[0] - 1000 / HZ);
+      const k = b[0] > ta ? Math.max(0, Math.min(1, (head - ta) / (b[0] - ta))) : 0;
       const s = mapS(lerp(a[1], b[1], k)), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
