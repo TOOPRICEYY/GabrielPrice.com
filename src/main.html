@@ -162,12 +162,13 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 .keys kbd.wide { min-width: 120px; }
 .keys kbd.on { background: var(--cobalt); color: var(--vellum); transform: translateY(2px); }
 .krow span, .keyhint { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--graphite-2); }
-@media (hover: none) { section.drive .keys, section.drive .keyhint { display: none; } }
+@media (hover: none), (pointer: coarse) { section.drive .keys, section.drive .keyhint, .kb { display: none; } }   /* keyboard hints mean nothing on touch screens */
 /* lead clip: the card's main story, full card width */
 .card.vid { width: min(480px, 100%); }
 .lead { margin: 0; display: flex; flex-direction: column; gap: 4px; }
-.lead video, .lead img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
-.lead.tall video, .lead.tall img { aspect-ratio: 4 / 5; max-height: 58vh; }
+/* each lead keeps its file's own shape (--ar, --arn = width/height on the element); --lh caps the height by narrowing it, never by cropping */
+.lead video, .lead img { width: min(100%, calc(var(--lh, 9999px) * var(--arn, 1.7778))); aspect-ratio: var(--ar, 16 / 9); object-fit: contain; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
+.lead { --lh: 56vh; }
 .lead figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .lead figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
 #lb { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: rgba(12, 14, 30, .82); padding: 4vh 4vw; cursor: zoom-out; }
@@ -245,8 +246,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   .card h2 { font-size: 24px; }
   .card h2 .sub { font-size: 15px; }
   .card p { font-size: 13px; line-height: 1.35; }
-  .lead.tall video, .lead.tall img { height: 26vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
-  .lead video, .lead img { max-height: 21vh; }
+  .lead { --lh: 36vh; }
   .log li { width: 72px; } .log li.l { width: 152px; } .log li.q { width: 96px; }
   .log img, .log video { height: 96px; }
   .log figcaption { font-size: 9px; }
@@ -257,16 +257,14 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 }
 @media (max-width: 720px) and (max-height: 720px) {   /* small phones: the docked card must stay under half the screen */
   .card h2 { font-size: 21px; }
-  .lead video, .lead img { max-height: 19vh; }
-  .lead.tall video, .lead.tall img { height: 24vh; }
+  .lead { --lh: 30vh; }
 }
 /* phones held sideways (short and wide): side cards stay beside the figure, so squeeze them to fit the height */
 @media (max-height: 520px) and (min-width: 721px) {
   .card, .card.vid { width: min(400px, 46vw); padding: 12px; gap: 6px; }
   .card h2 { font-size: 22px; }
   .card p { font-size: 12.5px; line-height: 1.35; }
-  .lead video, .lead img { max-height: 40vh; }
-  .lead.tall video, .lead.tall img { height: 50vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
+  .lead { --lh: 46vh; }
   .log li { width: 60px; } .log li.l { width: 128px; } .log li.q { width: 80px; }
   .log img, .log video { height: 72px; }
   .log figcaption { font-size: 9px; }
@@ -377,7 +375,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
       <h2>Crutch Refreshments</h2>
       <p>A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.</p>
-      <figure class="lead tall"><img loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
+      <figure class="lead tall"><img style="--ar: 3 / 4; --arn: .75" loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="crRead"></div><div class="ctl">
         <label>Stride swing <input id="crSwing" type="range" min="0" max="20" step="1" value="12"><output id="crSwingOut">12°</output></label>
       </div></div>
@@ -389,7 +387,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
       <h2>The Quad Father</h2>
       <p>A motorized knee scooter. What could go wrong?</p>
-      <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
+      <figure class="lead tall"><video style="--ar: 9 / 16; --arn: .5625" muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
     </div>
   </section>
 
@@ -398,7 +396,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">11 <b>QuadFather · Belt drive</b></div>
       <h2>Irresponsible Power</h2>
       <p>With a peak power of over 8Hp and a max speed of 30mph, this medical device is guaranteed to leave you more injured than you started.</p>
-      <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
+      <figure class="lead tall"><video style="--ar: 9 / 16; --arn: .5625" muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="scBelt"></div></div>
     </div>
   </section>
@@ -415,7 +413,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars.</h2>
-      <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop.</p>
+      <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to ride, <kbd>Space</kbd> to hop.</p>
       <div class="jsonly" hidden><div class="readout" id="scRead"></div><div class="ctl">
         <label>Steering δ <input id="scSteer" type="range" min="-35" max="35" step="1" value="0"><output id="scSteerOut">0°</output></label>
         <label>Knee pad height <input id="scKnee" type="range" min="-4" max="6" step="0.5" value="0"><output id="scKneeOut">0 cm</output></label>
@@ -428,7 +426,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">14 <b>Not So Lazy Boy</b></div>
       <h2>The Not So Lazy Boy</h2>
       <p>Staying on the couch or going out? Why choose!</p>
-      <figure class="lead"><video muted loop playsinline preload="none" poster="photos/couch_campus_poster.jpg" data-src="photos/couch_campus.mp4" aria-label="The couch driving through a crowd on a campus walkway at sunset with four people on it"></video><figcaption><b>On campus</b>Four aboard · real time</figcaption></figure>
+      <figure class="lead"><video style="--ar: 1 / 1; --arn: 1" muted loop playsinline preload="none" poster="photos/couch_campus_poster.jpg" data-src="photos/couch_campus.mp4" aria-label="The couch driving through a crowd on a campus walkway at sunset with four people on it"></video><figcaption><b>On campus</b>Four aboard · real time</figcaption></figure>
       <ol class="log">
         <li class="p"><figure><video muted loop playsinline preload="none" poster="photos/couch_module_poster.jpg" data-src="photos/couch_module.mp4" aria-label="A hub-motor wheel on a swivel caster plate spinning on the bench"></video><figcaption><b>Aug 2025</b>First drive wheel</figcaption></figure></li>
         <li class="l"><figure><img loading="lazy" src="photos/couch_wiring_day_thumb.webp" data-full="photos/couch_wiring_day.webp" alt="The couch tipped on its back in a driveway with wheels fitted while friends wire it up, laptop and tools on the ground"><figcaption><b>Build</b>Wiring day</figcaption></figure></li>
@@ -455,10 +453,6 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">15 <b>CatZoom</b></div>
       <h2>Cat Zoom</h2>
       <p>Your cat missed you today. Now you never have to leave them again. With a laser, camera, mic and speaker your codependency can sore to new heights!</p>
-      <ol class="log">
-        <li class="q"><figure><img loading="lazy" src="photos/catzoom_built_thumb.webp" data-full="photos/catzoom_built.webp" alt="CatZoom on a nightstand: a coral faceted printed shade on a white base, the laser and camera behind a slot in the side"><figcaption><b>Oct 2026</b>Built</figcaption></figure></li>
-        <li class="q"><figure><img loading="lazy" src="photos/catzoom_inside_thumb.webp" data-full="photos/catzoom_inside.webp" alt="CatZoom with its lid off: the pan and tilt servos, the laser bell crank and wiring inside the shade"><figcaption><b>Inside</b>Servos, laser crank</figcaption></figure></li>
-      </ol>
       <div class="jsonly" hidden><div class="readout" id="asRead"></div></div>
     </div>
   </section>
@@ -467,6 +461,10 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="card">
       <div class="eyebrow">16 <b>Up close</b></div>
       <h2>Up close</h2>
+      <ol class="log">
+        <li class="q"><figure><img loading="lazy" src="photos/catzoom_built_thumb.webp" data-full="photos/catzoom_built.webp" alt="CatZoom on a nightstand: a coral faceted printed shade on a white base, the laser and camera behind a slot in the side"><figcaption><b>Oct 2026</b>Built</figcaption></figure></li>
+        <li class="q"><figure><img loading="lazy" src="photos/catzoom_inside_thumb.webp" data-full="photos/catzoom_inside.webp" alt="CatZoom with its lid off: the pan and tilt servos, the laser bell crank and wiring inside the shade"><figcaption><b>Inside</b>Servos, laser crank</figcaption></figure></li>
+      </ol>
     </div>
   </section>
 
