@@ -85,6 +85,8 @@ main .card, main .hero-wrap { pointer-events: auto; }
   background: var(--sheet); border: 1px solid var(--graphite); padding: 6px 10px; cursor: pointer;
 }
 .viewbar button:hover { background: var(--graphite); color: var(--vellum); }
+/* the orbit hint waits until the brace is on (#viewhint.early, set in the frame loop): before that the hero is all text */
+#viewhint { transition: opacity .4s, visibility .4s; } #viewhint.early { opacity: 0; visibility: hidden; }
 section {
   min-height: 130vh; display: flex; align-items: center;
   max-width: 1280px; margin-inline: auto;
@@ -512,7 +514,7 @@ addEventListener('unhandledrejection', (e) => { if (!window.__rig) no3D.err ||= 
 setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); }, 25000);
 </script>
 <div id="laser" aria-hidden="true"></div>
-<div class="viewbar"><span id="viewhint">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
+<div class="viewbar"><span id="viewhint" class="early">Drag to orbit · right-drag to pan</span><button id="resetview" type="button" hidden>Reset view</button></div>
 <div class="titleblock" aria-hidden="true">
   <span>Sheet</span><span id="tb-sheet">01 / 13</span>
   <span>Scale</span><span>1 : 10</span>
@@ -1446,6 +1448,7 @@ function frameBody() {
   }
   if (Array.isArray(window.__cam)) { camera.position.fromArray(window.__cam[0]); camera.lookAt(_p1.fromArray(window.__cam[1])); } // debug hook for render checks
   // construction overlay: only in the opening hero and the closing shot
+  { const early = s < 2.3; if (early !== hintEl.classList.contains('early')) hintEl.classList.toggle('early', early); }   // orbit hint only once the brace is on
   lineMat.opacity = .67 * Math.max(1 - seg(s, 1.6, 2.6), smooth(seg(s, 17.3, 17.9)));
   constr.visible = lineMat.opacity > .002;
 
