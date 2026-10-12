@@ -201,6 +201,18 @@
       "section": "08 Exoleg · Full leg",
       "tag": "p",
       "updatedAt": "2026-10-12T03:03:05.653Z"
+    },
+    "s8.div1.p1": {
+      "fp": "A printed cage that clips between the crutch rails and holds a water bottle.",
+      "html": "A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.",
+      "key": "s8.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A printed cage that clips between the crutch rails and holds a water bottle.",
+      "sec": 8,
+      "section": "09 Water Break · Crutch",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:03:28.208Z"
     }
   }
 }
