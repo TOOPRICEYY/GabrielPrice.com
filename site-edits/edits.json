@@ -166,6 +166,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:11:11.973Z"
     },
+    "s16.div1.p1": {
+      "fp": "The base stays put while the head darts and flicks the dot.",
+      "html": "2 axis gimbal",
+      "key": "s16.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "The base stays put while the head darts and flicks the dot.",
+      "sec": 16,
+      "section": "16 Up close",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:11:46.616Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
