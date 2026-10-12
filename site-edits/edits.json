@@ -57,6 +57,18 @@
       "section": "Portfolio Engineer · Builder",
       "tag": "p",
       "updatedAt": "2026-10-12T02:49:17.609Z"
+    },
+    "s1.div1.h21": {
+      "fp": "Start from the body.",
+      "html": "Creation begins with the body",
+      "key": "s1.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Start from the body.",
+      "sec": 1,
+      "section": "02 About",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:51:19.821Z"
     }
   }
 }
