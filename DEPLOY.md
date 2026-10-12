@@ -6,7 +6,7 @@ The site runs on Cloudflare as a Worker with static assets: the built page and p
 
 - **The door.** Three quick clicks in the top-left corner of the page open the editor. Visitors' copy of the page has no editing code, only the small part that applies saved edits.
 - **The lock.** Cloudflare Access guards `/admin`. The first time, it asks for your email and sends you a one-time code. After that you stay signed in for the session length you set (24 hours by default). The Worker checks the Access login again on every request, so the editor stays locked even on preview links, where Access doesn't sit in front.
-- **Edits** (retyping, styling, moving, hiding) save to `site-edits/edits.json` on the branch `site-edits`. The Worker keeps one pull request open for them, called "Site edits from the editor", and its preview link shows them. Merge it and they go live. Close it without merging and they are thrown away; your next edit starts a fresh pull request from what is live.
+- **Edits** (retyping, styling, moving, hiding) save to `site-edits/edits.json` on the branch `site-edits`. The Worker keeps one pull request open for them, called "Site edits from the editor", and its preview link shows them. Press **Publish** in the editor panel and the Worker merges it; Cloudflare rebuilds and the edits are live in about a minute. Merging the pull request on GitHub does the same. Close it without merging and the edits are thrown away; your next edit starts a fresh pull request from what is live.
 - **Notes** become GitHub issues labelled `site-note`. Each issue records the section, scroll position, screen point, camera, the part you clicked, and a snapshot of the 3D view. The snapshot is stored on the branch `site-notes`, which is never merged. Claude works through open notes and answers each one with a pull request that closes the issue, plus a one-line comment. The editor shows that comment as Claude's reply and marks the note done.
 
 ## One-time setup
@@ -53,7 +53,7 @@ If you have already connected the repo to Cloudflare's **Workers Builds** (Worke
 
 ### 5. Try it
 
-Open gabrielprice.com and click the top-left corner three times, quickly. Access asks for your email, then you land back on the page with the editor open. Retype a heading: within a couple of seconds "Saved to GitHub" shows, and a pull request appears in the repo. Pin a note: an issue labelled `site-note` appears.
+Open gabrielprice.com and click the top-left corner three times, quickly. Access asks for your email, then you land back on the page with the editor open. Retype a heading: within a couple of seconds "Saved, not published" shows, and a pull request appears in the repo. Press Publish, and the change is on the live site about a minute later. Pin a note: an issue labelled `site-note` appears.
 
 ## Day to day
 

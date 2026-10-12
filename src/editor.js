@@ -226,11 +226,13 @@ function setStatus(kind, err) {
   if (err) lastErr = err.code || err.message || String(err);
   if (!statusEl) return;
   const txt = store.mode === 'local' ? 'This browser only'
-    : kind === 'saving' ? 'Saving…' : kind === 'error' ? 'Not saved' : store.mode === 'server' ? 'Saved to GitHub' : 'Saved to the page';
-  statusEl.textContent = txt; statusEl.dataset.k = store.mode === 'local' ? 'local' : kind;
-  statusEl.title = kind === 'error' ? 'Error: ' + lastErr : store.mode === 'local' ? 'Kept in this browser. Use Export to hand it to Claude.'
-    : store.mode === 'server' ? 'Edits wait in a pull request until you merge it; notes are GitHub issues Claude works through.' : 'Stored in this artifact; Claude can read it.';
+    : kind === 'saving' ? 'Saving…' : kind === 'error' ? 'Not saved' : kind === 'publishing' ? 'Publishing…' : kind === 'published' ? 'Published'
+    : store.mode === 'server' ? (store.pr ? 'Saved, not published' : 'Saved to GitHub') : 'Saved to the page';
+  statusEl.textContent = txt; statusEl.dataset.k = store.mode === 'local' ? 'local' : kind === 'publishing' ? 'saving' : kind === 'published' ? 'saved' : kind;
+  statusEl.title = kind === 'error' ? 'Error: ' + lastErr : kind === 'published' ? 'Your edits are on the live site in about a minute, once Cloudflare rebuilds it.' : store.mode === 'local' ? 'Kept in this browser. Use Export to hand it to Claude.'
+    : store.mode === 'server' ? 'Visitors see your edits once you press Publish; notes are GitHub issues Claude works through.' : 'Stored in this artifact; Claude can read it.';
   if (prBtn) prBtn.hidden = !(store.mode === 'server' && store.pr);
+  if (pubBtn) { pubBtn.hidden = !(store.mode === 'server' && store.pr); pubBtn.disabled = kind === 'publishing'; }
 }
 function save(col, id) {
   if (store.mode === 'local') { clearTimeout(lsTimer); lsTimer = setTimeout(saveLocal, 250); return; }
@@ -257,8 +259,9 @@ async function flush(col, id, retry = 1) {
   }
   busy.delete(k);
   if (again.delete(k)) return flush(col, id);
-  dirty.delete(k);
+  if (ok) dirty.delete(k);           // a failed save stays dirty, so Publish never merges without it
   if (ok && !dirty.size) setStatus('saved');
+  return ok;
 }
 async function saveShot(id, shot) {
   shots.set(id, shot);
@@ -326,6 +329,23 @@ async function writeServer(col, id) {
   }
   await api('PATCH', 'notes/' + d.issue, { text: d.text, status: d.status });
 }
+// Publish: send any edit still waiting to save, then have the Worker merge the edits PR; Cloudflare rebuilds the live site
+let publishing = false;
+async function publish() {
+  if (store.mode !== 'server' || publishing) return;
+  publishing = true;
+  try {
+    const k = 'edits/*';
+    if (timers.has(k)) { clearTimeout(timers.get(k)); timers.delete(k); }
+    if (dirty.has(k)) await flush('edits', '*');
+    while (busy.has(k)) await new Promise((r) => setTimeout(r, 100));
+    if (dirty.has(k)) return;        // the save failed and its error is showing; nothing is merged
+    setStatus('publishing');
+    const o = await api('POST', 'edits/publish');
+    store.pr = null;
+    setStatus(o.published ? 'published' : 'saved');
+  } catch (e) { setStatus('error', e); } finally { publishing = false; }
+}
 async function loadServer(which = ['edits', 'notes']) {
   try {
     if (which.includes('edits')) { const o = await api('GET', 'edits'); store.pr = o.pr || null; onDocs('edits', Object.entries(o.edits || {}).filter(([k]) => ID_OK.test(k))); }
@@ -379,7 +399,7 @@ const layoutOf = (it) => (edits.get(docIdFor(it))?.layout || {})[layoutNow()] ||
 
 // ---------- the 3D side: what is under a screen point, the camera, a snapshot ----------
 const R = () => (window.__rig && window.__rig.scene ? window.__rig : null);
-const RIG_NAMES = { crutch: 'Crutch + Water Break', scooter: 'Knee scooter', couch: 'Swerve couch', street: 'Street', course: 'Drift course', hearth: 'Hearth + Assym Restore', cat: 'Cat' };
+const RIG_NAMES = { crutch: 'Crutch + Water Break', scooter: 'QuadFather', couch: 'Not So Lazy Boy', street: 'Street', course: 'Drift course', hearth: 'Hearth + CatZoom', cat: 'Cat' };
 function partMap(r) {
   const m = new Map();
   const put = (o, label) => { if (o && o.isObject3D && !m.has(o)) m.set(o, label); };
@@ -534,6 +554,8 @@ html.ed-on.ed-select main .card, html.ed-on.ed-select main .hero-wrap { cursor: 
 .ed-list .done .ed-n { background: var(--graphite-2); }
 .ed-empty { color: var(--graphite-2); }
 .ed-foot { display: flex; flex-wrap: wrap; gap: 4px; }
+.ed-foot [data-act="publish"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--vellum); }
+.ed-foot [data-act="publish"]:disabled { opacity: .5; }
 .ed-box { position: fixed; z-index: 55; pointer-events: none; display: none; }
 #ed-hov { outline: 1px dashed var(--cobalt); outline-offset: 3px; }
 #ed-sel { outline: 1.5px solid var(--cobalt); outline-offset: 3px; }
@@ -565,7 +587,7 @@ html.ed-on.ed-select main .card, html.ed-on.ed-select main .hero-wrap { cursor: 
   .ed-grid { grid-template-columns: 1fr 1fr; }
 }`;
 
-let panel, bodyEl, hintEl, inspEl, listEl, ncEl, nnEl, hovBox, selBox, selTag, pinsEl, popEl, briefEl, toggleBtn, fileIn, prBtn;
+let panel, bodyEl, hintEl, inspEl, listEl, ncEl, nnEl, hovBox, selBox, selTag, pinsEl, popEl, briefEl, toggleBtn, fileIn, prBtn, pubBtn;
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 function buildUI() {
   if (panel) return;
@@ -586,14 +608,15 @@ function buildUI() {
         <button type="button" data-act="brief">Summary for Claude</button>
         <button type="button" data-act="export" data-local>Export</button>
         <button type="button" data-act="import" data-local>Import</button>
-        <button type="button" data-act="pr" hidden title="Your edits wait in this pull request: check its preview link, then merge it to publish">Review PR</button>
+        <button type="button" data-act="publish" hidden title="Put your edits on the live site. It updates in about a minute.">Publish</button>
+        <button type="button" data-act="pr" hidden title="Your unpublished edits, as a pull request on GitHub, with a preview link">Review PR</button>
       </div>
     </div></div>`);
   document.body.appendChild(panel);
   bodyEl = panel.querySelector('.ed-body'); hintEl = panel.querySelector('.ed-hint'); inspEl = panel.querySelector('.ed-insp');
   listEl = panel.querySelector('.ed-listwrap'); statusEl = panel.querySelector('#ed-status');
   [ncEl, nnEl] = panel.querySelectorAll('.ed-tabs span');
-  prBtn = panel.querySelector('[data-act="pr"]');
+  prBtn = panel.querySelector('[data-act="pr"]'); pubBtn = panel.querySelector('[data-act="publish"]');
   panel.querySelectorAll('[data-local]').forEach((b) => { b.hidden = store.mode !== 'local'; });
   dockPin = ls.get(LS_DOCK);            // 'left' / 'right' once ⇆ is used; otherwise the panel keeps to the side away from the card
   hovBox = el('<div id="ed-hov" class="ed-box ed-ui"></div>');
@@ -792,6 +815,7 @@ function onPanelClick(e) {
     case 'dock': dockPin = panel.classList.contains('dock-right') ? 'left' : 'right'; ls.set(LS_DOCK, dockPin); return autoDock();
     case 'undo': return undo();
     case 'brief': return openBrief();
+    case 'publish': return publish();
     case 'pr': return store.pr && /^https:\/\/github\.com\//.test(store.pr.url) && window.open(store.pr.url, '_blank', 'noopener');
     case 'export': return exportFile();
     case 'import': return fileIn.click();

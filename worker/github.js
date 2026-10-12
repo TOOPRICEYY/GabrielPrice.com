@@ -1,7 +1,8 @@
 // The editor's two stores, both in the site's GitHub repo:
 // - edits: one file, site-edits/edits.json, on the branch `site-edits` with one open pull request into the default branch.
-//   Merging it publishes the edits (the build bakes the file into the page). With no PR open, the next save starts the branch
-//   again from the default branch, so a closed or merged PR never leaks old commits into the new one.
+//   Merging it publishes the edits (the build bakes the file into the page): the editor's Publish button merges it through
+//   publishEdits(), or it can be merged on GitHub. With no PR open, the next save starts the branch again from the default
+//   branch, so a closed or merged PR never leaks old commits into the new one.
 // - notes: one issue per note, labelled `site-note`. The issue body carries a readable summary and, in a fenced
 //   ```json site-note block, the whole note as the editor saved it. Closed as completed = done, closed as not planned = deleted.
 //   The latest comment on the issue is shown in the editor as Claude's reply. Snapshots of the 3D view are committed to the
@@ -123,7 +124,7 @@ export async function putEdits(env, edits, who) {
         body: [
           `Text and layout changes ${who ? who + ' ' : ''}made in the site editor. Every save adds a commit to this pull request.`,
           '',
-          'Check the preview link the deploy workflow comments below, then merge to publish. Closing without merging throws these edits away; the next save starts a new pull request from what is live.',
+          'Press Publish in the editor, or merge here, to put them on the live site. Closing without merging throws these edits away; the next save starts a new pull request from what is live.',
         ].join('\n'),
       });
       pr = { number: o.number, url: o.html_url };
@@ -132,6 +133,18 @@ export async function putEdits(env, edits, who) {
     }
   }
   return { pr, changed: true };
+}
+
+// Publish: merge the open edits PR into the default branch as one commit. Cloudflare then rebuilds with the edits baked in.
+export async function publishEdits(env, who) {
+  const g = gh(env);
+  const pr = await openEditsPR(g);
+  if (!pr) return { published: false, pr: null };
+  const o = await g.call('PUT', `/pulls/${pr.number}/merge`, {
+    merge_method: 'squash', commit_title: `Publish site edits (#${pr.number})`,
+    commit_message: `Published from the site editor${who ? ' by ' + who : ''}.`,
+  });
+  return { published: true, pr: null, number: pr.number, sha: o.sha || null };
 }
 
 // ---------- notes ----------
