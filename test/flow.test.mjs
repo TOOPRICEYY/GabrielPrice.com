@@ -174,6 +174,17 @@ test('the owner routes need the login, then list visits and merge a visit for re
   assert.equal(noBucket.status, 503);
 });
 
+test('replays open in a frame sized to the visit, and the dashboard links there', async () => {
+  assert.equal((await get('/admin/flow/replay?key=' + DAY + '/' + SID, null)).status, 403);
+  const page = await get('/admin/flow/replay?key=' + DAY + '/' + SID);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  const html = await page.text();
+  assert.match(html, /__flowReplay/); assert.match(html, /Math\.min\(4096/, 'recorded sizes are clamped before they size the frame'); assert.match(html, /<iframe|createElement\('iframe'\)/);
+  assert.match(fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8'), /\/admin\/flow\/replay\?key=/);
+  assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /__flowReplay/, 'the player looks for the frame host');
+});
+
 test('unversioned visits are read against the layout live when they arrived', () => {
   assert.equal(legacyFor('2026-10-12T02:10:00Z').layout, 'legacy-18');
   assert.equal(legacyFor('2026-10-12T02:10:00Z').sections[14], 'A lamp that plays with the cat.');

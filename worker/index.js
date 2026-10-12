@@ -10,7 +10,7 @@
 //   /admin/api/edits/publish  POST: merge that PR, which puts the edits on the live site after Cloudflare rebuilds
 //   /admin/api/notes        GET all, POST one (files a GitHub issue); PATCH /admin/api/notes/<issue> to edit, finish or remove
 //   /admin/api/shots/<id>   a note's snapshot
-//   /admin/flow, /admin/api/flow/*   visitor flow dashboard and replays (worker/flow.js)
+//   /admin/flow, /admin/flow/replay, /admin/api/flow/*   visitor flow dashboard and replays (worker/flow.js)
 //   /api/flow               public: visitors' pages post flow batches here (worker/flow.js)
 
 import { accessEmail } from './access.js';
@@ -46,7 +46,7 @@ async function admin(request, env, url) {
     return new Response(null, { status: 302, headers: { ...NO_STORE, location: safe + '#edit' } });
   }
   if (p === '/admin/session') return send({ ok: true, email });
-  if (p === '/admin/flow' || p === '/admin/flow/' || p.startsWith('/admin/api/flow/')) return flowAdmin(request, env, url);
+  if (p === '/admin/flow' || p === '/admin/flow/' || p === '/admin/flow/replay' || p.startsWith('/admin/api/flow/')) return flowAdmin(request, env, url);
   if (p === '/admin/editor-ui.js') return new Response(editorUi, { headers: { ...NO_STORE, 'content-type': 'text/javascript; charset=utf-8' } });
 
   if (p === '/admin/api/edits') {

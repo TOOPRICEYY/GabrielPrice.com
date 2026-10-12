@@ -9,7 +9,10 @@
 // localStorage "flow-off").
 //
 // Replay: /#replay=<day>/<sid> loads a recorded visit from /admin/api/flow/session (Access login needed) and plays it
-// back in the live 3D scene through the same hooks the editor's notes use (__rig.setS, window.__cam).
+// back in the live 3D scene through the same hooks the editor's notes use (__rig.setS, window.__cam). The dashboard opens it
+// inside /admin/flow/replay (the Worker's flow-replay module), which frames the page at the visitor's own viewport size; there the
+// page takes the visit from that frame host, answers the touch and dark-mode media queries the way the visitor's
+// browser did, and puts its controls in the host's bar.
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
@@ -22,7 +25,12 @@
   const hash = location.hash;
   const BUILD = window.__flowBuild || { version: 'dev', layout: '', sections: [] };
 
-  if (hash.startsWith('#replay=')) { waitRig(() => replay(decodeURIComponent(hash.slice(8)))); return; }
+  if (hash.startsWith('#replay=')) {
+    const host = replayHost();
+    if (host) emulate(host.meta || {});
+    waitRig(() => replay(decodeURIComponent(hash.slice(8)), host));
+    return;
+  }
 
   let off = false;
   try { off = localStorage.getItem('flow-off') === '1'; } catch {}
@@ -81,8 +89,12 @@
     const v = e.target, sec = v.closest && v.closest('section[data-s]');
     events.push([now(), 'v', sec ? +sec.dataset.s : -1, (v.getAttribute('aria-label') || '').slice(0, 60)]);
   }, { capture: true, passive: true });
-  let rz = 0;
-  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => events.push([now(), 'z', innerWidth, innerHeight]), 500); }, { passive: true });
+  // one z event per burst (a rotation or a URL bar sliding fires several), stamped when the burst began, with the final size
+  let rz = 0, rzT = -1;
+  addEventListener('resize', () => {
+    if (rzT < 0) rzT = now();
+    clearTimeout(rz); rz = setTimeout(() => { events.push([rzT, 'z', innerWidth, innerHeight]); rzT = -1; }, 500);
+  }, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); } });
   addEventListener('pagehide', flush);
 
@@ -109,20 +121,57 @@
   }
 
   // ---------- replay ----------
-  async function replay(key) {
-    const hud = document.createElement('div');
-    hud.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:50;font:13px/1.3 system-ui,sans-serif;background:rgba(10,20,40,.82);color:#fff;'
-      + 'padding:8px 10px;border-radius:10px;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 24px);flex-wrap:wrap';
-    document.body.appendChild(hud);
-    let res;
-    try { res = await fetch('/admin/api/flow/session?key=' + encodeURIComponent(key), { credentials: 'same-origin' }); } catch { res = null; }
-    if (!res || !res.ok) {
-      hud.innerHTML = res && res.status === 403
-        ? 'Replays need you signed in. <a style="color:#7df" href="/admin/login?to=%2Fadmin%2Fflow">Sign in</a>'
-        : 'Could not load that visit (' + (res ? res.status : 'offline') + ').';
-      return;
+  // the /admin/flow/replay page framing this one, if any (same origin, so its window is readable)
+  function replayHost() {
+    try { return window.parent !== window && window.parent.__flowReplay || null; } catch { return null; }
+  }
+
+  // Inside the frame host the page already has the visitor's width and height. This makes the rest of the device match:
+  // media queries on touch (hover/pointer) and dark mode get the visitor's answers, in the stylesheets and in matchMedia.
+  // It runs before the page's module scripts, which read matchMedia once at start.
+  function emulate(meta) {
+    const want = { 'hover: none': !!meta.touch, 'pointer: coarse': !!meta.touch, 'hover: hover': !meta.touch, 'pointer: fine': !meta.touch,
+      'prefers-color-scheme: dark': !!meta.dark, 'prefers-color-scheme: light': !meta.dark };
+    const fix = (q) => q.replace(/\(\s*([a-z-]+)\s*:\s*([a-z-]+)\s*\)/g, (m, f, v) => {
+      const k = f + ': ' + v;
+      return k in want ? (want[k] ? '(min-width: 0px)' : '(max-width: 0.001px)') : m;
+    });
+    const mm = window.matchMedia.bind(window);
+    window.matchMedia = (q) => mm(fix(String(q)));
+    const walk = (rules) => {
+      for (const r of rules) {
+        if (r.media && r.cssRules) { const t = fix(r.media.mediaText); if (t !== r.media.mediaText) r.media.mediaText = t; }
+        if (r.cssRules) walk(r.cssRules);
+      }
+    };
+    const sheets = () => { for (const sh of document.styleSheets) { try { walk(sh.cssRules); } catch {} } };
+    sheets(); document.addEventListener('DOMContentLoaded', sheets); addEventListener('load', sheets);
+    // touch screens overlay their scrollbar
+    if (meta.touch) document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'html{scrollbar-width:none}html::-webkit-scrollbar{display:none}' }));
+    emulate.sheets = sheets;
+  }
+
+  async function replay(key, host) {
+    const doc = host ? window.parent.document : document;
+    const hud = doc.createElement('div');
+    hud.style.cssText = (host ? '' : 'position:fixed;left:12px;bottom:12px;z-index:50;max-width:calc(100vw - 24px);')
+      + 'font:13px/1.3 system-ui,sans-serif;background:rgba(10,20,40,.82);color:#fff;padding:8px 10px;border-radius:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    (host ? host.bar : document.body).appendChild(hud);
+    if (host && emulate.sheets) emulate.sheets();   // styles the page added after loading
+    let rec;
+    if (host) rec = host.rec;
+    else {
+      let res;
+      try { res = await fetch('/admin/api/flow/session?key=' + encodeURIComponent(key), { credentials: 'same-origin' }); } catch { res = null; }
+      if (!res || !res.ok) {
+        hud.innerHTML = res && res.status === 403
+          ? 'Replays need you signed in. <a style="color:#7df" href="/admin/login?to=%2Fadmin%2Fflow">Sign in</a>'
+          : 'Could not load that visit (' + (res ? res.status : 'offline') + ').';
+        return;
+      }
+      rec = await res.json();
     }
-    const rec = await res.json(), S = rec.samples || [], E = rec.events || [];
+    const S = rec.samples || [], E = (rec.events || []).slice().sort((x, y) => x[0] - y[0]);
     if (!S.length) { hud.textContent = 'That visit has no samples.'; return; }
     const rig = window.__rig, dur = S[S.length - 1][0];
     // recorded on another set of sections: move each sample's section to the section with the same title on this page
@@ -142,17 +191,22 @@
     let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0;
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; };
+    // the visit's own window size at the playhead: the first batch's, then each resize up to it
+    const resizeTo = (w, h) => { if (host) host.resize(w, h); };
+    range.oninput = () => { head = +range.value; i = 0; ei = 0; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
     let C = centers(); addEventListener('resize', () => { C = centers(); });
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
     const lerp = (a, b, k) => a + (b - a) * k;
     function step(t) {
       const dt = t - prev; prev = t;
-      if (playing) head = Math.min(dur, head + dt * speed);
+      if (playing) head = Math.min(dur, head + Math.max(0, dt) * speed);   // the first frame can start a touch before prev
       while (i < S.length - 2 && S[i + 1][0] <= head) i++;
       while (i > 0 && S[i][0] > head) i--;
-      const a = S[i], b = S[Math.min(i + 1, S.length - 1)], k = b[0] > a[0] ? Math.max(0, Math.min(1, (head - a[0]) / (b[0] - a[0]))) : 0;
+      // a sample is kept only when something changed, so across a gap the state held still until the tick before b:
+      // hold a until then and move only over that last tick (a fling after a pause is a jump, not a slow drift)
+      const a = S[i], b = S[Math.min(i + 1, S.length - 1)], ta = Math.max(a[0], b[0] - 1000 / HZ);
+      const k = b[0] > ta ? Math.max(0, Math.min(1, (head - ta) / (b[0] - ta))) : 0;
       const s = mapS(lerp(a[1], b[1], k)), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
@@ -167,7 +221,11 @@
         if (!set) continue; set.clear();
         KEYS.forEach((key, j) => { if (a[5] & (1 << j)) set.add(key); });
       }
-      while (ei < E.length && E[ei][0] <= head) { if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); ei++; }
+      while (ei < E.length && E[ei][0] <= head) {
+        if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
+        else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
+        ei++;
+      }
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);
     }
