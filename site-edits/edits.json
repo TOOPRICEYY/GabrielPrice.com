@@ -130,6 +130,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:08:50.025Z"
     },
+    "s13.div1.p1": {
+      "fp": "A full-size sofa on powered wheels, driven from the seat with a racing wheel and pedals. WASD to drive, Shift to drift.",
+      "html": "Staying on the couch or going out? Why choose!",
+      "key": "s13.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A full-size sofa on powered wheels, driven from the seat with a racing wheel and pedals. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to drive, <kbd>Shift</kbd> to drift.",
+      "sec": 13,
+      "section": "14 Not So Lazy Boy",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:09:23.592Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
