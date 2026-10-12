@@ -302,7 +302,7 @@ export async function prune(env, now = Date.now()) {
       if (!DAY.test(day) || day > cut) continue;
       // older days go whole; on the cutoff day only what is past 90 days by its upload time, so nothing is kept longer
       // than 90 days plus a day (between runs) and nothing goes early
-      const objs = (await listAll(env, pre, false, 100)).filter((o) => day < cut || +new Date(o.uploaded) <= now - KEEP_DAYS * 864e5).map((o) => o.key);
+      const objs = (await listAll(env, pre, false, Infinity)).filter((o) => day < cut || +new Date(o.uploaded) <= now - KEEP_DAYS * 864e5).map((o) => o.key);
       for (let j = 0; j < objs.length; j += 1000) await env.FLOW.delete(objs.slice(j, j + 1000));
       n += objs.length;
     }

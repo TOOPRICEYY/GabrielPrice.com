@@ -48,6 +48,7 @@
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
   const vis = { id: '', n: 0, ok: false };   // the returning-visitor id, once known (see visitor())
+  let quit = false;   // opted out while this page was open (see optOut)
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
   // frame rate: frames and visible time since the last batch. A freeze counts as the time it took (it is what the visitor
   // saw); hidden time doesn't, since visibilitychange resets prevT
@@ -111,6 +112,12 @@
     flush();
   }
 
+  // opting out on /privacy (or the owner opening /admin/flow) in another tab, or before this page came back from the
+  // back-forward cache: stop here too, drop what hasn't gone out, and keep no id
+  const optOut = () => { quit = stopped = true; samples = []; events = []; vis.id = ''; };
+  addEventListener('storage', (e) => { if (e.key === 'flow-off' && e.newValue === '1') optOut(); });
+  addEventListener('pageshow', (e) => { if (e.persisted) try { if (localStorage.getItem('flow-off') === '1') optOut(); } catch {} });
+
   // fingers on the screen, and when the last one lifted: set on touch start and end, nothing per move
   let fingers = 0, liftT = -1e9;
   const fingersNow = (e) => { fingers = e.touches.length; if (!fingers) liftT = performance.now(); };
@@ -153,6 +160,7 @@
   document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); if (glLost <= 5) flush(); } }, { capture: true, passive: true });
 
   function flush() {
+    if (quit) return;
     lastFlush = performance.now();
     // a batch with nothing new still goes out to deliver a full-load time or device details that missed the first batch
     const late = seq > 0 && ((full && !fullSent) || (hw && !hwSent));
@@ -196,13 +204,14 @@
   // Switzerland: GET /api/flow answers from the visitor's country), nothing is stored until the visitor says yes to a small
   // note; no, or letting the note fade, is remembered for the same time so it never asks twice.
   function visitor(rig) {
-    const KEY = 'gp.vid', YEAR = 395 * 864e5, put = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} };
+    const KEY = 'gp.vid', YEAR = 395 * 864e5, put = (v) => { if (!quit) try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} };
     let k = null; try { k = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
     const live = k && k.exp > Date.now(), had = live && /^[0-9a-f]{16}$/.test(k.id);
     const use = () => { vis.id = k.id; vis.n = (k.n | 0) + 1; vis.ok = !!k.ok; put({ ...k, n: vis.n }); };
     if (live && (k.no || k.ok)) { if (had) use(); return; }   // a yes or a no stands until it runs out
     // a new id, or one kept without asking (somewhere a yes isn't needed): check where the visitor is now
     const start = (ok) => {
+      if (quit) return;
       if (had) { k.ok = ok; use(); return; }   // the same device saying yes keeps its history
       vis.id = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join(''); vis.n = 1; vis.ok = ok; put({ id: vis.id, n: 1, ok, exp: Date.now() + YEAR });
     };
