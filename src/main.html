@@ -1124,7 +1124,11 @@ function fadeSheets() {
     c.style.opacity = o.toFixed(3); c.style.pointerEvents = o < .4 ? 'none' : '';
   }
 }
-addEventListener('scroll', () => { readScroll(); returnToPath(); fadeSheets(); }, { passive: true });
+// the frame loop also checks scrollY, because iOS can drop the scroll event at the end of a fling or a tap-to-top, which left the
+// scene parked on a section the page had already left
+let seenY = -1;
+const onScroll = () => { seenY = scrollY; readScroll(); returnToPath(); fadeSheets(); };
+addEventListener('scroll', onScroll, { passive: true });
 
 let camVO = -1;
 function resize() {
@@ -1155,6 +1159,11 @@ let phase = 0;
 const wp = new THREE.Vector3(), wc = new THREE.Vector3();
 const sheetEl = document.getElementById('tb-sheet');
 function frame() {
+  requestAnimationFrame(frame);   // first, so one bad frame can't stop the loop for good
+  try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
+}
+function frameBody() {
+  if (scrollY !== seenY) onScroll();
   const dt = Math.min(clock.getDelta(), .05);
   sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
   const s = sNow;
@@ -1289,7 +1298,6 @@ function frame() {
     }
   }
   renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
 
 resize(); themeColors(); readScroll(); sNow = sTarget;
