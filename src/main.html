@@ -105,6 +105,7 @@ h1, h2 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-sp
 h1 { font-size: clamp(56px, 11vw, 148px); line-height: .86; font-weight: 300; font-variation-settings: "opsz" 96; }
 h1 em { font-style: normal; font-weight: 750; display: block; }
 h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.02; font-weight: 600; }
+h2 .sub { display: block; margin-top: 8px; font-size: .5em; line-height: 1.2; font-weight: 500; letter-spacing: -.01em; color: var(--graphite-2); }
 p { margin: 0; max-width: 62ch; }
 .hero-wrap { display: flex; flex-direction: column; gap: 18px; max-width: 640px; }
 .hero-wrap p { font-size: 18px; color: var(--graphite-2); max-width: 44ch; }
@@ -237,6 +238,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   main section.gallery { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
   .card { padding: 14px 14px 12px; gap: 8px; }
   .card h2 { font-size: 24px; }
+  .card h2 .sub { font-size: 15px; }
   .card p { font-size: 13px; line-height: 1.35; }
   .lead.tall video, .lead.tall img { height: 26vh; width: auto; max-width: 100%; aspect-ratio: 4 / 5; }
   .lead video, .lead img { max-height: 21vh; }
@@ -295,7 +297,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="hero-wrap">
       <div class="eyebrow">Portfolio <b>Engineer · Builder</b></div>
       <h1>Gabriel <em>Price</em></h1>
-      <p>I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.</p>
+      <p>I create to live and live to create</p>
       <div class="scrollhint">Scroll to start ↓</div>
     </div>
   </section>
@@ -303,23 +305,23 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="right" data-s="1">
     <div class="card">
       <div class="eyebrow">02 <b>About</b></div>
-      <h2>Start from the body.</h2>
-      <p>I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scooter and a couch that drives. Each one starts as a Fusion 360 model and ends up printed, wired and tested on me.</p>
+      <h2>I build things because I love to,<span class="sub">it just also happens that I have to</span></h2>
+      <p>My body has always been held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ ligament sprains which set a ceiling on my life. I don't like ceilings</p>
     </div>
   </section>
 
   <section data-s="2">
     <div class="card">
       <div class="eyebrow">03 <b>Project · Anti-thetis</b></div>
-      <h2>The Kicker</h2>
-      <p>A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.</p>
+      <h2>ExoLeg</h2>
+      <p>A 2HP bio-adaptive ankle exoskeleton</p>
     </div>
   </section>
 
   <section class="right" data-s="3">
     <div class="card">
       <div class="eyebrow">04 <b>Fit</b></div>
-      <h2>Built around one leg.</h2>
+      <h2>Like a Glove</h2>
       <p>The calf shell is shaped from a scan of my own leg.</p>
     </div>
   </section>
@@ -327,15 +329,15 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="4">
     <div class="card">
       <div class="eyebrow">05 <b>Drive train</b></div>
-      <h2>Motor to ankle, in four steps.</h2>
-      <div class="chain"><span>Motor</span><span>Sun gear</span><span>4 planets → carrier</span><span>Pinion → rack</span><span>Shoe cup</span></div>
+      <h2>Four stage mechanical transmission</h2>
+      <div class="chain"><span>Motor</span><span>Sun gear</span><span>4 planets → carrier</span><span>Pinion → rack</span><span>Foot</span></div>
     </div>
   </section>
 
   <section class="right" data-s="5">
     <div class="card">
       <div class="eyebrow">06 <b>Exploded view</b></div>
-      <h2>Every part, apart.</h2>
+      <h2>Parts</h2>
       <ol class="bom" id="bom"></ol>
     </div>
   </section>
@@ -343,8 +345,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="6">
     <div class="card vid">
       <div class="eyebrow">07 <b>Built</b></div>
-      <h2>Then I built it.</h2>
-      <p>From the first print to the one I wear now.</p>
+      <h2>Build log</h2>
       <figure class="lead"><video muted loop playsinline preload="none" poster="photos/kicker_bench_poster.jpg" data-src="photos/kicker_bench.mp4" aria-label="The Kicker motor and gearbox running on a bench while a laptop plots the run"></video><figcaption><b>Jul 2026</b>Bench test · 3× speed</figcaption></figure>
       <ol class="log">
         <li class="p"><figure><img loading="lazy" src="photos/kicker_proto_white_worn_thumb.webp" data-full="photos/kicker_proto_white_worn.webp" alt="Gabriel wearing the first white-printed Kicker on his leg beside a car, battery and controller on his belt"><figcaption><b>May 2026</b>First print</figcaption></figure></li>
@@ -358,8 +359,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="right" data-s="7">
     <div class="card vid">
       <div class="eyebrow">08 <b>Exoleg · Full leg</b></div>
-      <h2>Then it has to walk.</h2>
-      <p>The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.</p>
+      <h2>Running before you can walk</h2>
+      <p>The calf portion powers my stride and the thigh portion prevents excess torque transmitted through my knee</p>
       <figure class="lead"><video muted loop playsinline preload="none" poster="photos/exoleg_hero_poster.jpg" data-src="photos/exoleg_hero.mp4" aria-label="Gabriel straps the exoleg on by a lake, then runs past the camera in it"></video><figcaption><b>Oct 2026</b>Strapping in at 10×, then running at ½ speed</figcaption></figure>
       <ol class="log">
         <li class="p"><figure><img loading="lazy" src="photos/legexo_front_thumb.webp" data-full="photos/legexo_front.webp" alt="The full-leg exo worn: thigh cuffs, the knee hinge and the Kicker at the ankle"><figcaption><b>Worn</b>Cuffs, hinge, Kicker</figcaption></figure></li>
@@ -373,8 +374,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="8">
     <div class="card vid">
       <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
-      <h2>Water, on crutches.</h2>
-      <p>A printed cage that clips between the crutch rails and holds a water bottle.</p>
+      <h2>Crutch Refreshments</h2>
+      <p>A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.</p>
       <figure class="lead tall"><img loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="crRead"></div><div class="ctl">
         <label>Stride swing <input id="crSwing" type="range" min="0" max="20" step="1" value="12"><output id="crSwingOut">12°</output></label>
@@ -385,8 +386,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="right" data-s="9">
     <div class="card vid">
       <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
-      <h2>A knee scooter with a belt drive.</h2>
-      <p>A motorized knee scooter: a C6374 motor under the deck, belted to the rear wheel.</p>
+      <h2>The Quad Father</h2>
+      <p>A motorized knee scooter. What could go wrong?</p>
       <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
     </div>
   </section>
@@ -394,8 +395,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="10">
     <div class="card vid">
       <div class="eyebrow">11 <b>QuadFather · Belt drive</b></div>
-      <h2>Fast motor, slow wheel.</h2>
-      <p>A small pulley on the motor turns a big one on the wheel, trading speed for torque.</p>
+      <h2>Irresponsible Power</h2>
+      <p>With a peak power of over 8Hp and a max speed of 30mph, this medical device is guaranteed to leave you more injured than you started.</p>
       <figure class="lead tall"><video muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="scBelt"></div></div>
     </div>
@@ -404,7 +405,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="right" data-s="11">
     <div class="card">
       <div class="eyebrow">12 <b>Inside QuadFather</b></div>
-      <h2>Twelve parts, pulled apart.</h2>
+      <h2>Exploded BOM</h2>
       <ol class="bom" id="bom3"></ol>
     </div>
   </section>
@@ -424,8 +425,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="13">
     <div class="card vid">
       <div class="eyebrow">14 <b>Not So Lazy Boy</b></div>
-      <h2>A couch that drives sideways.</h2>
-      <p>A full-size sofa on powered wheels, driven from the seat with a racing wheel and pedals. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to drive, <kbd>Shift</kbd> to drift.</p>
+      <h2>The Not So Lazy Boy</h2>
+      <p>Staying on the couch or going out? Why choose!</p>
       <figure class="lead"><video muted loop playsinline preload="none" poster="photos/couch_campus_poster.jpg" data-src="photos/couch_campus.mp4" aria-label="The couch driving through a crowd on a campus walkway at sunset with four people on it"></video><figcaption><b>On campus</b>Four aboard · real time</figcaption></figure>
       <ol class="log">
         <li class="p"><figure><video muted loop playsinline preload="none" poster="photos/couch_module_poster.jpg" data-src="photos/couch_module.mp4" aria-label="A hub-motor wheel on a swivel caster plate spinning on the bench"></video><figcaption><b>Aug 2025</b>First drive wheel</figcaption></figure></li>
@@ -451,8 +452,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="right" data-s="15">
     <div class="card">
       <div class="eyebrow">15 <b>CatZoom</b></div>
-      <h2>A lamp that plays with the cat.</h2>
-      <p>A laser lamp for the cat. Point at the floor and the cat goes after the dot.</p>
+      <h2>Cat Zoom</h2>
+      <p>Your cat missed you today. Now you never have to leave them again. With a laser, camera, mic and speaker your codependency can sore to new heights!</p>
       <div class="jsonly" hidden><div class="readout" id="asRead"></div></div>
     </div>
   </section>
@@ -460,15 +461,14 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section data-s="16">
     <div class="card">
       <div class="eyebrow">16 <b>Up close</b></div>
-      <h2>CatZoom, at play.</h2>
-      <p>The base stays put while the head darts and flicks the dot.</p>
+      <h2>Up close</h2>
     </div>
   </section>
 
   <section class="right" data-s="17">
     <div class="card">
       <div class="eyebrow">17 <b>Inside CatZoom</b></div>
-      <h2>Thirteen parts, seen through.</h2>
+      <h2>Parts</h2>
       <ol class="bom" id="bom2"></ol>
     </div>
   </section>
@@ -476,8 +476,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
   <section class="gallery" id="gallery" data-s="18" aria-labelledby="gallery-h">
     <div class="gal-wrap">
       <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
-      <h2 id="gallery-h">More from the bench.</h2>
-      <p>Open one to turn it over, pull it apart and see how it goes together.</p>
+      <h2 id="gallery-h">Other Projects.</h2>
       <div class="gal-grid" id="galgrid"></div>
     </div>
   </section>

@@ -54,13 +54,13 @@ const PROJECTS = [
       <figure><img loading="lazy" src="mittenmade/sign.webp" alt="An oak family sign with a carved Michigan beside the name The Richards"><figcaption><b>Custom</b>Family sign</figcaption></figure></div>`,
     specs: `<dl class="spec"><dt>Shop</dt><dd><a href="https://mittenmade.shop" target="_blank" rel="noopener">mittenmade.shop</a></dd><dt>Etsy</dt><dd><a href="https://www.etsy.com/shop/MittenMadeWoodCraft" target="_blank" rel="noopener">MittenMadeWoodCraft</a></dd><dt>Instagram</dt><dd><a href="https://www.instagram.com/mittenmadegr" target="_blank" rel="noopener">@mittenmadegr</a></dd></dl>
       <div class="gx-hf"><img src="mittenmade/face.webp" alt="A carved Michigan standing outdoors in low sun"></div>` },
-  { id: 'gauge', title: 'Ghetto Gauge', kind: '3D printing', model: 'gauge',
+  { id: 'gauge', title: 'Tensile Tester', kind: '3D printing', model: 'gauge',
     blurb: 'A three-part printed gauge from the Printers Printing Printers project, with a dogbone keyed into its post.',
     names: [['Body1', 'Base and post'], ['Body2', 'Cap and sleeve'], ['Vertical Dogbone', 'Dogbone']],
     explode: [['Body2', [0, 10, 0]], ['Body1', [0, -2, 0]], ['Vertical Dogbone', [-10, 4, 0]]],
     mat: (k) => k.includes('Dogbone') ? 'accent' : 'print',
     text: {
-      hero: ['Ghetto Gauge.', 'A small printed gauge in three parts.'],
+      hero: ['Tensile Tester.', 'A small printed gauge in three parts.'],
       explode: ['Three parts.', ''],
       build: ['Back together.', ''],
       cut: ['Cut through.', ''],

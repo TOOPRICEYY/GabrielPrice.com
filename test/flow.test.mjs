@@ -156,14 +156,15 @@ test('the owner routes need the login, then list visits and merge a visit for re
   assert.equal(v.ip, '203.0.113.7'); assert.equal(v.city, 'Detroit');
   assert.deepEqual(list.layouts[LAYOUT], SECTIONS, 'older layouts come back with the list');
   assert.equal(list.layouts['legacy-18'].length, 18);
-  // a visit from before versions: read against the layout live when it arrived (here: now, which is today's page)
+  // a visit from before versions: read against the layout live when it arrived (here: now, the last legacy layout, which is
+  // today's page only until a section heading changes in the source)
   const sid = 'cccccccccccccccc', { v: _v, layout: _l, sections: _s, ...plain } = batch().meta;
   await post(batch({ sid, meta: plain }));
   const old = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
-  const { default: B } = await import('../worker/sections.gen.js');
-  assert.equal(old.layout, B.layout);
+  const L = legacyFor(new Date().toISOString());
+  assert.equal(old.layout, L.layout);
   const oldRec = await (await get('/admin/api/flow/session?key=' + encodeURIComponent(old.key))).json();
-  assert.deepEqual(oldRec.meta.sections, B.sections, 'the replayer gets the legacy titles');
+  assert.deepEqual(oldRec.meta.sections, L.sections, 'the replayer gets the legacy titles');
   const rec = await (await get('/admin/api/flow/session?key=' + encodeURIComponent(v.key))).json();
   assert.equal(rec.samples.length, 4); assert.equal(rec.meta.w, 1280);
   assert.deepEqual(rec.meta.sections, SECTIONS, 'the replayer gets the visit\'s own section titles');
