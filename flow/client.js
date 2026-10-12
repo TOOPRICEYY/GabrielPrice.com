@@ -32,7 +32,7 @@
 
   if (hash.startsWith('#replay=')) {
     const host = replayHost();
-    if (host) emulate(host.meta || {});
+    if (host) { emulate(host.meta || {}); fewerPixels(host.scale); }
     waitRig(() => replay(decodeURIComponent(hash.slice(8)), host));
     return;
   }
@@ -224,6 +224,14 @@
     // touch screens overlay their scrollbar
     if (meta.touch) document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'html{scrollbar-width:none}html::-webkit-scrollbar{display:none}' }));
     emulate.sheets = sheets;
+  }
+
+  // The frame host shrinks the visit to fit this screen, so the page only needs that many pixels: a 2560-wide visit shown
+  // 0.15x on a 3x phone needs about 1150 across, not 5120. The page sizes its 3D view and images from devicePixelRatio,
+  // read once at start, and this runs before its module scripts, so lowering it here is all it takes.
+  function fewerPixels(k) {
+    const real = window.devicePixelRatio || 1, want = Math.max(0.25, Math.round(real * (k > 0 ? k : 1) * 100) / 100);
+    if (want < real) try { Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => want }); } catch {}
   }
 
   async function replay(key, host) {
