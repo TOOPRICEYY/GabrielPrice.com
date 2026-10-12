@@ -813,7 +813,7 @@ function rigUI() {
     const cards = [...document.querySelectorAll('section .card, section.drive .keyhint.touchonly')];
     const tick = () => {
       let on = rigs.ready && (rigs.couchOn || rigs.scootOn);
-      if (on) { const top = innerHeight - (pad.offsetHeight || 210); on = !cards.some(c => { const r = c.getBoundingClientRect(); return r.bottom > top && r.top < innerHeight && +(c.style.opacity || 1) > .3; }); }
+      if (on) { const top = innerHeight - (pad.offsetHeight || 180); on = !cards.some(c => { const r = c.getBoundingClientRect(); return r.bottom > top && r.top < innerHeight && +(c.style.opacity || 1) > .3; }); }
       pad.classList.toggle('wait', !on);
       if (on && pad.hidden) pad.hidden = false;
       if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }

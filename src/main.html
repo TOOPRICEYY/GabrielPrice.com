@@ -264,6 +264,11 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 @media (max-width: 720px) {
   main > section:not(.hero):not(.drive):not(.gallery) { box-sizing: border-box; min-height: 230vh; padding-block: 160vh 2vh; align-items: flex-end; }
   main > section:not(.hero):not(.drive):not(.gallery) > .card { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  /* QuadFather, drive it: on touch the card arrives early and docks above the driving pad, so it is read first and stays readable while you ride */
+  @media (hover: none), (pointer: coarse) {
+    main > section[data-s="12"]:not(.hero):not(.drive):not(.gallery) { padding-top: 40vh; }
+    main > section[data-s="12"]:not(.hero):not(.drive):not(.gallery) > .card { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }
+  }
   section.drive { min-height: 90vh; }
   /* landing: name at the top, tagline and scroll hint at the bottom, the figure clear between them; svh so Safari's toolbar never covers the tagline */
   section.hero { min-height: 100vh; min-height: 100svh; box-sizing: border-box; align-items: stretch; padding-block: calc(60px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)); }
@@ -1120,7 +1125,8 @@ function fadeSheets() {
   const ph = innerWidth <= 720, H = innerHeight;
   for (const c of sheets) {
     if (!ph) { if (c.style.opacity) { c.style.opacity = ''; c.style.pointerEvents = ''; } continue; }
-    const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - 14 - r.height - r.top - H * .3) / (H * .22)));   // rises 30% of the screen off its dock before it starts to fade
+    const db = c._db ??= (parseFloat(getComputedStyle(c).bottom) || 10) + 4;   // its dock: 10px up, or above the driving pad
+    const r = c.getBoundingClientRect(), o = 1 - smooth(clamp01((H - db - r.height - r.top - H * .3) / (H * .22)));   // rises 30% of the screen off its dock before it starts to fade
     c.style.opacity = o.toFixed(3); c.style.pointerEvents = o < .4 ? 'none' : '';
   }
 }

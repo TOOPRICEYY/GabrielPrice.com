@@ -75,20 +75,20 @@ const PROJECTS = [
       specs: ['Pedestal Desk', ''] },
     specs: `<dl class="spec"><dt>Built</dt><dd>July 2026</dd><dt>Stock</dt><dd>Pine 2×4s, a 4×4 post, a pine top</dd><dt>Adjust</dt><dd>Sleeve slides on the post, bolt holds the height</dd></dl>
       <div class="gx-hf"><img src="photos/pedestal_desk.webp" alt="The pedestal desk in a yard with a laptop, a drill and printed parts on its top"></div>` },
-  { id: 'hexacopter', title: 'Hexacopter', kind: 'Drone', ph: 'hex',
-    blurb: 'A six-rotor drone with a clear dome over its electronics, flown on a Spektrum DX6.',
+  { id: 'hexacopter', title: 'Heavy Lift Hexacopter', kind: 'Drone', ph: 'hex',
+    blurb: 'A six-rotor ArduPilot drone that lifts an 8 kg payload.',
     chapters: [{ key: 'hero', cam: [30, 20, 3.3], spin: .6 }, { key: 'flight', cam: [-24, 8, 3.1], side: 'right' }, { key: 'liftoff', cam: [0, 78, 3.4] }, { key: 'specs', cam: [-40, 18, 3.4], spin: .6 }],   // props aren't in the radius, so these sit further out
     props: hexProps, anim: () => hexProps.anim?.(),
     text: {
-      hero: ['Hexacopter.', 'Six rotors, built in 2018.'],
+      hero: ['Heavy Lift Hexacopter.', 'Six rotors on ArduPilot, lifting 8 kg.'],
       flight: ['Off the ground.', ''],
       liftoff: ['From its camera.', 'Takeoff to the rooftops, 4× speed.'],
-      specs: ['Hexacopter', ''] },
+      specs: ['Heavy Lift Hexacopter', ''] },
     flight: `<figure class="gx-vid"><video src="photos/drone_flight.mp4" poster="photos/drone_flight.webp" autoplay muted loop playsinline preload="metadata" aria-label="The hexacopter hovering over a backyard shed"></video></figure>`,
     liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" autoplay muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighbourhood roofs"></video></figure>`,
-    specs: `<dl class="spec"><dt>Built</dt><dd>April 2018</dd><dt>Frame</dt><dd>Six aluminium arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fibre</dd><dt>Radio</dt><dd>Spektrum DX6</dd></dl>
-      <div class="gx-gal two"><figure><img loading="lazy" src="photos/drone_build.webp" alt="The hexacopter on a wood floor with its Spektrum DX6 transmitter"><figcaption><b>Built</b>April 2018</figcaption></figure>
-      <figure><img loading="lazy" src="photos/drone_thrust.webp" alt="Thrust test rig: an Arduino drives an ESC, the motor and carbon prop sit on a kitchen scale, a multimeter reads the current from a Turnigy LiPo"><figcaption><b>Thrust test</b>Motor on a scale, Dec 2019</figcaption></figure></div>` },
+    specs: `<dl class="spec"><dt>Autopilot</dt><dd>ArduPilot</dd><dt>Payload</dt><dd>8 kg</dd><dt>Frame</dt><dd>Six aluminium arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fibre</dd></dl>
+      <div class="gx-gal two"><figure><img loading="lazy" src="photos/drone_build.webp" alt="The heavy lift hexacopter on a wood floor with its transmitter"><figcaption><b>Built</b></figcaption></figure>
+      <figure><img loading="lazy" src="photos/drone_thrust.webp" alt="Thrust test rig: an Arduino drives an ESC, the motor and carbon prop sit on a kitchen scale, a multimeter reads the current from a Turnigy LiPo"><figcaption><b>Thrust test</b>Motor on a scale</figcaption></figure></div>` },
   { id: 'flyingbike', title: 'Flying Bike', kind: 'In progress', model: 'flyingbike', soon: true,
     blurb: 'Coming soon.', mat: () => 'neon' },
 ];
@@ -335,8 +335,12 @@ function hexPlaceholder() {
     out.push(part('Arm ' + i, arm, alu));
     out.push(part('Motor ' + i, new THREE.CylinderGeometry(3.3, 3.3, 3.2, 28).translate(cx * L, Y + 4.2, cz * L), motorM));
   }
-  for (const [x, z] of [[-7, -9], [7, -9], [-7, 9], [7, 9]]) out.push(part('Leg ' + (out.length), new THREE.CylinderGeometry(.7, .7, Y - 2, 12).translate(x * 1.25, (Y - 2) / 2 + 2, z * 1.4), alu, 'Leg'));
-  for (const z of [-12.6, 12.6]) {
+  // legs splay from under the centre plate out onto the skids
+  const tube = (a, b, r) => { const d = b.clone().sub(a), g = new THREE.CylinderGeometry(r, r, d.length(), 12);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); return g.translate(...a.clone().add(b).multiplyScalar(.5).toArray()); };
+  const SK = 13;
+  for (const [x, z] of [[-7, -1], [7, -1], [-7, 1], [7, 1]]) out.push(part('Leg ' + out.length, tube(new THREE.Vector3(x, Y - .6, z * 7), new THREE.Vector3(x * 1.15, 1.4, z * SK), .7), alu, 'Leg'));
+  for (const z of [-SK, SK]) {
     const sk = new THREE.CylinderGeometry(.8, .8, 40, 14); sk.rotateZ(Math.PI / 2); sk.translate(0, 1.2, z); out.push(part('Skid ' + (z > 0 ? 1 : 2), sk, alu));
     for (const x of [-20.5, 20.5]) { const f = new THREE.CylinderGeometry(1.3, 1.3, 3.5, 14); f.rotateZ(Math.PI / 2); f.translate(x, 1.2, z); out.push(part('Foot ' + (x > 0 ? 1 : 2) + z, f, black, 'Foot')); }
   }
