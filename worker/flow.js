@@ -181,7 +181,7 @@ export function summarise(c) {
     if (x[5]) drive += dt;
     if (x[3] >= 0) ptr += dt;
   }
-  const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(S.length ? S[S.length - 1][0] : 0),
+  const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(Math.max(S.length ? S[S.length - 1][0] : 0, ...c.events.map((e) => e[0]))),   // a freeze or crash after the page went still still counts
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
     dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
     err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}), ...(num(c.fms) ? { fms: String(c.fms) } : {}), ...(num(c.full) ? { full: String(c.full) } : {}) };

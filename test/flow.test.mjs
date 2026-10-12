@@ -303,7 +303,7 @@ test('a 3D crash is stored with where it happened, counted per visit, and sent t
   const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
   assert.deepEqual(st.events[1], [5200, 'g', 7.25]);
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
-  assert.equal(v.gl, 1); assert.equal(v.stalls, 1);
+  assert.equal(v.gl, 1); assert.equal(v.stalls, 1); assert.equal(v.ms, 5200, 'the visit lasts to its last event');
   // a loss that came back, in the next batch, is not a crash
   const sid2 = 'aeaeaeaeaeaeaeae';
   await post(batch({ sid: sid2, events: [[5200, 'g', 7.25]] }));
