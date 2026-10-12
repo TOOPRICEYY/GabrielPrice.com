@@ -4,6 +4,7 @@
 //   GET  /admin/flow                   the dashboard (section funnel, time per section, visits with replay links)
 //   GET  /admin/api/flow/sessions?days=N   visits from the last N days, summarised from R2 object metadata
 //   GET  /admin/api/flow/session?key=<day>/<sid>   one visit, all batches merged, for /#replay=
+//   POST /admin/api/flow/delete {keys: ['<day>/<sid>', …]}   remove those visits for good (every batch of each)
 //
 // Storage is the R2 bucket bound as FLOW (wrangler.jsonc): flow/<day>/<sid>/<seq>.json. Each object's custom metadata holds
 // that batch's summary, so listing a day gives the dashboard everything without reading the traces. Visitor data never goes
@@ -128,6 +129,11 @@ export function summarise(c) {
 // ---------- owner routes (index.js has already checked the Access login) ----------
 export async function flowAdmin(request, env, url) {
   const p = url.pathname;
+  if (p === '/admin/api/flow/delete') {
+    if (request.method !== 'POST') return send({ error: 'POST' }, 405);
+    if (!env.FLOW) return send({ error: 'The R2 bucket for analytics is not set up yet (DEPLOY.md, section 6).' }, 503);
+    return deleteVisits(env, request);
+  }
   if (request.method !== 'GET') return send({ error: 'GET' }, 405);
   if (p === '/admin/flow' || p === '/admin/flow/') {
     return new Response(dashboard, { headers: { ...NO_STORE, 'content-type': 'text/html; charset=utf-8',
@@ -160,6 +166,26 @@ export async function flowAdmin(request, env, url) {
     return send(rec);
   }
   return send({ error: 'not found' }, 404);
+}
+
+// the dashboard's "Delete selected": every batch of each named visit. A visit still in progress can post again afterwards,
+// which brings back only its later batches.
+async function deleteVisits(env, request) {
+  const text = await request.text();
+  if (text.length > MAX_BODY) return send({ error: 'request too large' }, 413);
+  let b;
+  try { b = JSON.parse(text); } catch { return send({ error: 'body is not JSON' }, 400); }
+  const keys = Array.isArray(b && b.keys) ? b.keys : null;
+  if (!keys || !keys.length || keys.length > 500) return send({ error: 'keys: 1 to 500 visits' }, 400);
+  const prefixes = [];
+  for (const k of keys) {
+    const [day, sid, more] = String(k).split('/');
+    if (more !== undefined || !DAY.test(day || '') || !SID.test(sid || '')) return send({ error: 'bad key: ' + String(k).slice(0, 40) }, 400);
+    prefixes.push(`flow/${day}/${sid}/`);
+  }
+  const objs = (await Promise.all([...new Set(prefixes)].map((pre) => listAll(env, pre, false)))).flat().map((o) => o.key);
+  for (let i = 0; i < objs.length; i += 1000) await env.FLOW.delete(objs.slice(i, i + 1000));   // R2 takes up to 1000 keys a call
+  return send({ deleted: new Set(objs.map((k) => k.split('/').slice(1, 3).join('/'))).size, batches: objs.length });
 }
 
 async function listAll(env, prefix, meta, cap = 20) {
