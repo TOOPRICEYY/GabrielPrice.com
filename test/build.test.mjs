@@ -47,8 +47,19 @@ test('every editor edit still finds its element in the page source', () => {
   const decode = (s) => s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(parseInt(e.slice(1).replace(/^x/i, '0x'))) : ent[e] ?? m);
   // a small tree of main.html's sections, keyed like keyFor(): s<data-s>, then tag + index among same-tag siblings
   const VOID = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+  // gallery.js writes the gallery cards into #galgrid: rebuild them from its PROJECTS list with the same markup, so they get
+  // the same keys
+  const q = String.raw`'((?:[^'\\]|\\.)*)'`, unq = (s) => s.replace(/\\(.)/g, '$1');
+  const cards = [...src('gallery.js').matchAll(new RegExp(String.raw`\{ id: '[^']+', title: ${q}, kind: ${q}([^\n]*)\n\s*blurb: ${q}`, 'g'))]
+    .map(([, title, kind, rest, blurb]) => `<button>\n  <div class="gal-thumb"><img>${/\bsoon: true/.test(rest) ? '<div><span>Coming soon</span></div>' : ''}</div>`
+      + `\n  <div class="gal-meta"><span class="gal-tag">${unq(kind)}</span><h3>${unq(title)}</h3><p>${unq(blurb)}</p></div></button>`);
+  assert.ok(cards.length > 3, 'read the gallery cards');
+  assert.match(src('gallery.js'), /<div class="gal-meta"><span class="gal-tag">\$\{p\.kind\}<\/span><h3>\$\{p\.title\}<\/h3><p>\$\{p\.blurb\}<\/p><\/div><\/button>/,
+    'gallery cards still use the markup rebuilt here');
   const els = [], stack = [];
-  const html = src('main.html').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<!--[\s\S]*?-->/g, '');
+  const html = src('main.html').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/(<div class="gal-grid" id="galgrid">)/, '$1' + cards.join(''));
+  assert.ok(html.includes(cards[0]), 'found the gallery grid');
   for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*)>|([^<]+)/g)) {
     if (m[4] != null) { for (const e of stack) e.text += decode(m[4]); continue; }
     const tag = m[2].toLowerCase();
@@ -59,13 +70,6 @@ test('every editor edit still finds its element in the page source', () => {
     if (tag === 'section' && s) e.key = 's' + s[1];
     else if (parent?.key) { const n = parent.kids.filter((k) => k.tag === tag).length + 1; e.key = parent.key + '.' + tag + n; }
     parent?.kids.push(e); stack.push(e); els.push(e);
-  }
-  // gallery cards are written by gallery.js: a button holding the tag, the title and the blurb
-  const q = String.raw`'((?:[^'\\]|\\.)*)'`, unq = (s) => s.replace(/\\(.)/g, '$1');
-  const cards = [...src('gallery.js').matchAll(new RegExp(String.raw`\{ id: '[^']+', title: ${q}, kind: ${q}[^\n]*\n\s*blurb: ${q}`, 'g'))];
-  assert.ok(cards.length > 3, 'read the gallery cards');
-  for (const [, title, kind, blurb] of cards) {
-    els.push({ tag: 'button', text: unq(kind) + unq(title) + unq(blurb) }, { tag: 'h3', text: unq(title) }, { tag: 'span', text: unq(kind) }, { tag: 'p', text: unq(blurb) });
   }
   const fp = (e) => norm(e.text).slice(0, 160);
   const byKey = new Map(els.filter((e) => e.key).map((e) => [e.key, e]));
