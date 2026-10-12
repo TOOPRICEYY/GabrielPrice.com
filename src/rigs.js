@@ -1574,6 +1574,10 @@ function scooterFrame(s, dt, w) {
   // then hold the scooter still on screen and move the course and floor by the inverse of that pose
   S.psi += S.v * Math.tan(S.delta) / L * dt;
   S.X += Math.sin(S.psi) * S.v * dt; S.Z += Math.cos(S.psi) * S.v * dt;
+  if (S.touchRun && rigs.scootOn) {   // phones: a swipe snaps into the next lane in about a quarter second (not the steering geometry); the nose tips toward the move for show
+    const nx = S.X + ((S.lane || 0) * 55 - S.X) * (1 - Math.pow(1e-5, dt)), vx = (nx - S.X) / Math.max(dt, 1e-4);
+    S.X = nx; S.psi = Math.max(-.45, Math.min(.45, Math.atan2(vx, Math.max(120, S.v)) * .7));
+  }
   if (Math.abs(S.X) > GAME.edge) { S.X = Math.sign(S.X) * GAME.edge; S.v *= Math.pow(.25, dt); }    // the curb: a wheel can drop off the walk, no more
   // ramps and hops: the walk's height under the rear axle and the front wheel (a ramp is a wedge rising H over its length along +z)
   const P2r = 2 * SC.gap, seed = S.game.on ? S.game.seed : 0, rampAt = (x, z) => {
@@ -1927,7 +1931,8 @@ function couchCues(Co, Tn, drive, st) {
     Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
     return;
   }
-  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
+  if (Co.hold) { if (Tn < Co.waitT + 10) Co.kLast = Tn; else { Co.hold = false; return; }   // waits 10 s on the line, then lets the autopilot back
+    if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
   const P = Co.g.position, near = Math.hypot(P.x - CC.ring[0], P.z - CC.ring[1]) < CC.ringR + 120;   // at the roundabout itself, not just past the last gate
   if (C.i === n && near) {                          // on the roundabout
     if (Co.dOn && Co.cue !== 'keep') { Co.cue = 'keep'; bigCue('Keep drifting', 'all the way round'); }
