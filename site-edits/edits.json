@@ -165,6 +165,18 @@
       "section": "07 Built",
       "tag": "h2",
       "updatedAt": "2026-10-12T03:01:01.500Z"
+    },
+    "s6.div1.p1": {
+      "fp": "From the first print to the one I wear now.",
+      "html": "",
+      "key": "s6.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "From the first print to the one I wear now.",
+      "sec": 6,
+      "section": "07 Built",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:01:15.491Z"
     }
   }
 }
