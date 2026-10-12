@@ -141,6 +141,90 @@
       "section": "05 Drive train",
       "tag": "h2",
       "updatedAt": "2026-10-12T03:00:07.652Z"
+    },
+    "s5.div1.h21": {
+      "fp": "Every part, apart.",
+      "html": "Parts",
+      "key": "s5.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Every part, apart.",
+      "sec": 5,
+      "section": "06 Exploded view",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:00:47.274Z"
+    },
+    "s6.div1.h21": {
+      "fp": "Then I built it.",
+      "html": "Build log",
+      "key": "s6.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Then I built it.",
+      "sec": 6,
+      "section": "07 Built",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:01:01.500Z"
+    },
+    "s6.div1.p1": {
+      "fp": "From the first print to the one I wear now.",
+      "html": "",
+      "key": "s6.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "From the first print to the one I wear now.",
+      "sec": 6,
+      "section": "07 Built",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:01:15.491Z"
+    },
+    "s7.div1.h21": {
+      "fp": "Then it has to walk.",
+      "html": "Running before you can walk",
+      "key": "s7.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Then it has to walk.",
+      "sec": 7,
+      "section": "08 Exoleg · Full leg",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:01:41.832Z"
+    },
+    "s7.div1.p1": {
+      "fp": "The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.",
+      "html": "The calf portion powers my stride and the thigh portion prevents excess torque transmitted through my knee",
+      "key": "s7.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "The Kicker plus a knee hinge and thigh cuffs. Strapped on in a minute, then out for a run.",
+      "sec": 7,
+      "section": "08 Exoleg · Full leg",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:03:05.653Z"
+    },
+    "s8.div1.h21": {
+      "fp": "Water, on crutches.",
+      "html": "Crutch Refreshments",
+      "key": "s8.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Water, on crutches.",
+      "sec": 8,
+      "section": "09 Water Break · Crutch",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:04:21.149Z"
+    },
+    "s8.div1.p1": {
+      "fp": "A printed cage that clips between the crutch rails and holds a water bottle.",
+      "html": "A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.",
+      "key": "s8.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A printed cage that clips between the crutch rails and holds a water bottle.",
+      "sec": 8,
+      "section": "09 Water Break · Crutch",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:03:28.208Z"
     }
   }
 }
