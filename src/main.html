@@ -183,6 +183,11 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #tpad button.tp-play { width: auto; height: auto; border-radius: 40px; display: flex; gap: .6em; align-items: center; white-space: nowrap; font: 600 16px var(--f-mono); letter-spacing: .16em; color: var(--vellum); background: var(--cobalt); border: 0; }   /* not one of the round pad keys */
 #swipe { position: fixed; inset: 0; z-index: 23; touch-action: none; -webkit-user-select: none; user-select: none; }
 #swipe[hidden] { display: none; }
+#scexit { position: fixed; z-index: 27; left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px)); width: 36px; height: 36px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--sheet); color: var(--graphite); font: 500 16px var(--f-mono); display: grid; place-items: center; opacity: .8;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); touch-action: manipulation; }
+#scexit[hidden] { display: none; }
+#scexit::before { content: ''; position: absolute; inset: -8px; }   /* a bigger target than it looks */
 #tpad > div { display: flex; gap: 10px; align-items: flex-end; }
 #tpad .tp-col { display: grid; gap: 10px; }
 #tpad button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
@@ -194,17 +199,13 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #tpad .tp-drift { width: 72px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
 #tpad button[hidden] { display: none; }
 #tpad button.on { background: var(--cobalt); color: var(--vellum); transform: scale(.94); }
-/* the couch pad: bigger keycap-style buttons, easy to hit with a thumb; a soft glow when pressed */
+/* the couch pad: bigger keycap-style buttons, easy to hit with a thumb; grey and see-through, a little brighter when pressed */
 #tpad > div, #tpad .tp-col, #tpad .tp-row { gap: 8px; }
-#tpad button[data-k] { width: 78px; height: 72px; border-radius: 22px; font-size: 26px; color: var(--cobalt);
-  border: 1px solid color-mix(in srgb, var(--cobalt) 35%, transparent); border-bottom-width: 3px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--vellum) 80%, transparent), color-mix(in srgb, var(--vellum) 50%, transparent));
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--cobalt) 18%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent); }
-#tpad button.tp-drift { width: 84px; height: 72px; font: 600 13px var(--f-mono); letter-spacing: .16em; color: var(--vellum);
-  background: linear-gradient(135deg, var(--cobalt), color-mix(in srgb, var(--cobalt) 55%, var(--sun))); border-color: transparent; }
-#tpad button[data-k].on { color: var(--vellum); background: var(--cobalt); transform: translateY(2px) scale(.96); border-bottom-width: 1px;
-  box-shadow: 0 0 22px color-mix(in srgb, var(--neon) 60%, transparent); }
-#tpad button.tp-drift.on { background: linear-gradient(135deg, var(--sun), var(--neon)); }
+#tpad button[data-k] { width: 78px; height: 72px; border-radius: 22px; font-size: 24px; color: color-mix(in srgb, var(--graphite) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--graphite) 18%, transparent); border-bottom-width: 3px;
+  background: color-mix(in srgb, var(--graphite) 10%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent); }
+#tpad button.tp-drift { width: 84px; height: 72px; font: 600 12px var(--f-mono); letter-spacing: .16em; }
+#tpad button[data-k].on { color: var(--graphite); background: color-mix(in srgb, var(--graphite) 26%, transparent); transform: translateY(2px) scale(.96); border-bottom-width: 1px; }
 @media (hover: none), (pointer: coarse) { section[data-s="12"] { padding-bottom: calc(8vh + 160px); } section.drive { padding-bottom: calc(12vh + 160px); padding-right: 16px; } }   /* the cards sit above the pad */
 /* lead clip: the card's main story, full card width */
 .card.vid { width: min(480px, 100%); }
