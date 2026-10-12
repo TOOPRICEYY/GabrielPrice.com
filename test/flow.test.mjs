@@ -244,7 +244,7 @@ test('each visit records its device type, model, OS and browser', async () => {
 test('headless browsers and crawlers are accepted quietly but never stored', async () => {
   const before = env.FLOW.m.size;
   for (const ua of ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/129.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse']) {
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Mozilla/5.0 (X11; Linux x86_64; Storebot-Google/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36', 'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse']) {
     assert.equal((await post(batch({ sid: 'abababababababab' }), { ua })).status, 204);
   }
   assert.equal(env.FLOW.m.size, before);
@@ -299,14 +299,14 @@ test('each visit records its hardware, network, frame rate and load time, within
 });
 
 test('a 3D crash is stored with where it happened, counted per visit, and sent the moment it happens', async () => {
-  const sid = 'abababababababab';
+  const sid = 'adadadadadadadad';
   await post(batch({ sid, events: [[4000, 'l', 900], [5200, 'g', 7.25]] }));
   const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
   assert.deepEqual(st.events[1], [5200, 'g', 7.25]);
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
   assert.equal(v.gl, 1); assert.equal(v.stalls, 1);
   // a loss that came back, in the next batch, is not a crash
-  const sid2 = 'acacacacacacacac';
+  const sid2 = 'aeaeaeaeaeaeaeae';
   await post(batch({ sid: sid2, events: [[5200, 'g', 7.25]] }));
   await post(batch({ sid: sid2, seq: 1, meta: undefined, samples: [sample(6000, 7.3)], events: [[6100, 'r']] }));
   const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));

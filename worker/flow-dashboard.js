@@ -44,7 +44,7 @@ let data = null, shown = [], last = -1;
 const fam = (s) => String(s.os || '').split(' ')[0];
 // "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)" -> "NVIDIA GeForce RTX 3060"
 const gpuName = (g) => { const m = /^ANGLE \\([^,]*, (?:ANGLE Metal Renderer: )?(.+?)(?: \\(0x[0-9a-f]+\\))?(?: Direct3D.*?)?(?: OpenGL.*?)?(?:, [^,]*)?\\)$/i.exec(g || ''); return m ? m[1] : g || ''; };
-const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); const h = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
 const picked = new Set();   // keys of the ticked visits
 async function load() {
   $('status').textContent = 'Loading…';

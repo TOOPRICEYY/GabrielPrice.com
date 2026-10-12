@@ -20,7 +20,7 @@ import replayPage from './flow-replay.js';
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 // crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
 // models such as the CUBOT X30 contain
-const BOT = /HeadlessChrome|Lighthouse|PageSpeed|[a-z]bot\/|\bbot\b|crawler|spider|slurp/i;
+const BOT = /HeadlessChrome|Lighthouse|PageSpeed|[a-z]bot[\/-]|\bbot\b|crawler|spider|slurp/i;
 const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
 // layouts live before visits carried one, by when they went live: PR #6's 18 sections, then from #7 (deployed 02:24:13Z) the
 // couch drive section at 14. An unversioned visit is read against the one live when its first batch arrived.

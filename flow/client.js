@@ -274,7 +274,7 @@
     function step(t) {
       const dt = t - prev; prev = t;
       if (playing) head = Math.min(dur, head + Math.max(0, dt) * speed);   // the first frame can start a touch before prev
-      while (i < S.length - 2 && S[i + 1][0] <= head) i++;
+      while (i < S.length - 1 && S[i + 1][0] <= head) i++;   // up to the last sample, so its state (a lifted finger) applies
       while (i > 0 && S[i][0] > head) i--;
       // a sample is kept only when something changed, so across a gap the state held still until the tick before b:
       // hold a until then and move only over that last tick (a fling after a pause is a jump, not a slow drift)
