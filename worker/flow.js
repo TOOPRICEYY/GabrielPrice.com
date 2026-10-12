@@ -60,7 +60,10 @@ export async function flowIngest(request, env, ctx, url) {
     const cf = request.cf || {};
     clean.meta.cc = str(cf.country, 2); clean.meta.region = str(cf.region, 40); clean.meta.city = str(cf.city, 40);
     clean.meta.ip = str(request.headers.get('cf-connecting-ip'), 45);
-    clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(request.headers.get('user-agent') || '');
+    const ua = request.headers.get('user-agent') || '';
+    clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(ua);
+    Object.assign(clean.meta, device(ua, clean.meta.ch, clean.meta.touch));
+    delete clean.meta.ch;
   }
   const key = `flow/${clean.day}/${clean.sid}/${String(clean.seq).padStart(3, '0')}.json`;
   const work = [env.FLOW.put(key, JSON.stringify(clean), { httpMetadata: { contentType: 'application/json' }, customMetadata: summarise(clean) })];
@@ -93,9 +96,54 @@ export function checkBatch(b) {
     out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true,
       lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true,
       v: /^\w{1,12}$/.test(m.v) ? m.v : '', layout: LAYOUT.test(m.layout) ? m.layout : '' };
+    if (m.ch && typeof m.ch === 'object') out.meta.ch = { model: str(m.ch.model, 40), pv: str(m.ch.pv, 20) };
     if (out.meta.layout && Array.isArray(m.sections) && m.sections.length <= 80 && m.sections.every((x) => typeof x === 'string' && x.length <= 80)) out.meta.sections = m.sections;
   }
   return out;
+}
+
+// What the visitor was on, from the user agent plus the page's client hints (ch: model and OS version, Chromium only):
+//   dev 'phone' | 'tablet' | 'desktop', os 'iOS 18.1' | 'Android 14' | 'Windows 11' | 'macOS 15.1' …, browser 'Safari 18' …,
+//   model 'iPhone' | 'Pixel 8' | 'SM-S918B' | 'Mac' | '' (Apple and desktop browsers don't name the model)
+export function device(ua, ch, touch) {
+  ua = String(ua || ''); ch = ch || {};
+  const v = (re) => { const m = re.exec(ua); return m ? m[1].replace(/_/g, '.') : ''; };
+  const major = (x) => String(x || '').split('.')[0];
+  const two = (x) => String(x || '').split('.').slice(0, 2).join('.').replace(/\.0$/, '');
+  let os = '', model = '', dev = '';
+  // Safari 26 froze the iOS version in its user agent at 18.6; its own Version/ token carries the real one
+  const safariV = v(/Version\/(\d+(?:\.\d+)?)/);
+  const appleV = (x) => (Number(major(safariV)) >= 26 ? two(safariV) : two(x));
+  if (/iPhone/.test(ua)) { os = 'iOS ' + appleV(v(/iPhone OS (\d+(?:_\d+)?)/)); model = 'iPhone'; dev = 'phone'; }
+  else if (/iPad/.test(ua)) { os = 'iPadOS ' + appleV(v(/CPU OS (\d+(?:_\d+)?)/)); model = 'iPad'; dev = 'tablet'; }
+  else if (/Macintosh/.test(ua) && touch) { os = 'iPadOS' + (safariV ? ' ' + two(safariV) : ''); model = 'iPad'; dev = 'tablet'; }   // iPads ask for the desktop site
+  else if (/Android/.test(ua)) {
+    // the parts after "Android NN;" up to ")": locale, model (with " Build/…"), "wv" for in-app views, "Mobile", "rv:…"
+    const parts = (/Android[^;)]*;([^)]*)\)/.exec(ua) || [, ''])[1].split(';').map((x) => x.trim().replace(/\s+Build\/.*$/, '').replace(/^SAMSUNG\s+/i, ''));
+    const named = parts.find((x) => x && !/^(K|wv|Mobile|Tablet|U|[a-z]{2}(?:[-_][a-z]{2})?|rv:.*)$/i.test(x)) || '';
+    // Chrome now sends "Android 10; K" whatever the phone: the version and model then only come from the page's hints
+    const frozen = parts[0] === 'K';
+    os = 'Android' + (two(ch.pv) ? ' ' + two(ch.pv) : frozen ? '' : ' ' + v(/Android (\d+(?:\.\d+)?)/));
+    model = ch.model || named;
+    dev = /Mobile/.test(ua) ? 'phone' : 'tablet';
+  }
+  else if (/CrOS/.test(ua)) { os = 'ChromeOS'; model = 'Chromebook'; }
+  else if (/Windows NT/.test(ua)) {
+    const nt = v(/Windows NT (\d+\.\d+)/);
+    os = nt === '10.0' ? (ch.pv ? (Number(major(ch.pv)) >= 13 ? 'Windows 11' : 'Windows 10') : 'Windows 10/11') : ({ '6.3': 'Windows 8.1', '6.2': 'Windows 8', '6.1': 'Windows 7' }[nt] || 'Windows');
+    model = 'PC';
+  }
+  else if (/Macintosh/.test(ua)) { os = 'macOS' + (ch.pv ? ' ' + two(ch.pv) : ''); model = 'Mac'; }   // Safari and Firefox freeze it at 10.15
+  else if (/Linux/.test(ua)) { os = 'Linux'; model = 'PC'; }
+  if (!dev) dev = /Mobi/.test(ua) ? 'phone' : touch && !model ? 'tablet' : 'desktop';
+  const b = (name, re) => { const x = v(re); return x !== '' ? name + ' ' + major(x) : null; };
+  const browser = (/bot|crawl|spider|slurp|preview/i.test(ua) ? 'bot' : null)
+    || (/Instagram/.test(ua) ? 'Instagram app' : null) || (/FBAN|FBAV/.test(ua) ? 'Facebook app' : null) || (/LinkedInApp/.test(ua) ? 'LinkedIn app' : null)
+    || (/; wv\)/.test(ua) ? 'in-app browser' : null)
+    || b('Edge', /Edg(?:e|A|iOS)?\/(\d+)/) || b('Opera', /(?:OPR|OPT)\/(\d+)/) || b('Samsung Internet', /SamsungBrowser\/(\d+)/)
+    || b('Firefox', /(?:Firefox|FxiOS)\/(\d+)/) || b('Headless Chrome', /HeadlessChrome\/(\d+)/) || b('Chrome', /(?:CriOS|Chrome)\/(\d+)/)
+    || (/Safari\//.test(ua) && safariV ? 'Safari ' + major(safariV) : null) || '';
+  return { dev, os: os.trim().slice(0, 40), browser: browser.slice(0, 40), model: model.trim().slice(0, 40) };
 }
 
 // per-batch summary kept in R2 custom metadata (strings, well under its 2 KB limit)
@@ -120,7 +168,8 @@ export function summarise(c) {
     err: String(c.events.filter((e) => e[1] === 'e').length) };
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
-    m.dev = c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop';
+    m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
+    m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || '';
     m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
   return m;
@@ -216,7 +265,7 @@ export async function listSessions(env, days) {
       v.err = (v.err || 0) + (Number(m.err) || 0);
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }

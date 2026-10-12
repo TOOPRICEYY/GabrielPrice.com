@@ -23,7 +23,7 @@ Events are `[ms, type, …]`:
 - `z`: the window being resized;
 - `e`: the sampler hit an error and stopped (the message).
 
-Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, and the page's version and section layout. The Worker adds the visitor's IP address, the country, region and city Cloudflare places it in, and whether the device is a phone. No cookies are set.
+Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, the page's version and section layout, and, in Chromium browsers, the phone model and OS version (`navigator.userAgentData` client hints). The Worker adds the visitor's IP address and the country, region and city Cloudflare places it in. It also reads the device type (phone, tablet or desktop), model, OS and browser from the user agent and those hints (`device()` in `worker/flow.js`), keeps those four and drops the raw hints. Safari and Firefox never name a phone model, so an iPhone shows only as "iPhone". Chrome on Android sends a frozen "Android 10; K", so without the hints the OS shows only as "Android". Visits recorded before this was added have no OS or browser. No cookies are set.
 
 Batches are sent every 30 s, and when the tab is hidden or closed, through `navigator.sendBeacon` as `text/plain` (no CORS preflight). A visit is capped at 30 minutes and 60 batches. Recording is skipped for Global Privacy Control, Do Not Track, automated browsers, `#edit`, and any browser that has opened `/admin/flow` (that page sets localStorage `flow-off`).
 

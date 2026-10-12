@@ -29,24 +29,30 @@ button.del{border-color:#d9534f;color:#c9302c}button.del:disabled{opacity:.45;bo
 <h1>Site flow</h1><p class="sub">How visitors move through gabrielprice.com. Your own visits from this browser are not recorded.</p>
 <div class="row"><label>Range <select id="days"><option value="1">Today</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>
 <label>Device <select id="dev"><option value="">All</option><option>desktop</option><option>phone</option><option>tablet</option></select></label>
+<label>OS <select id="os"><option value="">All</option></select></label>
 <span id="status" class="sub" style="margin:0"></span></div>
 <div class="tiles" id="tiles"></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
-<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card"><div class="head"><h2>Visits</h2><button class="del" id="del" disabled>Delete selected</button></div><div class="scroll"><table><thead><tr><th class="ck"><input type="checkbox" id="all" title="Select every visit shown" aria-label="Select every visit shown"></th><th>Started</th><th>Length</th><th>Furthest section</th><th>Device</th><th>OS</th><th>Browser</th><th>Size</th><th>From</th><th>Location</th><th>IP</th><th class="n">Clicks</th><th class="n">Drove (s)</th><th>Version</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </main><script>
 try { localStorage.setItem('flow-off', '1'); } catch (e) {}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
 let data = null, shown = [], last = -1;
+const fam = (s) => String(s.os || '').split(' ')[0];
 const picked = new Set();   // keys of the ticked visits
 async function load() {
   $('status').textContent = 'Loading…';
   const r = await fetch('/admin/api/flow/sessions?days=' + $('days').value, { credentials: 'same-origin' });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { $('status').textContent = j.error || ('Error ' + r.status); return; }
-  data = j; $('status').textContent = ''; draw();
+  data = j; $('status').textContent = '';
+  // the OS filter lists the families in this range (iOS, Android, Windows …); visits from before OS capture have none
+  const pick = $('os').value, fams = [...new Set(data.sessions.map(fam).filter(Boolean))].sort();
+  $('os').innerHTML = '<option value="">All</option>' + fams.map((f) => '<option' + (f === pick ? ' selected' : '') + '>' + esc(f) + '</option>').join('');
+  draw();
 }
 function bars(el, items, unit) {
   const max = Math.max(1e-9, ...items.map((x) => x.v));
@@ -56,7 +62,7 @@ function bars(el, items, unit) {
 // key(list, i): the title plus how many times it appeared before, so two sections with the same heading stay distinct.
 const key = (list, i) => list[i] + '#' + list.slice(0, i).filter((t) => t === list[i]).length;
 function draw() {
-  const dev = $('dev').value, V = data.sessions.filter((s) => !dev || s.dev === dev), N = V.length;
+  const dev = $('dev').value, os = $('os').value, V = data.sessions.filter((s) => (!dev || s.dev === dev) && (!os || fam(s) === os)), N = V.length;
   const cur = data.current.sections, L = (s) => data.layouts[s.layout] || cur;
   const curKeys = cur.map((_, i) => key(cur, i));
   const name = (list, i) => (list[i] ? i + '. ' + list[i] : 'Section ' + i);
@@ -82,7 +88,7 @@ function draw() {
   $('rows').innerHTML = V.slice(0, 300).map((s) => {
     const isOld = s.layout !== data.current.layout;
     const on = picked.has(s.key);
-    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
+    return '<tr' + (on ? ' class="on"' : '') + '><td class="ck"><input type="checkbox" data-key="' + esc(s.key) + '"' + (on ? ' checked' : '') + ' aria-label="Select this visit"></td><td>' + esc(s.start ? new Date(s.start).toLocaleString() : s.day) + '</td><td class="n">' + fmt(s.ms) + '</td><td>' + esc(L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS)) + '</td><td>' + esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : '') + '</td><td>' + esc(s.os || '') + '</td><td>' + esc(s.browser || '') + '</td><td>' + esc(s.size || '') + '</td><td>' + esc(s.ref || 'direct') + '</td><td>' + esc([s.city, s.region, s.cc].filter(Boolean).join(', ')) + '</td><td>' + esc(s.ip || '') + '</td><td class="n">' + s.clicks + '</td><td class="n">' + s.drive.toFixed(0) + '</td><td class="' + (isOld ? 'old' : '') + '" title="' + (isOld ? 'Recorded on an older set of sections; counted by section title' : 'Current version') + '">' + esc(s.v || 'before versions') + (isOld ? ' (older)' : '') + (s.err ? ' <span class="warn">⚠</span>' : '') + '</td><td><a href="/admin/flow/replay?key=' + encodeURIComponent(s.key) + '" target="_blank" rel="noopener">Replay</a></td></tr>';
   }).join('');
   ticks();
 }
@@ -122,6 +128,6 @@ $('del').onclick = async () => {
   $('status').textContent = 'Deleted ' + j.deleted + (j.deleted === 1 ? ' visit.' : ' visits.');
   draw();
 };
-$('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = () => { last = -1; if (data) draw(); };
+$('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = $('os').onchange = () => { last = -1; if (data) draw(); };
 load();
 </script></body></html>`;
