@@ -16,6 +16,18 @@
       "section": "Gallery Smaller builds and works in progress",
       "tag": "button",
       "updatedAt": "2026-10-11T22:33:46.032Z"
+    },
+    "s0.div1.p1": {
+      "fp": "I create to live and live to create",
+      "html": "Live to create, create to live",
+      "key": "s0.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "I create to live and live to create",
+      "sec": 0,
+      "section": "Portfolio Engineer · Builder",
+      "tag": "p",
+      "updatedAt": "2026-10-12T04:01:33.049Z"
     }
   }
 }
