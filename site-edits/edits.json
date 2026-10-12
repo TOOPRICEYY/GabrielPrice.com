@@ -153,6 +153,18 @@
       "section": "06 Exploded view",
       "tag": "h2",
       "updatedAt": "2026-10-12T03:00:47.274Z"
+    },
+    "s6.div1.h21": {
+      "fp": "Then I built it.",
+      "html": "Build log",
+      "key": "s6.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Then I built it.",
+      "sec": 6,
+      "section": "07 Built",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:01:01.500Z"
     }
   }
 }
