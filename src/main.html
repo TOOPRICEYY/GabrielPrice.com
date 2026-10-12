@@ -169,12 +169,17 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #tpad { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none;
   padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
 #tpad[hidden] { display: none; }
+#tpad { transition: opacity .3s; } #tpad.wait { opacity: 0; } #tpad.wait button { pointer-events: none; }
 #tpad > div { display: flex; gap: 10px; align-items: flex-end; }
 #tpad .tp-col { display: grid; gap: 10px; }
 #tpad button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--graphite);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font: 500 20px var(--f-mono); display: grid; place-items: center; transition: background .1s, transform .1s; }
-#tpad .tp-act { width: 72px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+#tpad .tp-l { flex-direction: column; align-items: center; }
+#tpad .tp-row { display: flex; gap: 10px; }
+#tpad .tp-act { width: 88px; height: 88px; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+#tpad .tp-drift { width: 72px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+#tpad button[hidden] { display: none; }
 #tpad button.on { background: var(--cobalt); color: var(--vellum); transform: scale(.94); }
 @media (hover: none), (pointer: coarse) { section[data-s="12"] { padding-bottom: calc(8vh + 160px); } section.drive { padding-bottom: calc(12vh + 160px); padding-right: 16px; } }   /* the cards sit above the pad */
 /* lead clip: the card's main story, full card width */

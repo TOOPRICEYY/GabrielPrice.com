@@ -795,20 +795,28 @@ function rigUI() {
   // the keyboard does (◀ ▶ = A D, ▲ ▼ = W S, the action button = Shift drift on the couch, Space hop on the scooter)
   if (matchMedia('(hover: none), (pointer: coarse)').matches) {
     const pad = document.createElement('div'); pad.id = 'tpad'; pad.hidden = true; pad.setAttribute('aria-label', 'Driving controls');
-    pad.innerHTML = '<div class="tp-l"><button data-k="a" aria-label="Steer left">◀</button><button data-k="d" aria-label="Steer right">▶</button></div>' +
-      '<div class="tp-r"><button class="tp-act" data-k=" ">Hop</button><div class="tp-col"><button data-k="w" aria-label="Forward">▲</button><button data-k="s" aria-label="Back">▼</button></div></div>';
+    pad.innerHTML = '<div class="tp-l"><button class="tp-act" data-k=" ">Hop</button><div class="tp-row"><button data-k="a" aria-label="Steer left">◀</button><button data-k="d" aria-label="Steer right">▶</button></div></div>' +
+      '<div class="tp-r"><button class="tp-drift" data-k="shift w" hidden>Drift</button><div class="tp-col"><button data-k="w" aria-label="Forward">▲</button><button data-k="s" aria-label="Back">▼</button></div></div>';
     document.body.appendChild(pad);
-    const act = pad.querySelector('.tp-act'), send = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
+    // Hop (scooter) sits big on the left; Drift (couch) stays on the right and holds the gas too, so one thumb drifts.
+    // Keys are counted, so letting go of ▲ while Drift is still held keeps the gas on.
+    const hop = pad.querySelector('.tp-act'), drift = pad.querySelector('.tp-drift'), held = {};
+    const send = (type, k) => { held[k] = (held[k] || 0) + (type === 'keydown' ? 1 : -1); if (type === 'keydown' ? held[k] === 1 : held[k] === 0) dispatchEvent(new KeyboardEvent(type, { key: k })); };
+    const keys = (b) => b.dataset.k === ' ' ? [' '] : b.dataset.k.split(' ');
     for (const b of pad.querySelectorAll('button')) {
-      const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); send('keydown', b.dataset.k); };
-      const up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); send('keyup', b.dataset.k); };
+      const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); for (const k of keys(b)) send('keydown', k); };
+      const up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); for (const k of keys(b)) send('keyup', k); };
       b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
       b.addEventListener('contextmenu', e => e.preventDefault());
     }
+    // the pad waits until the card's instructions have been read: it stays out while a card still covers the bottom of the screen
+    const cards = [...document.querySelectorAll('section .card, section.drive .keyhint.touchonly')];
     const tick = () => {
-      const on = rigs.ready && (rigs.couchOn || rigs.scootOn);
-      if (pad.hidden === on) pad.hidden = !on;
-      if (on) { const couch = rigs.couchOn; act.dataset.k = couch ? 'shift' : ' '; act.textContent = couch ? 'Drift' : 'Hop'; }
+      let on = rigs.ready && (rigs.couchOn || rigs.scootOn);
+      if (on) { const top = innerHeight - (pad.offsetHeight || 210); on = !cards.some(c => { const r = c.getBoundingClientRect(); return r.bottom > top && r.top < innerHeight && +(c.style.opacity || 1) > .3; }); }
+      pad.classList.toggle('wait', !on);
+      if (on && pad.hidden) pad.hidden = false;
+      if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }
       requestAnimationFrame(tick);
     };
     tick();
@@ -1260,13 +1268,19 @@ const TIPS = [
   ['Double-tap <kbd>A</kbd> or <kbd>D</kbd>: the steering swings 90° and the couch drives sideways', (Co) => Co.oriUsed > 0],
   ['Double-tap the other way to swing it back. <kbd>Space</kbd> is the handbrake', (Co, t) => t > 6],
   ['Stop, let go of <kbd>W</kbd>, and hold <kbd>A</kbd> or <kbd>D</kbd> to spin on the spot like a tank', (Co) => Math.abs(Co.tk) > .8]];
+// the same tips for the touch pad: up top, where the pad and the thumbs aren't
+const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
+const TIPS_T = ['▲ to go, ◀ ▶ to steer, ▼ to brake', , 'Hold Drift through a turn: it keeps the gas on and lets the back end slide',
+  'Drifting! Steer the other way to hold the slide, let go of Drift to grip', 'Double-tap ◀ or ▶: the steering swings 90° and the couch drives sideways',
+  'Double-tap the other way to swing it back', 'Stop, let go of ▲, and hold ◀ or ▶ to spin on the spot like a tank'];
 function tipFrame(Co, dt, show, hud) {
   let el = rigs.tipEl;
   if (!el) {
     el = rigs.tipEl = document.createElement('div');
-    el.style.cssText = 'position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:4;pointer-events:none;text-align:center;' +
+    el.style.cssText = 'position:fixed;' + (TOUCH ? 'top:calc(64px + env(safe-area-inset-top,0px));' : 'bottom:calc(22px + env(safe-area-inset-bottom,0px));') +
+      'transform:translateX(-50%);z-index:4;pointer-events:none;text-align:center;' +
       'font-family:var(--f-mono);font-size:12px;line-height:1.5;color:#1d1b2e;background:rgba(255,255,255,.82);border:1px solid rgba(110,80,255,.35);padding:8px 14px;' +
-      'max-width:min(92vw,520px);transition:opacity .25s;opacity:0';
+      'width:max-content;max-width:min(92vw,520px);box-sizing:border-box;transition:opacity .25s;opacity:0';
     el.innerHTML = '<div class="tip" style="font-size:13px"></div><div class="hud" style="color:#6a4cff;letter-spacing:.06em;margin-top:3px"></div>';
     document.body.appendChild(el); el.tipN = -1;
   }
@@ -1274,7 +1288,7 @@ function tipFrame(Co, dt, show, hud) {
   el.style.left = (innerWidth > 720 ? 460 + (innerWidth - 460) / 2 : innerWidth / 2) + 'px';
   Co.tutT += dt;
   if (Co.tut < TIPS.length && TIPS[Co.tut][1](Co, Co.tutT)) { Co.tut++; Co.tutT = 0; }
-  if (el.tipN !== Co.tut) { el.tipN = Co.tut; el.firstChild.innerHTML = Co.tut < TIPS.length ? TIPS[Co.tut][0] : ''; el.firstChild.style.display = Co.tut < TIPS.length ? '' : 'none'; }
+  if (el.tipN !== Co.tut) { el.tipN = Co.tut; el.firstChild.innerHTML = Co.tut < TIPS.length ? (TOUCH && TIPS_T[Co.tut]) || TIPS[Co.tut][0] : ''; el.firstChild.style.display = Co.tut < TIPS.length ? '' : 'none'; }
   el.lastChild.textContent = hud;
 }
 function couchFrame(s, dt, w) {
