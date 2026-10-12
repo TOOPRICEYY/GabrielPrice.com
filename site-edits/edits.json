@@ -106,6 +106,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:08:24.591Z"
     },
+    "s11.div1.h21": {
+      "fp": "Twelve parts, pulled apart.",
+      "html": "Exploded BOM",
+      "key": "s11.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Twelve parts, pulled apart.",
+      "sec": 11,
+      "section": "12 Inside QuadFather",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:08:32.216Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
