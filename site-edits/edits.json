@@ -45,6 +45,78 @@
       "section": "Portfolio Mock 01 · framing",
       "tag": "h1",
       "updatedAt": "2026-10-11T22:33:23.397Z"
+    },
+    "s0.div1.p1": {
+      "fp": "I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.",
+      "html": "I create to live and live to create",
+      "key": "s0.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.",
+      "sec": 0,
+      "section": "Portfolio Engineer · Builder",
+      "tag": "p",
+      "updatedAt": "2026-10-12T02:49:17.609Z"
+    },
+    "s1.div1.h21": {
+      "fp": "Start from the body.",
+      "html": "I build things because I love to, it just also happens that I have to",
+      "key": "s1.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Start from the body.",
+      "sec": 1,
+      "section": "02 About",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:56:28.109Z"
+    },
+    "s1.div1.p1": {
+      "fp": "I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scoote",
+      "html": "My body has always been held together by chewing gum and dreams. Until recently I was at the mercy of various unexplained muscle strains/ ligament sprains which set a ceiling on my life. I don't like ceilings",
+      "key": "s1.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "I build things that help a body move, or just make moving more fun: an ankle exoskeleton, a full-leg brace, a crutch that carries water, a motorized knee scooter and a couch that drives. Each one starts as a Fusion 360 model and ends up printed, wired and tested on me.",
+      "sec": 1,
+      "section": "02 About",
+      "tag": "p",
+      "updatedAt": "2026-10-12T02:57:36.352Z"
+    },
+    "s2.div1.h21": {
+      "fp": "The Kicker",
+      "html": "ExoLeg",
+      "key": "s2.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "The Kicker",
+      "sec": 2,
+      "section": "03 Project · Anti-thetis",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:57:54.567Z"
+    },
+    "s2.div1.p1": {
+      "fp": "A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.",
+      "html": "A powered ankle exoskeleton with knee extension to offload as much calf or Achilles force as is programmed",
+      "key": "s2.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A powered ankle exoskeleton. A brushless motor and a planetary gearbox drive a rack that pushes the foot down.",
+      "sec": 2,
+      "section": "03 Project · Anti-thetis",
+      "tag": "p",
+      "updatedAt": "2026-10-12T02:58:46.321Z"
+    },
+    "s3.div1.h21": {
+      "fp": "Built around one leg.",
+      "html": "Molded precisely",
+      "key": "s3.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Built around one leg.",
+      "sec": 3,
+      "section": "04 Fit",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:59:21.644Z"
     }
   }
 }
