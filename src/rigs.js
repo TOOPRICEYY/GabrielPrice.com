@@ -1881,6 +1881,7 @@ function couchHud(Co, show, live, target) {
   if (show || LB.mode === 'lap') lbShow('lap', show ? 1 : 0, !!Co.hold);   // small while you drive, full on the line after a lap
   if (H.playing !== show) { H.playing = show; document.body.classList.toggle('playing', show || !!(ui.schud && ui.schud.playing)); }   // phones hide the orbit hint while you play
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
+  { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K) K.classList.toggle('pin', show); }   // the key legend stays put while you drive
   H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) return;
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
   // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
