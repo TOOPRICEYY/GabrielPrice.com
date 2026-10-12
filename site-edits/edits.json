@@ -105,6 +105,18 @@
       "section": "03 Project · Anti-thetis",
       "tag": "p",
       "updatedAt": "2026-10-12T02:58:46.321Z"
+    },
+    "s3.div1.h21": {
+      "fp": "Built around one leg.",
+      "html": "Molded precisely",
+      "key": "s3.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Built around one leg.",
+      "sec": 3,
+      "section": "04 Fit",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:59:21.644Z"
     }
   }
 }
