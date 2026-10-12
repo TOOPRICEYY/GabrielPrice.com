@@ -1402,8 +1402,8 @@ function adapt(now) {
   if (perf.sum / perf.n > 45) { dpr = Math.max(1, dpr - .5); renderer.setPixelRatio(dpr); resize(); perf.at = now; }
   perf.sum = perf.n = 0;
 }
-let gx;
-const galleryOpen = () => (gx ||= document.getElementById('gx')) && gx.classList.contains('on');
+let galPage;   // the project page overlay (gallery.js)
+const galleryOpen = () => (galPage ||= document.getElementById('gx')) && galPage.classList.contains('on');
 function frame(now) {
   requestAnimationFrame(frame);   // first, so one bad frame can't stop the loop for good
   if (galleryOpen()) return;      // a project page covers the stage: its blurred backdrop can hold still, and the phone renders one scene, not two
@@ -1567,6 +1567,7 @@ function warmShaders() {
   scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) lit.add(p); });
   for (const g of lit) g.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) hearth.add(m); });
   const all = [...draws.keys()], faded = all.filter((m) => m.transparent);
+  const parallel = renderer.extensions.has('KHR_parallel_shader_compile');   // (compileAsync without it logs a warning per call)
   // run fn, then put back the program three had picked for every material: the warm-up only fills the cache, and each material still
   // switches programs exactly when it would have without it
   const quietly = (fn) => {
@@ -1581,7 +1582,7 @@ function warmShaders() {
   const compile = (o, solid, fire) => () => quietly(() => {
     if (solid) for (const m of faded) m.transparent = false;
     if (fire) for (const g of lit) g.visible = true;
-    return renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
+    return parallel ? renderer.compileAsync(o, camera, scene) : renderer.compile(o, camera, scene);   // issues the compile now
   });
   // the brace's materials clip against a plane, and renderer.compile keys clipping on whatever three drew last (it sets clipping up only
   // when it draws). So first draw a speck with one clip plane into one pixel, before a frame (which then covers it), and right after
@@ -1604,12 +1605,13 @@ function warmShaders() {
   for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push(compile(o, false, true));
   for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push(compile(o, true, true));   // the hearth fades in, then the fire lights
   // where the GPU compiles in parallel, every compile goes now (the brace waits for the frame loop, which draws its speck before a frame)
-  if (renderer.extensions.has('KHR_parallel_shader_compile')) Promise.all(warmQ.splice(+kicker.ready).map((f) => f())).catch(() => {});
+  if (parallel) Promise.all(warmQ.splice(+kicker.ready).map((f) => f())).catch(() => {});
 }
 function warmStep() {   // from the frame loop, before the frame is drawn: until a new program is created, at rest only
   if (Math.abs(sTarget - sNow) > .01 || free.on) return;
   const n = renderer.info.programs.length;
   for (let i = 0; i < 40 && warmQ.length && renderer.info.programs.length === n; i++) Promise.resolve(warmQ.shift()()).catch(() => {});
+  if (renderer.info.programs.length !== n) perf.at = performance.now();   // a compile's slow frame is not the phone falling behind (adapt)
 }
 resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
