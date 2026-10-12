@@ -36,22 +36,45 @@ test('every local file the page refers to is in dist', () => {
   assert.deepEqual(missing, [], 'missing from dist: add the folder to STATIC_DIRS in scripts/build.mjs');
 });
 
-test('every editor edit still finds its text in the page source', () => {
-  // An edit is keyed to its element's original text (fp). If the source text changes under it, the page skips the edit,
+test('every editor edit still finds its element in the page source', () => {
+  // The page finds an edit's element the way resolve() in src/editor.js does: the element at its key if that still has the
+  // edit's original text (fp), else the one element of its tag with that text. If neither holds, the page skips the edit,
   // silently. Fix by baking the edit into src/main.html (or src/gallery.js) and removing it from site-edits/edits.json:
   // see "Edits from the editor" in CLAUDE.md.
   const src = (f) => fs.readFileSync(new URL('src/' + f, root), 'utf8');
   const norm = (s) => s.replace(/\s+/g, ' ').trim();
   const ent = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-  const text = norm(src('main.html').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '')
-    .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(parseInt(e.slice(1).replace(/^x/i, '0x'))) : ent[e] ?? m));
-  // gallery cards are written by gallery.js: tag, title, blurb
+  const decode = (s) => s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(parseInt(e.slice(1).replace(/^x/i, '0x'))) : ent[e] ?? m);
+  // a small tree of main.html's sections, keyed like keyFor(): s<data-s>, then tag + index among same-tag siblings
+  const VOID = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+  const els = [], stack = [];
+  const html = src('main.html').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<!--[\s\S]*?-->/g, '');
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*)>|([^<]+)/g)) {
+    if (m[4] != null) { for (const e of stack) e.text += decode(m[4]); continue; }
+    const tag = m[2].toLowerCase();
+    if (m[1]) { const at = stack.findLastIndex((e) => e.tag === tag); if (at >= 0) stack.length = at; continue; }
+    if (VOID.has(tag)) continue;
+    const parent = stack.at(-1), s = /\bdata-s="(\d+)"/.exec(m[3]);
+    const e = { tag, text: '', kids: [] };
+    if (tag === 'section' && s) e.key = 's' + s[1];
+    else if (parent?.key) { const n = parent.kids.filter((k) => k.tag === tag).length + 1; e.key = parent.key + '.' + tag + n; }
+    parent?.kids.push(e); stack.push(e); els.push(e);
+  }
+  // gallery cards are written by gallery.js: a button holding the tag, the title and the blurb
   const q = String.raw`'((?:[^'\\]|\\.)*)'`, unq = (s) => s.replace(/\\(.)/g, '$1');
-  const cards = [...src('gallery.js').matchAll(new RegExp(String.raw`\{ id: '[^']+', title: ${q}, kind: ${q}[^\n]*\n\s*blurb: ${q}`, 'g'))]
-    .map((m) => norm(unq(m[2]) + unq(m[1]) + unq(m[3])));
+  const cards = [...src('gallery.js').matchAll(new RegExp(String.raw`\{ id: '[^']+', title: ${q}, kind: ${q}[^\n]*\n\s*blurb: ${q}`, 'g'))];
   assert.ok(cards.length > 3, 'read the gallery cards');
+  for (const [, title, kind, blurb] of cards) {
+    els.push({ tag: 'button', text: unq(kind) + unq(title) + unq(blurb) }, { tag: 'h3', text: unq(title) }, { tag: 'span', text: unq(kind) }, { tag: 'p', text: unq(blurb) });
+  }
+  const fp = (e) => norm(e.text).slice(0, 160);
+  const byKey = new Map(els.filter((e) => e.key).map((e) => [e.key, e]));
+  assert.equal(fp(byKey.get('s0.div1.h11') || { text: '' }), 'Gabriel Price', 'keys line up with the page');
   const edits = JSON.parse(fs.readFileSync(new URL('site-edits/edits.json', root), 'utf8')).edits;
-  const stale = Object.entries(edits).filter(([, d]) => d.fp && !text.includes(norm(d.fp)) && !cards.some((c) => c.includes(norm(d.fp))))
-    .map(([k, d]) => `${k} (“${d.fp.slice(0, 40)}”)`);
-  assert.deepEqual(stale, [], 'these edits no longer match the page source, so the page skips them');
+  const stale = Object.entries(edits).filter(([k, d]) => {
+    if (!d.fp) return false;
+    const at = byKey.get(d.key || k);
+    return !(at && fp(at) === d.fp) && els.filter((e) => e.tag === d.tag && fp(e) === d.fp).length !== 1;
+  }).map(([k, d]) => `${k} (“${d.fp.slice(0, 40)}”)`);
+  assert.deepEqual(stale, [], 'the page no longer finds these edits, so it skips them');
 });
