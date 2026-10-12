@@ -180,7 +180,7 @@ test('replays open in a frame sized to the visit, and the dashboard links there'
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   const html = await page.text();
-  assert.match(html, /__flowReplay/); assert.match(html, /<iframe|createElement\('iframe'\)/);
+  assert.match(html, /__flowReplay/); assert.match(html, /Math\.min\(4096/, 'recorded sizes are clamped before they size the frame'); assert.match(html, /<iframe|createElement\('iframe'\)/);
   assert.match(fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8'), /\/admin\/flow\/replay\?key=/);
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /__flowReplay/, 'the player looks for the frame host');
 });

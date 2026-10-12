@@ -31,13 +31,16 @@ body{display:flex;flex-direction:column;overflow:hidden}
   const dev = document.createElement('div'), frame = document.createElement('iframe');
   dev.id = 'dev'; dev.className = meta.touch ? 'touch' : ''; frame.title = 'The visit, at the visitor\\'s screen size';
   dev.appendChild(frame); msg.replaceWith(dev);
-  let w = meta.w > 0 ? meta.w : stage.clientWidth - 24, h = meta.h > 0 ? meta.h : stage.clientHeight - 24;
+  // sizes come from the visitor's batch, which anyone can post: keep them to real screen sizes so a forged one can't ask
+  // the page for a giant WebGL canvas
+  const dim = (v, d) => (v > 0 ? Math.min(4096, Math.max(240, Math.round(v))) : d);
+  let w = dim(meta.w, stage.clientWidth - 24), h = dim(meta.h, stage.clientHeight - 24);
   function fit() {
     const pad = meta.touch ? 44 : 24, k = Math.min(1.5, (stage.clientWidth - pad) / w, (stage.clientHeight - pad) / h);
     frame.style.width = w + 'px'; frame.style.height = h + 'px'; frame.style.transform = 'scale(' + k + ')';
     dev.style.width = Math.round(w * k) + 'px'; dev.style.height = Math.round(h * k) + 'px';
   }
-  window.__flowReplay = { rec, meta, bar: document.getElementById('bar'), resize(nw, nh) { if (nw > 0 && nh > 0 && (nw !== w || nh !== h)) { w = nw; h = nh; fit(); } } };
+  window.__flowReplay = { rec, meta, bar: document.getElementById('bar'), resize(nw, nh) { if (nw > 0 && nh > 0) { nw = dim(nw, w); nh = dim(nh, h); if (nw !== w || nh !== h) { w = nw; h = nh; fit(); } } } };
   new ResizeObserver(fit).observe(stage);
   fit();
   frame.src = '/#replay=' + encodeURIComponent(key);
