@@ -431,7 +431,10 @@ function placeCam(k, dt) {
 // model state from t: 0..1 explode, 1.25..2.25 parts come back in build order; on the cut chapter c a plane cuts in over c-.6..c+.2 and clears over c+.6..c+1
 function applyModel(t) {
   if (!P.model) {                                   // placeholder: a slow bob, and a lean-in on the demo chapter
-    M.grp.position.y = Math.sin(performance.now() / 900) * M.R * .02; plane.constant = 1e6; return;
+    M.grp.position.y = Math.sin(performance.now() / 900) * M.R * .02; plane.constant = 1e6;
+    const io = CH.findIndex(q => q.key === 'open'), op = io < 0 ? 0 : sm((t - io + .7) / .55) * (1 - sm((t - io - .1) / .3));
+    for (const p of M.parts) if (p.slide) p.mesh.position.copy(p.base).addScaledVector(p.slide, op);   // e.g. the desk top riding up its post
+    return;
   }
   // explode ramps in over the .6 before the explode chapter; parts go back in order from .75 before the build chapter
   const ie = CH.findIndex(q => q.key === 'explode'), ib = CH.findIndex(q => q.key === 'build'), io = CH.findIndex(q => q.key === 'open');
