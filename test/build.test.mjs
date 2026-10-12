@@ -82,3 +82,15 @@ test('every editor edit still finds its element in the page source', () => {
   }).map(([k, d]) => `${k} (“${d.fp.slice(0, 40)}”)`);
   assert.deepEqual(stale, [], 'the page no longer finds these edits, so it skips them');
 });
+
+test('the hosted page loads three.js from its own domain, every file the import map reaches included', () => {
+  // a phone that can't reach jsdelivr (network, DNS filter, ad blocker) otherwise never gets past "Loading model…"
+  assert.ok(!html.includes('cdn.jsdelivr.net/npm/three'), 'no jsdelivr import left');
+  const map = JSON.parse(/<script type="importmap">([\s\S]*?)<\/script>/.exec(html)[1]).imports;
+  assert.equal(map.three, './vendor/three/build/three.module.js');   // import map values must be URLs (./), not bare paths
+  const files = [map.three, ...[...html.matchAll(/from 'three\/addons\/([\w/.-]+)'/g)].map((m) => map['three/addons/'] + m[1])];
+  for (const f of files) {
+    assert.ok(fs.existsSync(new URL('dist/' + f, root)), f + ' in dist');
+    for (const m of fs.readFileSync(new URL('dist/' + f, root), 'utf8').matchAll(/^\s*(?:import|export)\b[^'"]*?from\s*['"]([^'"]+)['"]/gm)) assert.equal(m[1], 'three', f + ' imports only three');
+  }
+});
