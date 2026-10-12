@@ -190,6 +190,7 @@ test('replays open in a frame sized to the visit, and the dashboard links there'
   assert.match(html, /e\[1\] === 'z'/, 'at the largest size the visit reaches, since the page reads the scale once');
   assert.match(client, /fewerPixels\(host\.scale\)/, 'a shrunk replay renders at a lower pixel ratio, so a desktop visit fits in a phone tab');
   assert.match(client, /defineProperty\(window, 'devicePixelRatio'/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../src/main.html', import.meta.url), 'utf8'), /setPixelRatio\(1\)|DPR_MAX = glSafe \? 1/, 'safe mode and a restored context never go above the reported pixel ratio');
 });
 
 test('ticked visits can be deleted from the dashboard, every batch of each, by the owner only', async () => {
