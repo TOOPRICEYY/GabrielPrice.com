@@ -45,6 +45,18 @@
       "section": "Portfolio Mock 01 · framing",
       "tag": "h1",
       "updatedAt": "2026-10-11T22:33:23.397Z"
+    },
+    "s0.div1.p1": {
+      "fp": "I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.",
+      "html": "I create to live and live to create",
+      "key": "s0.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "I design machines that move with the body in Fusion 360, then print, wire and wear them. Scroll and the figure puts each one on.",
+      "sec": 0,
+      "section": "Portfolio Engineer · Builder",
+      "tag": "p",
+      "updatedAt": "2026-10-12T02:49:17.609Z"
     }
   }
 }
