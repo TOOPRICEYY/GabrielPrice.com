@@ -989,7 +989,9 @@ function rigFrame(s, dt) {
   const sL = sL0 <= COUCH_HOLD ? sL0 : Math.max(COUCH_HOLD, sL0 - COUCH_IN);   // ...held still through the drive-ready section
   rigs.chasePre = win(s, 13.3, 13.6, 14.05, 14.3);  // drive-ready: the chase view without touching a key
   const wWalk = walkWeight(s), wCr = win(s, 7.5, 7.78, 8.22, 8.5), wSc = win(s, 8.5, 8.78, 12.22, 12.5), wCo = win(sL, 9.5, 9.78, 12.45 + ASSYM_IN, 12.85 + ASSYM_IN);
-  rigs.couchOn = wCo > .5 && sL < 10.3;
+  // the couch only takes the keys once its card (14, Not So Lazy Boy) has been on screen: its bottom edge has risen past 70% of the view
+  const c14 = rigs.card14 || (rigs.card14 = document.querySelector('section[data-s="13"] .card'));
+  rigs.couchOn = wCo > .5 && sL < 10.3 && (!c14 || c14.getBoundingClientRect().bottom < innerHeight * .7);
   curlHand('L', .18); curlHand('R', .18);
   figure.position.set(0, 0, 0);
   floorGrid.position.set(0, .05, 0); floorGrid.rotation.y = 0; floorGrid.material.opacity = .32;
