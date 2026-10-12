@@ -774,10 +774,21 @@ function rigUI() {
   // Assym Restore: bill of materials and the balloons that point at each part
   $('bom2').innerHTML = bomHTML(ASSYM_BOM); ui.callouts2 = $('callouts2'); ui.balloons2 = balloonSet(ui.callouts2, ASSYM_BOM);
   $('bom3').innerHTML = bomHTML(SCOOT_BOM); ui.callouts3 = $('callouts3'); ui.balloons3 = balloonSet(ui.callouts3, SCOOT_BOM);
-  // clips play only while their card is on screen
-  for (const vid of document.querySelectorAll('video[data-src]')) new IntersectionObserver(([en]) => {
-    if (en.isIntersecting) { if (!vid.src) vid.src = vid.dataset.src; if (!reduced) vid.play().catch(() => {}); } else vid.pause();
-  }).observe(vid);
+  // clips play only while their card is on screen. They are muted, inline and short, so they autoplay even with Reduce Motion on.
+  // Where the browser still refuses (iOS Low Power Mode, Android Data Saver), the clip shows a play badge and the next tap anywhere
+  // starts every clip on screen.
+  const blocked = new Set();
+  const tryPlay = (vid) => vid.play().then(() => { blocked.delete(vid); vid.closest('figure')?.classList.remove('needtap'); },
+    () => { blocked.add(vid); vid.closest('figure')?.classList.add('needtap'); });
+  const unblock = () => { for (const v of [...blocked]) if (v.dataset.onscreen) tryPlay(v); };
+  addEventListener('touchend', unblock, { passive: true }); addEventListener('click', unblock);
+  for (const vid of document.querySelectorAll('video[data-src]')) {
+    vid.muted = true; vid.defaultMuted = true; vid.playsInline = true; vid.setAttribute('webkit-playsinline', '');
+    new IntersectionObserver(([en]) => {
+      if (en.isIntersecting) { vid.dataset.onscreen = 1; if (!vid.src) { vid.src = vid.dataset.src; vid.load(); } tryPlay(vid); }
+      else { delete vid.dataset.onscreen; vid.pause(); }
+    }).observe(vid);
+  }
 }
 
 // ---------- per frame ----------
