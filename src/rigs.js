@@ -842,7 +842,9 @@ function rigUI() {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;   // typing a leaderboard tag
     const k = e.key.toLowerCase();
     if (rigs.couchOn && (k.length === 1 ? 'wasdqe '.includes(k) : k.startsWith('arrow') || k === 'shift')) {
-      const Co = rigs.couch; Co.keys.add(k); if (rigs.onDrive) rigs.onDrive(); Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
+      const Co = rigs.couch; Co.keys.add(k); if (rigs.onDrive) rigs.onDrive();
+      if (Co.hold && !e.repeat && (k === 'w' || k === 'arrowup')) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); }   // waiting on the line after a lap: go again
+      Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
       // (a quick double tap used to swing the steering 90° to drive sideways; Gabriel had it removed)
       const sd = k === 'a' || k === 'arrowleft' ? 1 : k === 'd' || k === 'arrowright' ? -1 : 0;
       if (sd && !e.repeat) {
@@ -1848,10 +1850,16 @@ function couchCues(Co, Tn, drive, st) {
   Co.dHold = raw ? Math.max(0, Co.dHold || 0) + .016 : Math.min(0, Co.dHold || 0) - .016;
   if (Co.dHold > .25) Co.dOn = true; else if (Co.dHold < -.8) Co.dOn = false;
   if (C.flash && Co.lapCue !== C.flash) {          // over the line: the lap time
-    Co.lapCue = C.flash; Co.cue = 'ready'; const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
-    bigCue(tm(C.last), C.best === C.last ? 'new best lap' : 'lap · best ' + tm(C.best)); return;
+    Co.lapCue = C.flash; Co.cue = 'wait'; Co.waitT = Tn + 1.8; const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
+    bigCue(tm(C.last), C.best === C.last ? 'new best lap' : 'lap · best ' + tm(C.best));
+    // finished: back on the start line, stopped, a fresh drift score; it waits there for a new press of W (or ▲)
+    Object.assign(Co, { x: 0, z: 0, h: 0, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, slip: 0, phi: 0, dl: 0, cy: 0, tk: 0, dS: 0, dT: 0, combo: 1, score: 0, hold: true, px: undefined });
+    Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
+    return;
   }
-  if (C.i === n) {                                  // on the roundabout
+  if (Co.hold) { Co.kLast = Tn; if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
+  const P = Co.g.position, near = Math.hypot(P.x - CC.ring[0], P.z - CC.ring[1]) < CC.ringR + 120;   // at the roundabout itself, not just past the last gate
+  if (C.i === n && near) {                          // on the roundabout
     if (Co.dOn && Co.cue !== 'keep') { Co.cue = 'keep'; bigCue('Keep drifting', 'all the way round'); }
     else if (!Co.dOn && Co.cue !== 'drift' && (Co.cue !== 'keep' || Co.dHold < -.8)) { Co.cue = 'drift'; bigCue('DRIFT', TOUCH ? 'hold Drift' : 'hold Shift'); }
   } else if (C.i === 0 && C.done) {                 // lap done: back to the start
@@ -1897,7 +1905,7 @@ function couchFrame(s, dt, w) {
   if (drive) {
     const has = (a, b) => K.has(a) || K.has(b);
     const st = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
-    const thr = Co.goT != null && Tn < Co.goT ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);   // held on the line until GO
+    const thr = Co.hold || (Co.goT != null && Tn < Co.goT) ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);   // held on the line until GO
     const hb = K.has(' ');                                                // handbrake: the rear lets go
     Co.df += ((K.has('shift') ? 1 : 0) - Co.df) * (1 - Math.pow(.02, dt));   // Shift: drift mode (oversteer, loose rear); otherwise it grips
     // steering frame: the body stays put while the modules re-aim, so the direction of travel swings with it (with some speed lost)
