@@ -202,18 +202,6 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:12:55.962Z"
     },
-    "s18.div1.h21": {
-      "fp": "More from the bench.",
-      "html": "Other Projects",
-      "key": "s18.div1.h21",
-      "kind": "text",
-      "name": "Heading",
-      "origHtml": "More from the bench.",
-      "sec": 18,
-      "section": "Gallery Smaller builds and works in progress",
-      "tag": "h2",
-      "updatedAt": "2026-10-12T03:21:12.326Z"
-    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
