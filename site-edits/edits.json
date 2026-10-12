@@ -82,6 +82,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T02:57:36.352Z"
     },
+    "s10.div1.h21": {
+      "fp": "Fast motor, slow wheel.",
+      "html": "Irresponsible Power",
+      "key": "s10.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Fast motor, slow wheel.",
+      "sec": 10,
+      "section": "11 QuadFather · Belt drive",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:06:06.493Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
