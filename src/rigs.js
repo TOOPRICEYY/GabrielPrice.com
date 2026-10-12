@@ -1198,6 +1198,7 @@ function whoosh() {
 // a hit: lose health on the part that was struck, slow down, flash the little body; at zero health the run is over
 function gameHurt(S, T, part, amt, label, fall) {
   const G = S.game; if (!G.on || T < G.downUntil || (T - G.hurtT < .5 && !fall)) return;
+  if (G.tut && !fall) amt = 0;                                    // learning: a hit slows you but costs no health
   G.hurtT = T; G.hp = Math.max(0, G.hp - amt); G.mini = true; G.dmg[part] = Math.min(1, G.dmg[part] + amt / 45); G.lastPart = part;
   G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud();
   starPop(label, S.g.localToWorld(R3.u.set(0, 120, 0)));
@@ -1303,6 +1304,135 @@ function hazGet(H, kind) {
   if (!h) { h = Object.assign(H.proto[kind](), { kind }); H.g.add(h.g); H.list.push(h); }
   h.on = true; h.g.visible = true; h.t0 = clock.elapsedTime; h.hit = false; h.passed = false; return h;
 }
+// ----- first-run tips: the first scooter run of a browser session teaches one move at a time, at the moment it is needed -----
+// 1 lanes (a crutch tips into your lane), 2 jump (two crutches across the whole walk) then double jump (two pairs back to back),
+// 3 duck (a low bird that follows your lane). As each hazard reaches the point where the move is needed, the world slows to a
+// crawl and the tip shows; making the move brings the speed back. Hits cost no health while the tips run and the walk does not
+// crumble; a missed move is taught again with a fresh hazard. Progress is kept in sessionStorage, so a new session teaches
+// again and a run that ends mid-way picks up at the same tip.
+const TUT = { key: 'gp.scooter.tut', steps: ['lane', 'jump', 'dbl', 'duck'], n: null, k: 1, kT: 1, rdt: 0, hint: '', el: null };
+function tutStep(v) {
+  if (v != null) { TUT.n = v; try { sessionStorage.setItem(TUT.key, String(v)); } catch (e) { } }
+  else if (TUT.n == null) { try { TUT.n = +(sessionStorage.getItem(TUT.key) || 0) || 0; } catch (e) { TUT.n = 0; } }
+  return TUT.n;
+}
+// the tip card: what to do, with the gesture (phones) or the keys (keyboard), and its place in the three
+function tutHint(id, S, dir) {
+  const want = id ? id + '|' + (S.touchRun ? 't' : 'k') + '|' + (dir || 0) : '';
+  if (want === TUT.hint) return; TUT.hint = want;
+  let el = TUT.el;
+  if (!el) {
+    el = TUT.el = document.createElement('div'); el.id = 'sctut'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
+    el.innerHTML = '<span class="ey"></span><div class="gl"></div><b class="tx"></b><button type="button" class="sk">Skip tips</button>';
+    el.querySelector('.sk').addEventListener('click', (e) => { e.stopPropagation(); tutSkip(); });
+    el.querySelector('.sk').addEventListener('pointerdown', (e) => e.stopPropagation());
+    document.body.appendChild(el);
+  }
+  if (!id) { el.classList.remove('on'); return; }
+  // phones get a finger that swipes or taps above the words; keyboards get the keys inline
+  const t = !!S.touchRun, side = dir > 0 ? 'left' : 'right', K = (...k) => k.map(x => '<kbd>' + x + '</kbd>').join(' or ');
+  const C = {
+    ride: [0, '', 'Hold ' + K('W', '↑') + ' to ride'],
+    lane: [1, 'swipe-' + side, t ? 'Swipe ' + (dir > 0 ? '←' : '→') + ' to change lanes' : 'Hold ' + (dir > 0 ? K('A', '←') : K('D', '→')) + ' to steer ' + side],
+    jump: [2, 'tap', t ? 'Tap to jump' : K('Space') + ' to jump'],
+    dbl: [2, 'tap', t ? 'Tap again in the air: double jump' : K('Space') + ' again in the air: double jump'],
+    duck: [3, 'swipe-down', t ? 'Swipe ↓ to duck' : 'Hold ' + K('S', '↓') + ' to duck'] }[id];
+  el.querySelector('.ey').textContent = C[0] ? 'Tip ' + C[0] + ' of 3' : 'Tip';
+  el.querySelector('.gl').innerHTML = t && C[1] ? '<i class="fg ' + C[1] + '"></i>' : '';
+  el.querySelector('.tx').innerHTML = C[2];
+  el.classList.add('on'); el.classList.toggle('touch', t);
+}
+function tutSkip() {
+  tutStep(TUT.steps.length); TUT.kT = 1; tutHint('');
+  const G = rigs.scooter && rigs.scooter.game; if (G && G.tut) tutEnd(G, clock.elapsedTime, 'Tips off · Go!');
+}
+function tutEnd(G, T, msg) {
+  G.tut = false; G.tl = null; G.t0 = T; G.next = { crutch: T + 1.5, ball: T + 4, bird: T + 8, puddle: T + 3 };
+  const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = msg;
+  el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+}
+// a crutch for the tips, lying in from one side (it reaches 9 cm short of the middle line)
+function tutCrutch(H, side, z) {
+  const h = hazGet(H, 'crutch'); h.side = side; h.z = z; h.ang = 0; h.state = 0; h.tut = true;
+  h.g.position.set(side * (GAME.edge + 52), .6, z); h.g.rotation.set(0, 0, 0); h.fall.rotation.set(0, 0, 0); return h;
+}
+// runs every frame of a scooter run, before the hazards move. Returns true while the tips own the run (no random hazards).
+function tutFrame(S, T, G, H, live, rz, v) {
+  rigs.tut = TUT;                                               // (for render checks)
+  if (G.tut == null) G.tut = tutStep() < TUT.steps.length;
+  if (!G.tut || !G.on) { TUT.kT = 1; tutHint(''); return false; }
+  const rdt = TUT.rdt || 1 / 60, K = S.keys;
+  // the walk stays put behind you and speed does not climb while you learn
+  G.t0 = T; G.zc = Math.min(G.zc, S.Z - GAME.fallGap);
+  if (!live) { TUT.kT = 1; tutHint(''); return true; }
+  const n = tutStep(), step = TUT.steps[n];
+  if (n >= TUT.steps.length) { tutEnd(G, T, 'Go!'); return false; }
+  // keyboard riders who have not found the gas yet
+  const gas = S.touchRun || K.has('w') || K.has('arrowup');
+  if (!gas && S.v < 25) { G.still = (G.still || 0) + rdt; } else G.still = 0;
+  let L = G.tl;
+  if (!L) {
+    TUT.kT = 1;
+    // keyboard riders stuck on the curb: the steering tip, back toward the middle (no slow-down)
+    G.curb = Math.abs(S.X) > GAME.edge - 4 ? (G.curb || 0) + rdt : 0;
+    if (G.still > 1.2) tutHint('ride', S); else if (G.curb > 1.2) tutHint('lane', S, -Math.sign(S.X)); else tutHint('', S);
+    // the next tip waits for a straight run at speed (a jump only clears a lying crutch above ~170 cm/s forward)
+    if (T < (G.tNext || G.t0r || (G.t0r = T + 1.2)) || S.v * Math.cos(S.psi) < (step === 'lane' ? 60 : 190) || Math.abs(S.X) > GAME.edge - 4) return true;
+    L = G.tl = { step, hz: [], trig: 0, acted: false, t: T };
+    const z = S.Z + Math.max(480, v * 2.4);
+    if (step === 'lane') { const sd = S.X > 6 ? 1 : S.X < -6 ? -1 : (Math.random() < .5 ? -1 : 1); L.side = sd; L.hz.push(tutCrutch(H, sd, z)); }
+    else if (step === 'jump') L.hz.push(tutCrutch(H, -1, z), tutCrutch(H, 1, z));
+    else if (step === 'dbl') L.hz.push(tutCrutch(H, -1, z), tutCrutch(H, 1, z), tutCrutch(H, -1, z + 90), tutCrutch(H, 1, z + 90));
+    else {
+      const h = hazGet(H, 'bird'); h.side = 1; h.x = S.X; h.z = S.Z + Math.max(640, v * 2.8); h.y = 135; h.spd = 300; h.tut = true;
+      h.g.position.set(h.x, h.y, h.z); h.g.rotation.set(0, 0, 0); chirp(); L.hz.push(h);
+    }
+  }
+  const h0 = L.hz[0], hit = L.hz.some(h => h.hit);
+  let show = '', dir = 0, k = 1;
+  if (L.step === 'lane') {
+    // in reach when any of the rider's three probe points (X ± 14) is under the crutch: side·x ≥ 9
+    const reach = L.side * S.X > -8;
+    if (!L.trig && h0.state === 1 && reach) L.trig = T;
+    if (L.trig && reach && !hit && h0.z > S.Z - 10) {
+      dir = -L.side;
+      if (S.touchRun ? (S.lane || 0) * dir > 0 || (L.lane0 != null && S.lane !== L.lane0) : (dir > 0 ? K.has('a') || K.has('arrowleft') : K.has('d') || K.has('arrowright'))) L.acted = true;
+      if (L.lane0 == null) L.lane0 = S.lane || 0;
+      show = 'lane'; k = L.acted ? 1 : .2;
+    }
+  } else if (L.step === 'jump' || L.step === 'dbl') {
+    // a single jump clears a crutch lying across the walk when it is between 61 + .035 v and .465 v − 10 cm ahead of the rear axle
+    // at take-off (SC.hop 245, the 9 cm a lying crutch stands up and the 51 cm wheelbase), so the slow-down lands inside that span
+    // at take-off. Time eases down over the last .3 v before the top of that span and crawls there; the tip shows only once a press
+    // right away would clear it, since that is what a reader does.
+    const vv = Math.max(150, S.v * Math.cos(S.psi)), d = h0.z - S.Z, dT = .465 * vv - 16, ramp = .3 * vv;
+    if (!L.trig && !S.air && !hit && d < dT + ramp && d > 0) L.trig = T;
+    if (L.trig && !L.acted && !hit) { if (S.air) L.acted = true; else if (d > 0) { k = Math.max(.03, Math.min(1, (d - dT) / ramp)); if (d < dT + 3) show = 'jump'; } }
+    if (S.air && L.acted && !L.cut) { L.cut = true; S.cut = true; }       // a tap is a full jump while learning (no short hop)
+    if (L.step === 'dbl' && L.acted && !hit) {
+      const d2 = L.hz[2].z - S.Z;
+      if (S.air && !S.dbl && S.vy <= 0 && d2 > -10 && !L.dbl) { show = 'dbl'; k = .03; }
+      if (S.dbl && !L.dbl) { L.dbl = true; S.cut = true; }
+    }
+  } else {
+    // the bird keeps to your lane and height (a ramp can throw you up into it) until it is close, so ducking is the way under it
+    if (h0.z - rz > 60) { h0.x += (S.X - h0.x) * Math.min(1, 5 * rdt); h0.y = 135 + S.y; }
+    const cv = Math.max(150, S.v) + h0.spd, gap = h0.z - rz, gT = .4 * cv, ramp = .3 * cv;   // closing speed; crawl when it is .4 s out
+    if (!L.trig && gap < gT + ramp && gap > 0 && !hit) L.trig = T;
+    const ducking = S.duckT > 0 || T < (S.duckUntil || 0);
+    if (L.trig && !hit && !h0.passed && gap > -30) { if (ducking) L.acted = true; if (!L.acted) { k = Math.max(.04, Math.min(1, (gap - gT) / ramp)); if (gap < gT + 3) show = 'duck'; } }
+  }
+  TUT.kT = k; tutHint(show, S, dir);
+  // the lesson is over once its hazards are behind the rider (or gone): learnt if nothing hit, else the same tip again
+  const over = L.hz.every(h => !h.on || h.z < S.Z - 40 || h.passed);
+  if (over) {
+    G.tl = null; G.tNext = T + 1.1; for (const h of L.hz) h.tut = false;
+    G.miss = hit ? (G.miss || 0) + 1 : 0;
+    if (hit && G.miss < 3) starPop('Again', S.g.localToWorld(R3.u.set(0, 140, 0)));
+    else { G.miss = 0; tutStep(n + 1); if (n + 1 < TUT.steps.length) starPop(n === 1 ? 'Now a double' : 'Nice', S.g.localToWorld(R3.u.set(0, 140, 0))); else tutEnd(G, T, 'You got it · Go!'); }
+  }
+  return G.tut;
+}
 function gameFrame(S, T, dt, w, Zw, manual, L) {
   const G = S.game, H = S.CM.haz;
   H.g.position.z = -Zw;
@@ -1331,7 +1461,8 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   }
   if (G.on && T >= G.downUntil && S.Z < zc + 4) gameHurt(S, T, 'legL', 999, 'Fell', true);
   const v = Math.max(120, S.v), rz = S.Z + 28, live = G.on && T >= G.downUntil && w > .6;
-  if (live) {
+  const tut = tutFrame(S, T, G, H, live, rz, v);   // the first-run tips own the run until they are done
+  if (live && !tut) {
     const lvl = clamp01(G.dist / 12000);                      // 0 at the start, 1 after 120 m
     const spawnZ = S.Z + Math.min(GAME.ahead, Math.max(380, v * 1.7));
     const clear = (z) => H.list.every(h => !h.on || Math.abs(h.z - z) > 110);
@@ -1485,12 +1616,14 @@ function crashThud() {
 function scooterFrame(s, dt, w) {
   const S = rigs.scooter; fade(S.g, w); fade(S.course, w);
   rigs.ghost = 0; rigs.scootOn = false;
-  if (w <= 0) { ui.callouts3.style.opacity = 0; return; }
+  if (w <= 0) { ui.callouts3.style.opacity = 0; tutHint(''); return; }
   const T = clock.elapsedTime, RW = 10.16, L = SC.L, kneeH = +ui.scKnee.value; S.T = T;   // S.T: the rig clock, for render checks
   const e = ease(win(s, 10.55, 10.85, 11.3, 11.6));                 // exploded
   const moving = 1 - win(s, 10.4, 10.7, 11.35, 11.65);               // it rolls to a stop before it comes apart
   rigs.ghost = win(s, 10.5, 10.8, 11.35, 11.6);                     // the rider goes see-through while it is apart
   rigs.scootOn = s > 11.6 && s < 12.4;
+  // first-run tips: the world slows to a crawl while a tip waits for its move (TUT.kT, set by tutFrame), and eases back after it
+  { const on = rigs.scootOn && S.game.on && S.game.tut; if (!on) { TUT.k = TUT.kT = 1; tutHint(''); } TUT.k += (TUT.kT - TUT.k) * (1 - Math.exp(-dt * (TUT.kT < TUT.k ? 30 : 12))); TUT.rdt = dt; dt *= TUT.k; }
   ui.scKneeOut.textContent = (kneeH > 0 ? '+' : '') + kneeH + ' cm';
   // driver: keys (or the slider) if touched in the last 3 s, else the autopilot
   const K = S.keys; if (K.size) S.last = T;                    // a held key keeps it yours
