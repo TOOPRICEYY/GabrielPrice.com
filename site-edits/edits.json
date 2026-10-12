@@ -142,6 +142,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:09:23.592Z"
     },
+    "s15.div1.h21": {
+      "fp": "A lamp that plays with the cat.",
+      "html": "Cat Zoom",
+      "key": "s15.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "A lamp that plays with the cat.",
+      "sec": 15,
+      "section": "15 CatZoom",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:09:45.766Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
