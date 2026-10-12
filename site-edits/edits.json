@@ -202,6 +202,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:12:55.962Z"
     },
+    "s18.div1.p1": {
+      "fp": "Open one to turn it over, pull it apart and see how it goes together.",
+      "html": "",
+      "key": "s18.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "Open one to turn it over, pull it apart and see how it goes together.",
+      "sec": 18,
+      "section": "Gallery Smaller builds and works in progress",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:22:03.906Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
