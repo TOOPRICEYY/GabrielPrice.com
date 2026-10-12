@@ -340,7 +340,7 @@ test('the page asks before keeping a visitor id only where the law needs a yes',
     return (await r.json()).ask;
   };
   assert.equal(await where('US'), false);
-  for (const cc of ['DE', 'FR', 'GB', 'NO', 'CH', 'T1', undefined]) assert.equal(await where(cc), true, cc + ' asks');
+  for (const cc of ['DE', 'FR', 'GB', 'NO', 'CH', 'T1', 'XX', 'EU', undefined]) assert.equal(await where(cc), true, cc + ' asks');
 });
 
 test('a returning visitor is linked across visits, and only with a yes where one is needed', async () => {
