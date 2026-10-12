@@ -757,7 +757,7 @@ function rigUI() {
   el('text', { x: X(22), y: 116 }).textContent = 'stance'; el('text', { x: X(76), y: 116 }).textContent = 'swing';
   let d = ''; for (let pc = 0; pc <= 100; pc++) d += (pc ? 'L' : 'M') + X(pc).toFixed(1) + ' ' + Y(curveAt(GAIT_K, pc)).toFixed(1);
   el('path', { class: 'curve', d });
-  ui.gait = { X, Y, cur: el('line', { class: 'cursor', y1: 8, y2: 104 }), dot: el('circle', { r: 4 }), read: $('gaitRead'), btn: $('walkBtn'), walking: !reduced, pc: 0, scrub: false };
+  ui.gait = { X, Y, cur: el('line', { class: 'cursor', y1: 8, y2: 104 }), dot: el('circle', { r: 4 }), read: $('gaitRead'), btn: $('walkBtn'), walking: true, pc: 0, scrub: false };
   ui.gait.btn.setAttribute('aria-pressed', ui.gait.walking);
   ui.gait.btn.onclick = () => { ui.gait.walking = !ui.gait.walking; ui.gait.btn.setAttribute('aria-pressed', ui.gait.walking); };
   const scrub = (e) => { const b = svg.getBoundingClientRect(); ui.gait.pc = clamp01(((e.clientX - b.left) / b.width * 320 - 28) / 284) * 100; ui.gait.walking = false; ui.gait.btn.setAttribute('aria-pressed', false); };
@@ -861,7 +861,7 @@ function rigFrame(s, dt) {
   // ----- walk in the brace -----
   if (wWalk > 0) {
     const G = ui.gait;
-    if (G.walking && !reduced) G.pc = (G.pc + dt / 1.1 * 100) % 100;
+    if (G.walking) G.pc = (G.pc + dt / 1.1 * 100) % 100;
     figure.position.y = -1.2 * wWalk * (1 - Math.cos(4 * Math.PI * G.pc / 100)) / 2;
     floorGrid.position.z = -((T * 120) % 20) * (G.walking ? 1 : 0);
     const k = curveAt(GAIT_K, G.pc);
@@ -892,11 +892,11 @@ function crutchFrame(s, dt, w) {
   if (w <= 0) return;
   const A = +ui.crSwing.value * RD, Lc = 131, Q = .5 * Lc * Math.sin(A);   // quarter stride from the swing angle
   ui.crSwingOut.textContent = ui.crSwing.value + '°';
-  if (!reduced) C.p = ((C.p || 0) + dt / CG.tc) % 1; else C.p = .25;
+  C.p = ((C.p || 0) + dt / CG.tc) % 1;
   const p = C.p, cr = cgPath(p, 0), lf = cgPath(p, 0), rf = cgPath(p, .5);
   // the body rides highest over each single-leg (or leg + crutch) support and dips at the hand-offs
   figure.position.y = w * (-2.6 - 1.4 * Math.cos(4 * Math.PI * p));
-  C.dist = (C.dist || 0) + (reduced ? 0 : 4 * Q / CG.tc * dt);
+  C.dist = (C.dist || 0) + 4 * Q / CG.tc * dt;
   floorGrid.position.z = -(C.dist % 20) * w;
   figure.updateMatrixWorld(true);
   // legs: ankle targets in the figure's frame (feet under the hips, flat when planted, toes lifting through the swing)
@@ -1041,7 +1041,6 @@ function scooterFrame(s, dt, w) {
     dT = Math.max(-SC.dMax, Math.min(SC.dMax, dT)); vT = SC.vAuto;
     S.useSlider = false;
   }
-  if (reduced) vT = 0;
   S.v += (vT * moving - S.v) * (1 - Math.pow(.05, dt));
   S.delta += (dT * moving - S.delta) * (1 - Math.pow(.002, dt));
   if (!S.useSlider) ui.scSteer.value = Math.round(S.delta / RD);
@@ -1292,7 +1291,7 @@ function couchFrame(s, dt, w) {
   const VMAX = 70, WMAX = .8, k = 1 - Math.pow(.02, dt);
   // keys: driven like a car (Ackermann on the front modules, rear fixed) with the back end stepping out in a drift; the camera
   // pulls in behind for a third-person view. Left alone for 3 s, it goes back to showing off what a holonomic base can do.
-  const drive = rigs.couchOn && Tn - Co.kLast < 3 && !reduced;
+  const drive = rigs.couchOn && Tn - Co.kLast < 3;
   Co.dr += ((drive ? 1 : 0) - Co.dr) * (1 - Math.pow(.15, dt));
   const ch0 = Math.cos(Co.h), sh0 = Math.sin(Co.h);
   if (drive) {
@@ -1328,7 +1327,7 @@ function couchFrame(s, dt, w) {
     Co.u = Co.sp * Math.cos(sl); Co.v = -Co.sp * Math.sin(sl);
   } else {
     const q = 1 - (rigs.chasePre || 0);                // drive-ready: it settles, square to the street, waiting for a key
-    if (Tn - Co.last > 3 && !reduced) { vx = .7 * q * Math.cos(Co.t * .5); vz = .7 * q * Math.sin(Co.t * .5); om = .55 * q * Math.sin(Co.t * .23); }   // circle while turning: only a holonomic base does this
+    if (Tn - Co.last > 3) { vx = .7 * q * Math.cos(Co.t * .5); vz = .7 * q * Math.sin(Co.t * .5); om = .55 * q * Math.sin(Co.t * .23); }   // circle while turning: only a holonomic base does this
     if (Co.dr < .02) Co.h = Math.atan2(Math.sin(Co.h), Math.cos(Co.h));
     const mg = Math.hypot(vx, vz); if (mg > 1) { vx /= mg; vz /= mg; }
     Co.vx += (vx * VMAX - .6 * Co.x - Co.vx) * k; Co.vz += (vz * VMAX - .6 * Co.z - Co.vz) * k; Co.w += (om * WMAX - .5 * Co.h - Co.w) * k;
@@ -1534,7 +1533,7 @@ function hearthFrame(s, dt, T) {
   if (wAs > 0) {
     let x, y;
     if (ui.ptr && performance.now() - ui.ptrT < 4000) { x = ui.ptr.x; y = ui.ptr.y; }
-    else { const u = reduced ? 0 : T * .8; x = innerWidth * (.62 + .22 * Math.sin(u * 1.3)); y = innerHeight * (.6 + .15 * Math.sin(u * 2.1 + 1)); }
+    else { const u = T * .8; x = innerWidth * (.62 + .22 * Math.sin(u * 1.3)); y = innerHeight * (.6 + .15 * Math.sin(u * 2.1 + 1)); }
     AS.nd.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); AS.ray.setFromCamera(AS.nd, camera);
     // the cursor can point at the hearth or the mantel itself, not just the floor: then the laser tips steeply down to it
     if (!AS.solid) { AS.solid = []; for (const c of Hh.g.children) if (c !== Hh.dev) c.traverse(m => { if (m.isMesh) AS.solid.push(m); }); }
