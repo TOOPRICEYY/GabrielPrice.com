@@ -23,7 +23,7 @@ Events are `[ms, type, …]`:
 - `z`: the window being resized;
 - `e`: the sampler hit an error and stopped (the message).
 
-Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, and the page's version and section layout. The Worker adds the country and whether the device is a phone. No cookies are set and no IP addresses are stored.
+Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, and the page's version and section layout. The Worker adds the visitor's IP address, the country, region and city Cloudflare places it in, and whether the device is a phone. No cookies are set.
 
 Batches are sent every 30 s, and when the tab is hidden or closed, through `navigator.sendBeacon` as `text/plain` (no CORS preflight). A visit is capped at 30 minutes and 60 batches. Recording is skipped for Global Privacy Control, Do Not Track, automated browsers, `#edit`, and any browser that has opened `/admin/flow` (that page sets localStorage `flow-off`).
 
