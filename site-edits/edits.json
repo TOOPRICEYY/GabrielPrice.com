@@ -52,6 +52,18 @@
       "section": "Gallery Smaller builds and works in progress",
       "tag": "p",
       "updatedAt": "2026-10-12T04:02:36.844Z"
+    },
+    "s7.div1.figure1.figcaption1": {
+      "fp": "Oct 2026Strapping in at 10×, then running at ½ speed",
+      "html": "<b>Oct 2026</b>Strapping in and then running for the first time in over 9 months",
+      "key": "s7.div1.figure1.figcaption1",
+      "kind": "text",
+      "name": "Caption",
+      "origHtml": "<b>Oct 2026</b>Strapping in at 10×, then running at ½ speed",
+      "sec": 7,
+      "section": "08 Exoleg · Full leg",
+      "tag": "figcaption",
+      "updatedAt": "2026-10-12T14:15:44.163Z"
     }
   }
 }
