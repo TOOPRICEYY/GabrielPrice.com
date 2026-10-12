@@ -190,6 +190,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:12:45.655Z"
     },
+    "s17.div1.h21": {
+      "fp": "Thirteen parts, seen through.",
+      "html": "Parts",
+      "key": "s17.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Thirteen parts, seen through.",
+      "sec": 17,
+      "section": "17 Inside CatZoom",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:12:55.962Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
