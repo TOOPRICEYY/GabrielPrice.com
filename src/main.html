@@ -170,6 +170,11 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 .lead video, .lead img { width: min(100%, calc(var(--lh, 9999px) * var(--arn, 1.7778))); aspect-ratio: var(--ar, 16 / 9); object-fit: contain; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
 .lead { --lh: 56vh; }
 .lead.crop video, .lead.crop img { object-fit: cover; }   /* Gabriel kept the 4:5 crop on cards 09-11 (crutch, scooter ride, hub motor) */
+/* a clip the browser would not autoplay: a play badge until the next tap starts it */
+.lead, .log figure { position: relative; }
+.needtap::before { content: '▶'; position: absolute; z-index: 1; left: 50%; top: 40%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; padding-left: 3px; box-sizing: border-box; font-size: 16px; color: #fff; background: rgba(12, 14, 30, .55); pointer-events: none; }
+.log .needtap::before { width: 30px; height: 30px; font-size: 11px; top: 35%; }
 .lead figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .lead figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
 #lb { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: rgba(12, 14, 30, .82); padding: 4vh 4vw; cursor: zoom-out; }
