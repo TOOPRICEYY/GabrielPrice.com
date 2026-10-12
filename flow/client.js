@@ -5,6 +5,7 @@
 // pointer, drive keys) and keep a sample when anything changed. Batches go to POST /api/flow every 30 s and when the tab
 // is hidden or closed. No listeners on scroll or pointer (the page tracks both already), no DOM observation, no cookies.
 // Measured cost: about 4 µs per sample, so well under 0.001 ms per frame (see flow/README.md).
+// The only listeners are a click, a video play, resizes, tab hiding, and a finger counter on touch start and end.
 // Skipped for Global Privacy Control / Do Not Track, automated browsers, and the owner (opening /admin/flow sets
 // localStorage "flow-off").
 //
@@ -16,10 +17,12 @@
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
 //          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h), e capture error (message). The first batch's meta carries the site version and its
+//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message). The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
-//          the Worker reads the device type, OS and browser from the user agent itself.
+//          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
+//          orientation, CPU cores, memory, GPU, network, time zone, languages, reduced motion, and how long the 3D scene took
+//          to appear (load) and until the page's load event, when every file it asks for up front has arrived (full). All of it is read once, in the first batch; each batch adds only its average frame rate (fps).
 (() => {
   const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
@@ -41,8 +44,15 @@
   const sid = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
-  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false;
+  let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
+  // frame rate: frames and visible time since the last batch. A freeze counts as the time it took (it is what the visitor
+  // saw); hidden time doesn't, since visibilitychange resets prevT
+  let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
+  // the page's load event: every file it asks for up front has arrived (photos and clips load later, as they scroll in).
+  // The builds themselves are made in code when the scene comes up, so the scene's own time is `ready`.
+  if (document.readyState === 'complete') { try { full = Math.round(performance.getEntriesByType('navigation')[0].loadEventEnd) || 1; } catch { full = 1; } }
+  else addEventListener('load', () => { full = Math.round(performance.now()); }, { once: true });
   // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
   // but answered long before the first batch goes out
   let hints = null;
@@ -50,8 +60,17 @@
 
   waitRig((rig) => {
     const dir = new rig.THREE.Vector3();
+    // read when the browser is idle, so it never lands in a frame
+    ready = performance.now();
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 2000));
+    idle(() => { try { hw = device(); } catch {} }, { timeout: 5000 });
     function tick(t) {
       if (stopped) return;
+      if (prevT && document.visibilityState === 'visible') { frames++; frameMs += Math.min(60000, t - prevT); }
+      // a stall: the page drew nothing for a quarter second or more while visible. The phone kept scrolling (it scrolls
+      // off the main thread) but no sample could be taken, so the replay holds still there; this marks why.
+      if (prevT && t - prevT >= 250 && stalls < 40 && document.visibilityState === 'visible') { stalls++; events.push([now(), 'l', Math.min(600000, Math.round(t - prevT))]); }
+      prevT = t;
       try { sample(t); } catch (err) { fail(err); return; }
       requestAnimationFrame(tick);
     }
@@ -60,7 +79,10 @@
         lastT = t;
         const cam = rig.camera, p = cam.position, ui = rig.ui;
         cam.getWorldDirection(dir);
-        const live = ui.ptr && performance.now() - ui.ptrT < 4000;
+        // a mouse stays where it was left; a finger is only there while it touches (the page keeps the last touch point
+        // for 4 s for its laser, which would read as a tap that never lifted). A pointer last moved before the last finger
+        // lifted was that finger; one moved since is a mouse, stylus or trackpad, so hybrid devices get both right.
+        const live = ui.ptr && performance.now() - ui.ptrT < 4000 && (fingers > 0 || ui.ptrT > liftT);
         let keys = 0;
         const held = [rig.rigs.couch && rig.rigs.couch.keys, rig.rigs.scooter && rig.rigs.scooter.keys];
         for (let i = 0; i < KEYS.length; i++) if (held.some((k) => k && k.has(KEYS[i]))) keys |= 1 << i;
@@ -84,6 +106,10 @@
     flush();
   }
 
+  // fingers on the screen, and when the last one lifted: set on touch start and end, nothing per move
+  let fingers = 0, liftT = -1e9;
+  const fingersNow = (e) => { fingers = e.touches.length; if (!fingers) liftT = performance.now(); };
+  for (const t of ['touchstart', 'touchend', 'touchcancel']) document.addEventListener(t, fingersNow, { capture: true, passive: true });
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element ? e.target : null;
     const hit = el && el.closest('button, a, summary, figure, [role=button], input, label');
@@ -101,21 +127,64 @@
     if (rzT < 0) rzT = now();
     clearTimeout(rz); rz = setTimeout(() => { events.push([rzT, 'z', innerWidth, innerHeight]); rzT = -1; }, 500);
   }, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); } });
+  document.addEventListener('visibilitychange', () => {
+    prevT = 0;   // frames stop while hidden: the gap until the first frame back is not a freeze
+    if (document.visibilityState === 'hidden') { events.push([now(), 'h']); flush(); }
+  });
   addEventListener('pagehide', flush);
+  // the phone dropped the page's WebGL context (out of GPU memory, usually): mark where, and send it now, since the tab
+  // may be killed next. Often the context comes back (Android drops it in the background), so that is marked too, and
+  // only a loss with no return counts as a crash. The events don't bubble, so they are caught on the way down; nothing
+  // runs until one fires.
+  let glLost = 0, glDown = false;
+  const stage = (e) => e.target instanceof Element && e.target.id === 'stage';
+  document.addEventListener('webglcontextlost', (e) => {
+    if (!stage(e) || glDown) return;
+    glDown = true;
+    events.push([now(), 'g', window.__rig ? r3(window.__rig.s) : -1]);
+    if (++glLost <= 5) flush();   // every loss is kept; only the first few go out on their own batch
+  }, { capture: true, passive: true });
+  // a return is sent at once too, so a tab killed in the background still shows the loss was recovered
+  document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); if (glLost <= 5) flush(); } }, { capture: true, passive: true });
 
   function flush() {
     lastFlush = performance.now();
-    if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0)) return;
+    // a batch with nothing new still goes out to deliver a full-load time or device details that missed the first batch
+    const late = seq > 0 && ((full && !fullSent) || (hw && !hwSent));
+    if (seq >= MAX_SEQ || (!samples.length && !events.length && seq > 0 && !late)) return;
     const o = { sid, seq, day, samples, events };
+    if (seq === 0 && !hw && ready) { try { hw = device(); } catch {} }   // leaving before the idle read: not in a frame either
+    if (frameMs > 0) { o.fps = Math.round(frames * 10000 / frameMs) / 10; o.fms = Math.round(frameMs); }   // fms: the visible time it covers
+    // every build loaded only after the first batch went out (a slow phone or connection): send it once, now
+    if (seq > 0 && full && !fullSent) { o.full = full; fullSent = true; }
+    // the first batch left before the scene was up (the tab hidden while it loaded): the device goes in the next one
+    if (seq > 0 && hw && !hwSent) { o.hw = { ...hw, load: Math.round(ready), full }; hwSent = true; }
+    frames = 0; frameMs = 0; stalls = 0;
     if (seq === 0) o.meta = { w: innerWidth, h: innerHeight, dpr: r2(devicePixelRatio || 1), touch: matchMedia('(pointer: coarse)').matches,
-      lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
-      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}) };
+      fg: true, lang: (navigator.language || '').slice(0, 12), ref: refHost(), dark: matchMedia('(prefers-color-scheme: dark)').matches,
+      v: BUILD.version, layout: BUILD.layout, sections: BUILD.sections, ...(hints ? { ch: hints } : {}), ...(hw ? { hw: { ...hw, load: Math.round(ready), full } } : {}) };
+    if (o.meta && o.meta.hw) { hwSent = true; if (full) fullSent = true; }
     const body = JSON.stringify(o);
     samples = []; events = []; seq++;
     // text/plain keeps it a simple request (no CORS preflight); sendBeacon survives the page closing
     const blob = new Blob([body], { type: 'text/plain' });
     if (!(navigator.sendBeacon && navigator.sendBeacon('/api/flow', blob))) fetch('/api/flow', { method: 'POST', body: blob, keepalive: true }).catch(() => {});
+  }
+  // the visitor's device, read once when the scene is up: plain property reads, no new contexts or requests. The GPU name
+  // comes from the page's own WebGL canvas (#stage), whose context already exists, so asking for it creates nothing.
+  function device() {
+    const n = navigator, c = n.connection || {}, sc = screen || {};
+    let gpu = '';
+    try {
+      const cv = document.getElementById('stage'), gl = cv && (cv.getContext('webgl2') || cv.getContext('webgl'));
+      // Firefox logs a deprecation warning for the extension, and its plain RENDERER already names the GPU
+      if (gl) { const x = /Firefox/.test(n.userAgent) ? null : gl.getExtension('WEBGL_debug_renderer_info'); gpu = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || ''); }
+    } catch {}
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+    return { sw: sc.width || 0, sh: sc.height || 0, orient: (sc.orientation && sc.orientation.type) || '', cores: n.hardwareConcurrency || 0,
+      mem: n.deviceMemory || 0, tp: n.maxTouchPoints || 0, gpu: gpu.slice(0, 100), net: c.effectiveType || '', down: c.downlink || 0, rtt: c.rtt || 0,
+      save: c.saveData === true, tz, langs: (n.languages || []).slice(0, 4).join(','), motion: matchMedia('(prefers-reduced-motion: reduce)').matches };
   }
   function refHost() { try { const u = new URL(document.referrer); return u.host === location.host ? '' : u.host.slice(0, 80); } catch { return ''; } }
 
@@ -179,7 +248,8 @@
     }
     const S = rec.samples || [], E = (rec.events || []).slice().sort((x, y) => x[0] - y[0]);
     if (!S.length) { hud.textContent = 'That visit has no samples.'; return; }
-    const rig = window.__rig, dur = S[S.length - 1][0];
+    // to the last sample or event, whichever is later: a page that froze or crashed while still has its note at the end
+    const rig = window.__rig, dur = Math.max(S[S.length - 1][0], E.length ? E[E.length - 1][0] : 0);
     // recorded on another set of sections: move each sample's section to the section with the same title on this page
     const old = rec.meta && rec.meta.layout && rec.meta.layout !== BUILD.layout ? rec.meta.sections || [] : null;
     const remap = old ? old.map((title, i) => { const j = BUILD.sections.indexOf(title); return j >= 0 ? j : Math.min(i, BUILD.sections.length - 1); }) : null;
@@ -189,40 +259,45 @@
       + 'box-shadow:0 0 0 3px rgba(255,61,127,.35);pointer-events:none;display:none';
     document.body.appendChild(dot);
     hud.innerHTML = '<button type="button" data-a="play">Pause</button><button type="button" data-a="speed">1×</button>'
-      + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span>'
+      + '<input type="range" min="0" max="' + dur + '" value="0" style="width:min(320px,50vw)"><span data-a="time"></span><span data-a="stall" style="color:#ffd27d"></span>'
       + '<span style="opacity:.7">' + (rec.meta ? [rec.meta.model, rec.meta.os, rec.meta.browser].filter(Boolean).map((x) => String(x).replace(/[&<>"]/g, '')).concat((rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h).join(' · ') : '') + '</span>'
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
-    const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]');
-    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0;
+    const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
+    let stallFrom = 0, stallUntil = 0;
+    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9;
+    const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
-    let C = centers(); addEventListener('resize', () => { C = centers(); });
+    let C = centers();
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
     const lerp = (a, b, k) => a + (b - a) * k;
     function step(t) {
       const dt = t - prev; prev = t;
       if (playing) head = Math.min(dur, head + Math.max(0, dt) * speed);   // the first frame can start a touch before prev
-      while (i < S.length - 2 && S[i + 1][0] <= head) i++;
+      while (i < S.length - 1 && S[i + 1][0] <= head) i++;   // up to the last sample, so its state (a lifted finger) applies
       while (i > 0 && S[i][0] > head) i--;
       // a sample is kept only when something changed, so across a gap the state held still until the tick before b:
       // hold a until then and move only over that last tick (a fling after a pause is a jump, not a slow drift)
       const a = S[i], b = S[Math.min(i + 1, S.length - 1)], ta = Math.max(a[0], b[0] - 1000 / HZ);
       const k = b[0] > ta ? Math.max(0, Math.min(1, (head - ta) / (b[0] - ta))) : 0;
+      C = centers();   // photos and clips loading move the sections; the page measures them on every scroll too
       const s = mapS(lerp(a[1], b[1], k)), fi = Math.min(C.length - 2, Math.max(0, Math.floor(s)));
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
       rig.setS(s);
       window.__cam = [[lerp(a[6], b[6], k), lerp(a[7], b[7], k), lerp(a[8], b[8], k)], [lerp(a[9], b[9], k), lerp(a[10], b[10], k), lerp(a[11], b[11], k)]];
-      if (a[3] >= 0) {
+      // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
+      if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }
+      if (a[3] >= 0 && (!touch || fg || head - lastPT < 600)) {
         const x = a[3] * innerWidth, y = a[4] * innerHeight;
         rig.ui.ptr = { x, y }; rig.ui.ptrT = performance.now();
         dot.style.display = 'block'; dot.style.left = x + 'px'; dot.style.top = y + 'px';
-      } else dot.style.display = 'none';
+      } else { dot.style.display = 'none'; rig.ui.ptr = null; }   // lifted or idle: the laser and the cat stop following it too
       for (const set of [rig.rigs.couch && rig.rigs.couch.keys, rig.rigs.scooter && rig.rigs.scooter.keys]) {
         if (!set) continue; set.clear();
         KEYS.forEach((key, j) => { if (a[5] & (1 << j)) set.add(key); });
@@ -230,8 +305,12 @@
       while (ei < E.length && E[ei][0] <= head) {
         if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
+        else if (E[ei][1] === 'l') { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
+        else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view dropped out here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
+        else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         ei++;
       }
+      if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);
     }
