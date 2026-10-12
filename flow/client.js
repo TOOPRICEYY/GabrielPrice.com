@@ -45,7 +45,8 @@
   const day = new Date().toISOString().slice(0, 10);
   const t0 = performance.now();
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
-  // frame rate: frames and visible time since the last batch (a gap over 1 s is a hidden tab or a stall, not counted)
+  // frame rate: frames and visible time since the last batch. A freeze counts as the time it took (it is what the visitor
+  // saw); hidden time doesn't, since visibilitychange resets prevT
   let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
   const now = () => Math.round(performance.now() - t0);
   // model ('Pixel 8', '' on desktops) and OS version ('14.0.0'; Windows 11 reports 13+): Chromium only, and asynchronous,
@@ -61,7 +62,7 @@
     idle(() => { try { hw = device(); } catch {} }, { timeout: 5000 });
     function tick(t) {
       if (stopped) return;
-      if (prevT && t - prevT < 1000) { frames++; frameMs += t - prevT; }
+      if (prevT && document.visibilityState === 'visible') { frames++; frameMs += Math.min(60000, t - prevT); }
       // a stall: the page drew nothing for a quarter second or more while visible. The phone kept scrolling (it scrolls
       // off the main thread) but no sample could be taken, so the replay holds still there; this marks why.
       if (prevT && t - prevT >= 250 && stalls < 40 && document.visibilityState === 'visible') { stalls++; events.push([now(), 'l', Math.min(600000, Math.round(t - prevT))]); }
