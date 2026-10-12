@@ -2062,7 +2062,7 @@ const TIPS = [
   ['Get some speed, then hold <kbd>Shift</kbd> through a turn to drift', (Co) => Co.df > .5 && Math.abs(Co.slip) > 12 * RD],
   ['Drifting! Steer the other way to hold the slide, let go of <kbd>Shift</kbd> to grip', (Co, t) => t > 4],
   ['Double-tap <kbd>A</kbd> or <kbd>D</kbd>: the steering swings 90° and the couch drives sideways', (Co) => Co.oriUsed > 0],
-  ['Double-tap the other way to swing it back. <kbd>Space</kbd> is the handbrake', (Co, t) => t > 6],
+  ['Double-tap the other way to swing it back', (Co, t) => t > 6],
   ['Stop, let go of <kbd>W</kbd>, and hold <kbd>A</kbd> or <kbd>D</kbd> to spin on the spot like a tank', (Co) => Math.abs(Co.tk) > .8]];
 // the same tips for the touch pad: up top, where the pad and the thumbs aren't
 const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
