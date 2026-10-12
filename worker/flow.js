@@ -18,6 +18,9 @@ import dashboard from './flow-dashboard.js';
 import replayPage from './flow-replay.js';
 
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
+// crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
+// models such as the CUBOT X30 contain
+const BOT = /HeadlessChrome|Lighthouse|PageSpeed|[a-z]bot[\/-]|\bbot\b|crawler|spider|slurp/i;
 const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
 // layouts live before visits carried one, by when they went live: PR #6's 18 sections, then from #7 (deployed 02:24:13Z) the
 // couch drive section at 14. An unversioned visit is read against the one live when its first batch arrived.
@@ -54,12 +57,15 @@ export async function flowIngest(request, env, ctx, url) {
   try { b = JSON.parse(text); } catch { return empty(400); }
   const clean = checkBatch(b);
   if (!clean) return empty(400);
+  // test rigs and crawlers: the page already skips automated browsers (navigator.webdriver); this catches the ones that hide it
+  if (BOT.test(request.headers.get('user-agent') || '')) return empty(204);
   if (!env.FLOW) return empty(204);
   if (clean.meta) {
     // where the visit came from, as Cloudflare sees it at the edge: country, region, city and the connecting IP
     const cf = request.cf || {};
     clean.meta.cc = str(cf.country, 2); clean.meta.region = str(cf.region, 40); clean.meta.city = str(cf.city, 40);
     clean.meta.ip = str(request.headers.get('cf-connecting-ip'), 45);
+    clean.meta.isp = str(cf.asOrganization, 60);   // the network: a mobile carrier, a home ISP, a university
     const ua = request.headers.get('user-agent') || '';
     clean.meta.mobile = /Mobi|Android|iPhone|iPad/.test(ua);
     Object.assign(clean.meta, device(ua, clean.meta.ch, clean.meta.touch));
@@ -87,19 +93,32 @@ export function checkBatch(b) {
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r'].includes(e[1])) return null;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };
+  if (num(b.fps) && b.fps >= 0 && b.fps <= 1000) { out.fps = Math.round(b.fps * 10) / 10; if (num(b.fms) && b.fms > 0 && b.fms <= 3600000) out.fms = Math.round(b.fms); }
+  if (num(b.full) && b.full > 0 && b.full <= 3600000) out.full = Math.round(b.full);
+  if (b.seq > 0) { const hw = checkHw(b.hw); if (hw) out.hw = hw; }   // the device, when the first batch left before it was read
   if (b.seq === 0) {
     const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
-    out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true,
+    out.meta = { w: num(m.w) ? m.w : 0, h: num(m.h) ? m.h : 0, dpr: num(m.dpr) ? m.dpr : 1, touch: m.touch === true, fg: m.fg === true,
       lang: str(m.lang, 12), ref: str(m.ref, 80), dark: m.dark === true,
       v: /^\w{1,12}$/.test(m.v) ? m.v : '', layout: LAYOUT.test(m.layout) ? m.layout : '' };
+    const hw = checkHw(m.hw); if (hw) out.meta.hw = hw;
     if (m.ch && typeof m.ch === 'object') out.meta.ch = { model: str(m.ch.model, 40), pv: str(m.ch.pv, 20) };
     if (out.meta.layout && Array.isArray(m.sections) && m.sections.length <= 80 && m.sections.every((x) => typeof x === 'string' && x.length <= 80)) out.meta.sections = m.sections;
   }
   return out;
+}
+
+// the device details the page reads once (flow/client.js device()): known fields only, numbers in range, strings trimmed
+function checkHw(h) {
+  if (!h || typeof h !== 'object') return null;
+  const n = (x, max) => (num(x) && x >= 0 && x <= max ? Math.round(x * 100) / 100 : 0);
+  return { sw: n(h.sw, 20000), sh: n(h.sh, 20000), orient: str(h.orient, 20), cores: n(h.cores, 1024), mem: n(h.mem, 1024), tp: n(h.tp, 64),
+    gpu: str(h.gpu, 100), net: str(h.net, 8), down: n(h.down, 10000), rtt: n(h.rtt, 60000), save: h.save === true, tz: str(h.tz, 40),
+    langs: str(h.langs, 60), motion: h.motion === true, load: n(h.load, 600000), full: n(h.full, 3600000) };
 }
 
 // What the visitor was on, from the user agent plus the page's client hints (ch: model and OS version, Chromium only):
@@ -137,7 +156,7 @@ export function device(ua, ch, touch) {
   else if (/Linux/.test(ua)) { os = 'Linux'; model = 'PC'; }
   if (!dev) dev = /Mobi/.test(ua) ? 'phone' : touch && !model ? 'tablet' : 'desktop';
   const b = (name, re) => { const x = v(re); return x !== '' ? name + ' ' + major(x) : null; };
-  const browser = (/bot|crawl|spider|slurp|preview/i.test(ua) ? 'bot' : null)
+  const browser = (BOT.test(ua) ? 'bot' : null)
     || (/Instagram/.test(ua) ? 'Instagram app' : null) || (/FBAN|FBAV/.test(ua) ? 'Facebook app' : null) || (/LinkedInApp/.test(ua) ? 'LinkedIn app' : null)
     || (/; wv\)/.test(ua) ? 'in-app browser' : null)
     || b('Edge', /Edg(?:e|A|iOS)?\/(\d+)/) || b('Opera', /(?:OPR|OPT)\/(\d+)/) || b('Samsung Internet', /SamsungBrowser\/(\d+)/)
@@ -162,15 +181,23 @@ export function summarise(c) {
     if (x[5]) drive += dt;
     if (x[3] >= 0) ptr += dt;
   }
-  const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(S.length ? S[S.length - 1][0] : 0),
+  const m = { n: String(S.length), t0: String(S.length ? S[0][0] : 0), t1: String(Math.max(S.length ? S[S.length - 1][0] : 0, ...c.events.map((e) => e[0]))),   // a freeze or crash after the page went still still counts
     maxS: maxS.toFixed(2), free: free.toFixed(1), drive: drive.toFixed(1), ptr: ptr.toFixed(1),
     dwell: Object.entries(dwell).map(([k, v]) => k + ':' + v.toFixed(1)).join(','), clicks: String(c.events.filter((e) => e[1] === 'c').length),
-    err: String(c.events.filter((e) => e[1] === 'e').length) };
+    err: String(c.events.filter((e) => e[1] === 'e').length), ...(num(c.fps) ? { fps: String(c.fps) } : {}), ...(num(c.fms) ? { fms: String(c.fms) } : {}), ...(num(c.full) ? { full: String(c.full) } : {}) };
+  const st = c.events.filter((e) => e[1] === 'l' && num(e[2]));
+  if (st.length) m.stall = st.length + ':' + st.reduce((a, e) => a + e[2], 0);   // how often and for how long (ms) the page froze
+  // losses of the 3D view's WebGL context less the ones that came back; a loss and its return can land in different
+  // batches (the loss is sent at once), so a batch can count -1 and the visit's sum is what matters
+  const gl = c.events.filter((e) => e[1] === 'g').length - c.events.filter((e) => e[1] === 'r').length;
+  if (gl) m.gl = String(gl);
+  const h = c.meta ? c.meta.hw : c.hw;
+  if (h) Object.assign(m, { scr: h.sw + 'x' + h.sh, cores: String(h.cores), mem: String(h.mem), gpu: h.gpu, net: h.net, tz: h.tz, load: String(h.load), full: String(Math.max(h.full, c.full || 0)) });
   if (c.meta) {
     m.v = c.meta.v || ''; m.layout = c.meta.layout || '';
     m.dev = c.meta.dev || (c.meta.mobile ? 'phone' : c.meta.touch ? 'tablet' : 'desktop');
-    m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || '';
-    m.size = c.meta.w + 'x' + c.meta.h; m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
+    m.os = c.meta.os || ''; m.br = c.meta.browser || ''; m.model = c.meta.model || ''; m.isp = c.meta.isp || '';
+    m.size = c.meta.w + 'x' + c.meta.h; m.dpr = String(c.meta.dpr); m.cc = c.meta.cc || ''; m.region = c.meta.region || ''; m.city = c.meta.city || ''; m.ip = c.meta.ip || ''; m.ref = c.meta.ref; m.lang = c.meta.lang;
   }
   return m;
 }
@@ -263,13 +290,20 @@ export async function listSessions(env, days) {
       v.ms = Math.max(v.ms, Number(m.t1) || 0);
       v.maxS = Math.max(v.maxS, Number(m.maxS) || 0);
       v.err = (v.err || 0) + (Number(m.err) || 0);
+      // weighted by the visible time each batch's frame rate covers (older batches: their sample span)
+      if (m.full) v.full = Math.max(v.full || 0, Number(m.full) || 0);
+      // the device's details, from the first batch or, when that left before they were read, a later one
+      if (m.scr) { v.scr = m.scr; v.cores = Number(m.cores) || 0; v.mem = Number(m.mem) || 0; v.gpu = m.gpu || ''; v.net = m.net || ''; v.tz = m.tz || ''; v.load = Number(m.load) || 0; }
+      if (m.fps) { const w = Math.max(1, Number(m.fms) || (Number(m.t1) || 0) - (Number(m.t0) || 0)); v.fpsW = (v.fpsW || 0) + w; v.fpsSum = (v.fpsSum || 0) + Number(m.fps) * w; v.fps = Math.round(10 * v.fpsSum / v.fpsW) / 10; }
+      if (m.gl) v.gl = (v.gl || 0) + (Number(m.gl) || 0);
+      if (m.stall) { const [k, ms] = m.stall.split(':').map(Number); v.stalls = (v.stalls || 0) + (k || 0); v.stallMs = (v.stallMs || 0) + (ms || 0); }
       v.free += Number(m.free) || 0; v.drive += Number(m.drive) || 0; v.ptr += Number(m.ptr) || 0; v.clicks += Number(m.clicks) || 0;
       for (const kv of (m.dwell || '').split(',')) { const [s, t] = kv.split(':'); if (t) v.dwell[s] = (v.dwell[s] || 0) + Number(t); }
-      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
+      if (m.dev) { v.v = m.v || ''; v.layout = m.layout || legacyFor(o.uploaded).layout; v.dev = m.dev; v.isp = m.isp || ''; v.dpr = m.dpr || ''; v.os = m.os || ''; v.browser = m.br || ''; v.model = m.model || ''; v.size = m.size; v.cc = m.cc; v.region = m.region || ''; v.city = m.city || ''; v.ip = m.ip || ''; v.ref = m.ref; v.lang = m.lang; v.start = o.uploaded; }
       byId.set(k, v);
     }
   }
-  return [...byId.values()].sort((a, b) => String(b.start || b.day).localeCompare(String(a.start || a.day)));
+  return [...byId.values()].map(({ fpsSum, fpsW, ...v }) => v).sort((a, b) => String(b.start || b.day).localeCompare(String(a.start || a.day)));
 }
 
 // store a layout's section titles once, only if they hash to the name the page gave them

@@ -43,7 +43,7 @@ async function post(body, { origin = ORIGIN, e = env, ua = '' } = {}) {
     method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
     headers: { 'content-type': 'text/plain', 'cf-connecting-ip': '203.0.113.7', ...(origin ? { origin } : {}), ...(ua ? { 'user-agent': ua } : {}) },
   });
-  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit' } });   // what Cloudflare's edge attaches
+  Object.defineProperty(req, 'cf', { value: { country: 'US', region: 'Michigan', city: 'Detroit', asOrganization: 'Comcast Cable' } });   // what Cloudflare's edge attaches
   const r = await worker.fetch(req, e, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   return r;
@@ -80,6 +80,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /Array\.isArray\(window\.__cam\)/, 'window.__cam camera override');
   assert.match(html, /const free = \{ on: false/, 'free.on flag');
   assert.match(html, /section[^>]*data-s="0"/, 'sections carry data-s');
+  assert.match(html, /<canvas id="stage"/, 'the WebGL canvas the recorder reads the GPU name from');
 });
 
 test('a valid batch is stored under flow/<day>/<sid>/<seq> with a summary, unknown fields dropped', async () => {
@@ -237,6 +238,81 @@ test('each visit records its device type, model, OS and browser', async () => {
   const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
   assert.deepEqual([v.dev, v.model, v.os, v.browser], ['phone', 'Pixel 8', 'Android 14', 'Chrome 129']);
   assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /getHighEntropyValues\(\['model', 'platformVersion'\]\)/);
+});
+
+test('headless browsers and crawlers are accepted quietly but never stored', async () => {
+  const before = env.FLOW.m.size;
+  for (const ua of ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/129.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Mozilla/5.0 (X11; Linux x86_64; Storebot-Google/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36', 'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse']) {
+    assert.equal((await post(batch({ sid: 'abababababababab' }), { ua })).status, 204);
+  }
+  assert.equal(env.FLOW.m.size, before);
+  // a phone whose model contains "bot" is a visitor, not a crawler
+  const cubot = 'Mozilla/5.0 (Linux; Android 12; CUBOT X30) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+  await post(batch({ sid: 'acacacacacacacac' }), { ua: cubot });
+  assert.equal(env.FLOW.m.size, before + 1, 'CUBOT phones are recorded');
+  assert.equal(device(cubot, null, true).browser, 'Chrome 129');
+  assert.match(fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8'), /navigator\.webdriver\) return/, 'automated browsers are skipped in the page');
+});
+
+test('each visit records its hardware, network, frame rate and load time, within the summary\'s size limit', async () => {
+  const sid = 'eeeeeeeeeeeeeeee';
+  const hw = { sw: 390, sh: 844, orient: 'portrait-primary', cores: 6, mem: 4, tp: 5, gpu: 'Apple GPU', net: '4g', down: 9.5, rtt: 50, save: false,
+    tz: 'America/Detroit', langs: 'en-US,en', motion: false, load: 2140, full: 6310, extra: 'dropped' };
+  await post(batch({ sid, fps: 58.7, meta: { ...batch().meta, hw } }));
+  await post(batch({ sid, seq: 1, meta: undefined, fps: 30.1, samples: [sample(30000, 2), sample(60000, 3)] }));
+  const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
+  assert.equal(st.fps, 58.7); assert.equal(st.meta.hw.gpu, 'Apple GPU'); assert.equal(st.meta.hw.extra, undefined); assert.equal(st.meta.isp, 'Comcast Cable');
+  const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  assert.deepEqual([v.scr, v.dpr, v.cores, v.mem, v.gpu, v.net, v.tz, v.load, v.full, v.isp], ['390x844', '2', 6, 4, 'Apple GPU', '4g', 'America/Detroit', 2140, 6310, 'Comcast Cable']);
+  assert.ok(v.fps > 30.1 && v.fps < 58.7, 'frame rate averages the batches by their length'); assert.equal(v.fpsSum, undefined);
+  // weighted by the visible time each frame rate covers, and a full load that came after the first batch still counts
+  const sid2 = 'efefefefefefefef';
+  await post(batch({ sid: sid2, fps: 60, fms: 29000, samples: [sample(0, 0)], meta: { ...batch().meta, hw: { ...hw, full: 0 } } }));
+  await post(batch({ sid: sid2, seq: 1, meta: undefined, fps: 20, fms: 1000, full: 41000, samples: [sample(30000, 1), sample(59000, 2)] }));
+  const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));
+  assert.equal(v2.fps, 58.7, 'the 29 s batch outweighs the 1 s one, however many samples each kept');
+  assert.equal(v2.full, 41000);
+  // the first batch left before the device was read (tab hidden while loading): a later batch carries it
+  const sid3 = 'edededededededed';
+  await post(batch({ sid: sid3 }));
+  await post(batch({ sid: sid3, seq: 1, meta: undefined, samples: [], events: [], hw }));
+  const v3 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid3));
+  assert.deepEqual([v3.scr, v3.cores, v3.gpu, v3.load, v3.full], ['390x844', 6, 'Apple GPU', 2140, 6310]); assert.ok(v3.dev, 'the first batch still names the device');
+  assert.equal(checkBatch(batch({ hw })).hw, undefined, 'the first batch carries it in meta only');
+  // junk is dropped, not stored
+  const bad = checkBatch(batch({ fps: 'fast', meta: { ...batch().meta, hw: { cores: -1, mem: 1e9, gpu: 42, load: 'x' } } }));
+  assert.equal(bad.fps, undefined); assert.deepEqual([bad.meta.hw.cores, bad.meta.hw.mem, bad.meta.hw.gpu, bad.meta.hw.load], [0, 0, '', 0]);
+  // every string at its longest still fits R2's 2 KB of custom metadata
+  const long = (n) => 'x'.repeat(n);
+  const max = checkBatch(batch({ fps: 59.9, events: [[1, 'l', 900], [2, 'g', 3]], samples: Array.from({ length: 40 }, (_, i) => sample(i * 2000, i)), meta: { ...batch().meta, ref: long(200), lang: long(20),
+    hw: { ...hw, gpu: long(300), tz: long(100), net: long(20), langs: long(200) } } }));
+  Object.assign(max.meta, { cc: 'US', region: long(40), city: long(40), ip: long(45), isp: long(60), os: long(40), browser: long(40), model: long(40), dev: 'desktop' });
+  const bytes = Object.entries(summarise(max)).reduce((a, [k, x]) => a + Buffer.byteLength(k) + Buffer.byteLength(x), 0);
+  assert.ok(bytes < 2048, `summary is ${bytes} bytes`);
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /requestIdleCallback/, 'the device is read when the browser is idle, not in a frame');
+  assert.match(client, /visibilitychange', \(\) => \{\s*prevT = 0/, 'time spent hidden is not counted as a freeze');
+  assert.match(client, /const late = [^;]*full && !fullSent[^;]*hw && !hwSent[^]*?!events\.length && seq > 0 && !late\)\) return/, 'a pending load time or device goes out even with nothing else new');
+  assert.match(client, /head < stallFrom\) stall\.textContent = ''/, 'a replay note stays up from its event until it times out');
+});
+
+test('a 3D crash is stored with where it happened, counted per visit, and sent the moment it happens', async () => {
+  const sid = 'adadadadadadadad';
+  await post(batch({ sid, events: [[4000, 'l', 900], [5200, 'g', 7.25]] }));
+  const st = JSON.parse(env.FLOW.m.get(`flow/${DAY}/${sid}/000.json`).body);
+  assert.deepEqual(st.events[1], [5200, 'g', 7.25]);
+  const v = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid));
+  assert.equal(v.gl, 1); assert.equal(v.stalls, 1); assert.equal(v.ms, 5200, 'the visit lasts to its last event');
+  // a loss that came back, in the next batch, is not a crash
+  const sid2 = 'aeaeaeaeaeaeaeae';
+  await post(batch({ sid: sid2, events: [[5200, 'g', 7.25]] }));
+  await post(batch({ sid: sid2, seq: 1, meta: undefined, samples: [sample(6000, 7.3)], events: [[6100, 'r']] }));
+  const v2 = (await (await get('/admin/api/flow/sessions?days=1')).json()).sessions.find((x) => x.key.endsWith(sid2));
+  assert.ok(!(v2.gl > 0), 'restored');
+  const client = fs.readFileSync(new URL('../flow/client.js', import.meta.url), 'utf8');
+  assert.match(client, /addEventListener\('webglcontextlost'[^]*?'g'[^]*?flush\(\)/, 'the recorder logs and sends a lost WebGL context');
+  assert.match(fs.readFileSync(new URL('../src/main.html', import.meta.url), 'utf8'), /<canvas id="stage"/, 'the 3D canvas the recorder watches is still #stage');
 });
 
 test('unversioned visits are read against the layout live when they arrived', () => {
