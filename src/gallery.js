@@ -85,8 +85,8 @@ const PROJECTS = [
       liftoff: ['From its camera.', 'Takeoff to the rooftops, 4× speed.'],
       specs: ['Heavy Lift Hexacopter', ''] },
     flight: `<figure class="gx-vid"><video src="photos/drone_flight.mp4" poster="photos/drone_flight.webp" muted loop playsinline preload="metadata" aria-label="The hexacopter hovering over a backyard shed"></video></figure>`,
-    liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighbourhood roofs"></video></figure>`,
-    specs: `<dl class="spec"><dt>Autopilot</dt><dd>ArduPilot</dd><dt>Payload</dt><dd>8 kg</dd><dt>Frame</dt><dd>Six aluminium arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fibre</dd></dl>
+    liftoff: `<figure class="gx-vid"><video src="photos/drone_liftoff.mp4" poster="photos/drone_liftoff.webp" muted loop playsinline preload="metadata" aria-label="Looking straight down from the drone as it lifts off snowy ground and climbs over the neighborhood roofs"></video></figure>`,
+    specs: `<dl class="spec"><dt>Autopilot</dt><dd>ArduPilot</dd><dt>Payload</dt><dd>8 kg</dd><dt>Frame</dt><dd>Six aluminum arms, a clear dome over the electronics</dd><dt>Props</dt><dd>Two-blade carbon fiber</dd></dl>
       <div class="gx-gal two"><figure><img loading="lazy" src="photos/drone_build.webp" alt="The heavy lift hexacopter on a wood floor with its transmitter"><figcaption><b>Built</b></figcaption></figure>
       <figure><img loading="lazy" src="photos/drone_thrust.webp" alt="Thrust test rig: an Arduino drives an ESC, the motor and carbon prop sit on a kitchen scale, a multimeter reads the current from a Turnigy LiPo"><figcaption><b>Thrust test</b>Motor on a scale</figcaption></figure></div>` },
   { id: 'flyingbike', title: 'Flying Bike', kind: 'In progress', model: 'flyingbike', soon: true,
