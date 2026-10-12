@@ -169,6 +169,7 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 /* each lead keeps its file's own shape (--ar, --arn = width/height on the element); --lh caps the height by narrowing it, never by cropping */
 .lead video, .lead img { width: min(100%, calc(var(--lh, 9999px) * var(--arn, 1.7778))); aspect-ratio: var(--ar, 16 / 9); object-fit: contain; display: block; border: 1px solid var(--rule); background: var(--vellum-2); cursor: zoom-in; }
 .lead { --lh: 56vh; }
+.lead.crop video, .lead.crop img { object-fit: cover; }   /* Gabriel kept the 4:5 crop on cards 09-11 (crutch, scooter ride, hub motor) */
 .lead figcaption { font-family: var(--f-mono); font-size: 10px; line-height: 1.35; color: var(--graphite-2); }
 .lead figcaption b { color: var(--cobalt); font-weight: 500; letter-spacing: .08em; margin-right: 6px; }
 #lb { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: rgba(12, 14, 30, .82); padding: 4vh 4vw; cursor: zoom-out; }
@@ -296,7 +297,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
     <div class="hero-wrap">
       <div class="eyebrow">Portfolio <b>Engineer · Builder</b></div>
       <h1>Gabriel <em>Price</em></h1>
-      <p>I create to live and live to create</p>
+      <p>Create to live, live to create</p>
       <div class="scrollhint">Scroll to start ↓</div>
     </div>
   </section>
@@ -375,7 +376,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
       <h2>Crutch Refreshments</h2>
       <p>A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.</p>
-      <figure class="lead tall"><img style="--ar: 3 / 4; --arn: .75" loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
+      <figure class="lead tall crop"><img style="--ar: 4 / 5; --arn: .8" loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminium crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="crRead"></div><div class="ctl">
         <label>Stride swing <input id="crSwing" type="range" min="0" max="20" step="1" value="12"><output id="crSwingOut">12°</output></label>
       </div></div>
@@ -387,7 +388,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
       <h2>The Quad Father</h2>
       <p>A motorized knee scooter. What could go wrong?</p>
-      <figure class="lead tall"><video style="--ar: 9 / 16; --arn: .5625" muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
+      <figure class="lead tall crop"><video style="--ar: 4 / 5; --arn: .8" muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
     </div>
   </section>
 
@@ -396,7 +397,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
       <div class="eyebrow">11 <b>QuadFather · Belt drive</b></div>
       <h2>Irresponsible Power</h2>
       <p>With a peak power of over 8Hp and a max speed of 30mph, this medical device is guaranteed to leave you more injured than you started.</p>
-      <figure class="lead tall"><video style="--ar: 9 / 16; --arn: .5625" muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
+      <figure class="lead tall crop"><video style="--ar: 4 / 5; --arn: .8" muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
       <div class="jsonly" hidden><div class="readout" id="scBelt"></div></div>
     </div>
   </section>
