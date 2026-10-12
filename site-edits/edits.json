@@ -81,6 +81,18 @@
       "section": "02 About",
       "tag": "p",
       "updatedAt": "2026-10-12T02:57:36.352Z"
+    },
+    "s2.div1.h21": {
+      "fp": "The Kicker",
+      "html": "ExoLeg",
+      "key": "s2.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "The Kicker",
+      "sec": 2,
+      "section": "03 Project · Anti-thetis",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T02:57:54.567Z"
     }
   }
 }
