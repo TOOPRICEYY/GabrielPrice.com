@@ -744,10 +744,12 @@ const renderer = (() => {
   no3D('This browser could not start the 3D view (WebGL is off or unavailable).'); throw new Error('no WebGL');
 })();
 // pixel ratio: up to 2 (1.5 on Android), stepped down by the frame loop when the phone can't keep up (see frame())
-const DPR_MAX = Math.min(devicePixelRatio, ANDROID ? 1.5 : 2);
+// safe mode: after a lost context (this tab, or before a reload in this session) render at 1x with no shadows
+let glSafe = false; try { glSafe = sessionStorage.getItem('gp.gl.safe') === '1'; } catch {}
+const DPR_MAX = glSafe ? 1 : Math.min(devicePixelRatio, ANDROID ? 1.5 : 2);
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !glSafe;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.localClippingEnabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -761,8 +763,11 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 // If the context doesn't come back within 4 s, the GPU has given up on this page: say so (the frowning face alone explains nothing).
 // window.__glLost counts losses, for the flow recorder and for debugging.
 let glLostT = 0;
-canvas.addEventListener('webglcontextlost', () => { window.__glLost = (window.__glLost || 0) + 1; clearTimeout(glLostT); glLostT = setTimeout(() => no3D('The 3D view crashed on this device.', true), 4000); });
-canvas.addEventListener('webglcontextrestored', () => { clearTimeout(glLostT); scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; });
+canvas.addEventListener('webglcontextlost', () => { window.__glLost = (window.__glLost || 0) + 1; try { sessionStorage.setItem('gp.gl.safe', '1'); } catch {} clearTimeout(glLostT); glLostT = setTimeout(() => no3D('The 3D view crashed on this device.', true), 4000); });
+canvas.addEventListener('webglcontextrestored', () => { clearTimeout(glLostT);
+  glSafe = true;
+  renderer.shadowMap.enabled = false; dpr = 1; renderer.setPixelRatio(1); resize();   // a restored context comes back lighter, so it isn't lost again
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; });
 
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
 
