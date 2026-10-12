@@ -14,6 +14,7 @@
 // can label and count every visit by its own sections, whatever the page looks like now.
 import CURRENT from './sections.gen.js';
 import dashboard from './flow-dashboard.js';
+import replayPage from './flow-replay.js';
 
 const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 const SID = /^[0-9a-f]{16}$/, DAY = /^\d{4}-\d{2}-\d{2}$/, LAYOUT = /^[0-9a-f]{12}$/;
@@ -130,6 +131,10 @@ export async function flowAdmin(request, env, url) {
   if (request.method !== 'GET') return send({ error: 'GET' }, 405);
   if (p === '/admin/flow' || p === '/admin/flow/') {
     return new Response(dashboard, { headers: { ...NO_STORE, 'content-type': 'text/html; charset=utf-8',
+      'content-security-policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'" } });
+  }
+  if (p === '/admin/flow/replay') {
+    return new Response(replayPage, { headers: { ...NO_STORE, 'content-type': 'text/html; charset=utf-8',
       'content-security-policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'" } });
   }
   if (!env.FLOW) return send({ error: 'The R2 bucket for analytics is not set up yet (DEPLOY.md, section 6).' }, 503);
