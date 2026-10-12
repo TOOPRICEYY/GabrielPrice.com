@@ -136,10 +136,10 @@
   let glLost = 0, glDown = false;
   const stage = (e) => e.target instanceof Element && e.target.id === 'stage';
   document.addEventListener('webglcontextlost', (e) => {
-    if (!stage(e) || glDown || glLost >= 5) return;
-    glLost++; glDown = true;
+    if (!stage(e) || glDown) return;
+    glDown = true;
     events.push([now(), 'g', window.__rig ? r3(window.__rig.s) : -1]);
-    flush();
+    if (++glLost <= 5) flush();   // every loss is kept; only the first few go out on their own batch
   }, { capture: true, passive: true });
   document.addEventListener('webglcontextrestored', (e) => { if (stage(e) && glDown) { glDown = false; events.push([now(), 'r']); } }, { capture: true, passive: true });
 
