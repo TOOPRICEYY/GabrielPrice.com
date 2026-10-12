@@ -94,6 +94,18 @@
       "tag": "h2",
       "updatedAt": "2026-10-12T03:06:06.493Z"
     },
+    "s10.div1.p1": {
+      "fp": "A small pulley on the motor turns a big one on the wheel, trading speed for torque.",
+      "html": "With a peak power of over 8Hp and a max speed of 30mph, this medical device is garnered to leave you more injured then you started",
+      "key": "s10.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A small pulley on the motor turns a big one on the wheel, trading speed for torque.",
+      "sec": 10,
+      "section": "11 QuadFather · Belt drive",
+      "tag": "p",
+      "updatedAt": "2026-10-12T03:07:08.400Z"
+    },
     "s2.div1.h21": {
       "fp": "The Kicker",
       "html": "ExoLeg",
