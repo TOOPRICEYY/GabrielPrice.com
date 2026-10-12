@@ -275,9 +275,9 @@
       + '<span style="opacity:.7">' + (rec.meta ? [rec.meta.model, rec.meta.os, rec.meta.browser].filter(Boolean).map((x) => String(x).replace(/[&<>"]/g, '')).concat((rec.meta.touch ? 'touch' : 'mouse') + ' · ' + rec.meta.w + '×' + rec.meta.h).join(' · ') : '') + '</span>'
       + (old || (rec.meta && !rec.meta.layout) ? '<span style="color:#ffd27d;flex-basis:100%">Recorded on an older version of the site'
         + (rec.meta && rec.meta.v ? ' (' + String(rec.meta.v).replace(/[^\w]/g, '') + ')' : '') + '. Sections are matched by title; scenes that changed may not line up.</span>' : '');
-    if (host) {   // the bar now has its height (and the viewer may turn the phone): render no more than the frame shows
+    if (host) {   // whenever the frame's room shrinks (the bar fills in or wraps, the viewer turns the phone): render no more than shows
       const settle = () => { if (fewerPixels(host.scale) && rig.renderer && rig.renderer.getPixelRatio() > dprNow) rig.renderer.setPixelRatio(dprNow); };
-      requestAnimationFrame(settle); window.parent.addEventListener('resize', settle);
+      requestAnimationFrame(settle); new window.parent.ResizeObserver(settle).observe(window.parent.document.getElementById('stage') || host.bar);
     }
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
     let stallFrom = 0, stallUntil = 0;

@@ -1393,6 +1393,7 @@ const sheetEl = document.getElementById('tb-sheet');
 const perf = { t: 0, n: 0, sum: 0, at: performance.now() };
 function adapt(now) {
   const d = now - perf.t; perf.t = now;
+  dpr = renderer.getPixelRatio();   // the visit replay player can lower it from outside
   if (document.hidden || d > 500 || now - perf.at < 4000 || dpr <= 1) return;
   perf.sum += d; perf.n++;
   if (perf.sum < 2000) return;
