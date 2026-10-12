@@ -1406,6 +1406,7 @@ function frame(now) {
   if (galleryOpen()) return;      // a project page covers the stage: its blurred backdrop can hold still, and the phone renders one scene, not two
   adapt(now);
   try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
+  if (warmQ.length) try { warmStep(); } catch (e) { warmQ.length = 0; console.warn(e); }
 }
 function frameBody() {
   rigs.onDrive = returnToPath;   // driving the couch or the scooter hands the camera back to the chase view (rigs.js loads after this script's top)
@@ -1546,31 +1547,44 @@ function frameBody() {
   renderer.render(scene, camera);
 }
 
-// once the first frame is up, compile every build's shaders in the background. Otherwise each build's first appearance stalls the
-// page while its shaders compile (seconds on budget Android GPUs). Only where the GPU compiles in parallel (KHR_parallel_shader_compile):
-// elsewhere three would block on each program right here, so they stay compiled on first use.
-// A program depends on the material's state at the time, so the faded-out builds are compiled see-through and solid, and with the
-// lights hidden right now turned on (the hearth's fire). One pass at a time, so the compiles don't crowd the first frames.
-async function warmShaders() {
-  const mats = new Set();
-  scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) mats.add(m); });
-  const faded = [...mats].filter((m) => m.transparent);
-  for (const [solid, lit] of [[false, false], [true, false], [false, true], [true, true]]) {
-    const hidden = [];   // whatever hides a light right now
-    if (lit) scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) hidden.push(p); });
-    if (lit && !hidden.length) break;
-    const was = faded.map((m) => m.transparent);
+// ---------- shader warm-up ----------
+// Each build's first appearance used to stall the page while its shaders compiled: 100–300 ms on a Pixel 7, seconds on budget Android
+// GPUs. Once the first frame is up, they compile ahead of time instead. A program depends on the material's state when it is picked,
+// so the materials that are on screen when the hearth's fire light comes on (the figure and floor, which are always there, and the
+// hearth itself, see-through and solid as it fades in) are also compiled with that light.
+// Where the GPU compiles in parallel (KHR_parallel_shader_compile, desktop Chrome) it all goes at once and costs no frames. Elsewhere
+// (Android Chrome) a compile holds up the next frame, so it is one new program per frame, only while the camera is at rest.
+const warmQ = [];
+function warmShaders() {
+  const draws = new Map(), shown = new Set();   // material → a mesh drawing it; materials drawn right now
+  scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) if (!draws.has(m)) draws.set(m, o); });
+  scene.traverseVisible((o) => { if (o.material) for (const m of [].concat(o.material)) shown.add(m); });
+  const lit = new Set(), hearth = new Set();   // whatever hides a light now, and the materials under it
+  scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) if (!p.visible) lit.add(p); });
+  for (const g of lit) g.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) hearth.add(m); });
+  const faded = [...draws.keys()].filter((m) => m.transparent);
+  for (const [m, o] of draws) warmQ.push([o, false, false]);
+  for (const [m, o] of draws) if (shown.has(m) || hearth.has(m)) warmQ.push([o, false, true]);
+  for (const [m, o] of draws) if (hearth.has(m) && m.transparent) warmQ.push([o, true, true]);   // the hearth fades in, then the fire lights
+  // compile one mesh in one state, then put back the program three had picked for every material already drawn: the compiles only fill
+  // the cache, and each material still switches programs exactly when it would have without them
+  const mats = [...draws.keys()];
+  warmShaders.one = ([o, solid, fire]) => {
+    const was = faded.map((m) => m.transparent), kept = mats.map((m) => renderer.properties.get(m)).filter((p) => p.currentProgram).map((p) => [p, { ...p }]);
     if (solid) for (const m of faded) m.transparent = false;
-    for (const o of hidden) o.visible = true;
-    // three keeps drawing a material with the program it last picked, so put back what each drawn material had: the compiles only fill
-    // the cache, and every material still switches programs exactly when it would have without them
-    const kept = [...mats].map((m) => renderer.properties.get(m)).filter((p) => p.currentProgram).map((p) => [p, { ...p }]);
-    const ready = renderer.compileAsync(scene, camera);   // compiles right away; the promise only waits for the GPU
-    for (const [p, was] of kept) Object.assign(p, was);
+    if (fire) for (const g of lit) g.visible = true;
+    const ready = renderer.compileAsync(o, camera, scene);   // issues the compile now; the promise waits for the GPU
+    for (const [p, v] of kept) Object.assign(p, v);
     faded.forEach((m, i) => { m.transparent = was[i]; });
-    for (const o of hidden) o.visible = false;
-    await ready;
-  }
+    if (fire) for (const g of lit) g.visible = false;
+    return ready;
+  };
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) { const all = warmQ.splice(0).map(warmShaders.one); Promise.all(all).catch(() => {}); }
+}
+function warmStep() {   // from the frame loop: until a new program is created, at rest only
+  if (Math.abs(sTarget - sNow) > .01 || free.on) return;
+  const n = renderer.info.programs.length;
+  for (let i = 0; i < 40 && warmQ.length && renderer.info.programs.length === n; i++) warmShaders.one(warmQ.shift()).catch(() => {});
 }
 resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
@@ -1578,7 +1592,7 @@ buildFigure().then(() => {
   window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; },
     scene, renderer, controls, free, get s() { return sNow; } }; // debug hook for render checks; the site editor (editor.js) reads scene, camera and s from it
   requestAnimationFrame(frame);
-  if (renderer.extensions.has('KHR_parallel_shader_compile')) requestAnimationFrame(() => requestAnimationFrame(() => warmShaders().catch((e) => console.warn(e))));
+  requestAnimationFrame(() => requestAnimationFrame(() => { try { warmShaders(); } catch (e) { console.warn(e); } }));
 })
   .catch(err => { console.error(err); document.getElementById('loading').textContent = 'Model failed to load'; });
 </script>
