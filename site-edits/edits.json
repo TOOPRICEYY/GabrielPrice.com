@@ -202,6 +202,18 @@
       "tag": "p",
       "updatedAt": "2026-10-12T03:03:05.653Z"
     },
+    "s8.div1.h21": {
+      "fp": "Water, on crutches.",
+      "html": "Crutch Refreshments",
+      "key": "s8.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Water, on crutches.",
+      "sec": 8,
+      "section": "09 Water Break · Crutch",
+      "tag": "h2",
+      "updatedAt": "2026-10-12T03:04:21.149Z"
+    },
     "s8.div1.p1": {
       "fp": "A printed cage that clips between the crutch rails and holds a water bottle.",
       "html": "A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.",
