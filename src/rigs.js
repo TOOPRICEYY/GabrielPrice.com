@@ -1198,10 +1198,16 @@ rigs.pinTip = (want) => { const [id, k, dir] = String(want || '').split('|'); tu
 rigs.pinPop = (text) => { const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = text; el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); };
 // the recorded vehicle states (the flow capture reads and writes these lists in this order)
 rigs.scKeys = ['m', 'X', 'Z', 'psi', 'v', 'delta', 'y', 'p', 'duck', 'air', 'run', 'lane', 'on', 'seed', 'dist', 'stars', 'hp', 'zc', 'tut', ...DMG];
-rigs.coKeys = ['drive', 'x', 'z', 'h', 'vx', 'vz', 'w', 'sp', 'slip', 'dl', 'df', 'r', 'tk', 'oriS', 'phi', 'nitro', 'boostOn', 'hold'];
+const CO_KEYS = ['drive', 'x', 'z', 'h', 'vx', 'vz', 'w', 'sp', 'slip', 'dl', 'df', 'r', 'tk', 'oriS', 'phi', 'nitro', 'boostOn', 'hold'];
+// and the lap's progress: gate, lap done, seconds into the lap (-1 before one starts), last and best lap, laps, the roundabout's swept angle
+const COURSE_KEYS = ['ci', 'cdone', 'clap', 'clast', 'cbest', 'claps', 'cacc'];
+rigs.coKeys = [...CO_KEYS, ...COURSE_KEYS];
 rigs.scState = (S) => { const G = S.game; return [S.manual ? 1 : 0, r2(S.X), r2(S.Z), r2(S.psi), r2(S.v), r2(S.delta), r2(S.y), r2(S.p), r2(S.duck), S.air ? 1 : 0, S.touchRun ? 1 : 0, S.lane || 0,
   G.on ? 1 : 0, G.seed, r2(G.dist), G.stars, r2(G.hp), r2(Math.max(-1e4, G.zc - S.Z)), G.tut ? 1 : 0, ...DMG.map((k) => r2(G.dmg[k]))]; };
-rigs.coState = (Co) => [Co.drive ? 1 : 0, ...rigs.coKeys.slice(1).map((k) => r2(Co[k]))];
+rigs.coState = (Co) => { const C = rigs.course; return [Co.drive ? 1 : 0, ...CO_KEYS.slice(1).map((k) => r2(Co[k])),
+  C.i, C.done ? 1 : 0, C.t0 >= 0 ? r2(clock.elapsedTime - C.t0) : -1, r2(C.last), r2(C.best), C.laps || 0, r2(C.acc)]; };
+// after a seek, or when the replay reaches the couch: the lap as it stood then (the gates are crossed by the pinned couch from there)
+rigs.pinCourse = (P) => Object.assign(rigs.course, { i: P.ci, done: !!P.cdone, t0: P.clap >= 0 ? clock.elapsedTime - P.clap : -1, last: P.clast, best: P.cbest, laps: P.claps, acc: P.cacc, a0: null });
 function pinScooter(S, P) {
   Object.assign(S, { X: P.X, Z: P.Z, psi: P.psi, v: P.v, delta: P.delta, y: P.y, p: P.p, duck: P.duck, duckT: P.duck > .5 ? 1 : 0, air: !!P.air, touchRun: !!P.run, lane: P.lane, hop: false });
 }
@@ -2240,7 +2246,7 @@ function couchFrame(s, dt, w) {
     Co.ori = 0; Co.tk = 0; Co.oriS *= 1 - k; Co.sp = Co.u; Co.phi = Co.h;          // so a takeover starts from how it is moving, steering square
   }
   if (pin) {
-    for (const key of rigs.coKeys) if (key !== 'drive') Co[key] = pin[key];
+    for (const key of CO_KEYS) if (key !== 'drive') Co[key] = pin[key];
     Co.boostOn = !!pin.boostOn; Co.hold = !!pin.hold; Co.u = Co.sp * Math.cos(Co.slip); Co.v = -Co.sp * Math.sin(Co.slip);
     if (!drive) { Co.u = Math.sin(Co.h) * Co.vx + Math.cos(Co.h) * Co.vz; Co.v = Math.cos(Co.h) * Co.vx - Math.sin(Co.h) * Co.vz; }
   }

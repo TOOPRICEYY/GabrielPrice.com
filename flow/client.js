@@ -389,7 +389,8 @@
     }
     // a recorded vehicle state at the playhead, as rigs.js reads it: numbers eased between samples, switches as they were
     const CAP = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' };
-    const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, drive: 1, boostOn: 1, hold: 1 };
+    const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, drive: 1, boostOn: 1, hold: 1, ci: 1, cdone: 1, clap: 1, clast: 1, cbest: 1, claps: 1, cacc: 1 };
+    let courseSync = true;   // set the couch's lap progress from the recording at the next couch sample (a seek, or arriving at the couch)
     function vehicle(keys, a, b, k) {
       const o = {}, same = b.length === a.length && b[13] === a[13];
       keys.forEach((key, j) => { const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
@@ -399,7 +400,7 @@
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; if (R.hazClear) R.hazClear(); if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; if (R.hazClear) R.hazClear(); if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
     let C = centers();
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
@@ -428,6 +429,14 @@
       // the scooter and the couch, held to what the visitor's did (rigs.js PIN); older visits drive them from the keys alone
       pin.sc = a[13] === 1 && R.scKeys ? vehicle(R.scKeys, a, b, k) : null;
       pin.co = a[13] === 2 && R.coKeys ? vehicle(R.coKeys, a, b, k) : null;
+      if (!pin.co) courseSync = true; else if (courseSync && R.pinCourse) { R.pinCourse(pin.co); courseSync = false; }
+      // a seek brings back every hazard of the run under way (from its first sample: on, with the same seed); the game drops those already behind
+      let runStart = seek ? Infinity : 0, behind = -Infinity;
+      if (seek && a[13] === 1 && R.scKeys) {
+        const on = 14 + R.scKeys.indexOf('on'), sd = 14 + R.scKeys.indexOf('seed');
+        let j = i; while (j > 0 && S[j - 1][13] === 1 && S[j - 1][on] === 1 && S[j - 1][sd] === a[sd]) j--;
+        if (a[on] === 1) { runStart = S[j][0]; behind = a[14 + R.scKeys.indexOf('Z')] - 320; }   // and only those not yet left behind
+      }
       // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
       if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }
       if (a[3] >= 0 && (!touch || fg || head - lastPT < 600)) {
@@ -447,7 +456,7 @@
       while (ei < E.length && E[ei][0] <= head) {
         const e = E[ei], age = (head - e[0]) / 1000;
         if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
-        else if (e[1] === 'k') { if (age < 6 && R.hazPut) R.hazPut(e.slice(2), age); }
+        else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < 3.4)) && R.pinHit) R.pinHit(e.slice(2), age); }
         else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
         if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }
