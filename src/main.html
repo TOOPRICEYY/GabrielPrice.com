@@ -60,6 +60,12 @@ body {
 #callouts circle, #callouts2 circle, #callouts3 circle { fill: var(--vellum); stroke: var(--cobalt); stroke-width: 1.2; }
 #callouts text, #callouts2 text, #callouts3 text { fill: var(--cobalt); font-family: var(--f-mono); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
 #callouts circle.dot, #callouts2 circle.dot, #callouts3 circle.dot { fill: var(--cobalt); stroke: none; }
+/* parts lists ↔ model: the lit row and its balloon (partLink) */
+#callouts g.hl circle:not(.dot), #callouts2 g.hl circle:not(.dot), #callouts3 g.hl circle:not(.dot) { fill: var(--cobalt); }
+#callouts g.hl text, #callouts2 g.hl text, #callouts3 g.hl text { fill: var(--vellum); }
+.bom li[data-k], .bomt tr[data-k] { cursor: pointer; }
+.bom li.hl, .bomt tr.hl td, .bomt tr.hl td.p.on { background: color-mix(in srgb, var(--cobalt) 16%, var(--vellum)); }
+.bom li.hl .n, .bomt tr.hl td.n span { background: var(--cobalt); color: var(--vellum); }
 
 .titleblock {
   position: fixed; z-index: 3; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -1193,11 +1199,12 @@ const BOM_GROUPS = [
     [null, 'Amass EC3 connector pair', 3, 3, null, [['Order', AMZ('Amass EC3 connector 10 pairs 14 gauge silicone wire')]]],
   ]],
   ['Knee add-on', [
-    ['kneeShin', 'Knee hinge, shin side (aluminium)', 1, 8.4, 8.4, [['Stock', AMZ('6061 aluminum flat bar')]]],
-    ['kneeThigh', 'Knee hinge, thigh side (aluminium)', 1, 4.22, 4.22, [['Stock', AMZ('6061 aluminum flat bar')]]],
+    ['kneeShin', 'Shin tube, 6061 rectangular 3/4 × 1-1/2 in, 1/8 in wall, 300 mm', 1, 2.91, 2.91, [['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
+    ['kneeThigh', 'Thigh tube, same stock, 310 mm', 1, 3.01, 3.01, [['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
+    [null, 'Knee hinge blocks (ABS)', 3, 1.53, 1.53, []],
     ['cuffs', 'Thigh cuff (ABS)', 2, 3.5, 3.5, []],
-    [null, '608 knee bearing', 2, 1.36, 1.36, [['Order', 'https://ebay.com/itm/204366987316']]],
-    [null, 'Knee pivot bolt and mounting screws', 'set', 1.16, 1.16, [['Order', AMZ('metric socket head cap screw nylock nut assortment M3 M10')]]],
+    [null, '6709-2RS knee bearing, 45 × 55 × 6 mm', 2, 5, 5, [['Order', AMZ('uxcell 6709-2RS 45x55x6 5pcs')]]],
+    [null, 'Knee screws (M5 × 40 and M5 × 30) and nuts', 'set', 1.16, 1.16, [['Order', AMZ('metric socket head cap screw nylock nut assortment M3 M10')]]],
     [null, 'Hook-and-loop strap, 1 in', '2 ft', .81, .81, [['Order', AMZ('YMCRLUX 1" x 32ft hook and loop straps metal buckles')]]],
   ], 'kn'],
 ];
@@ -1215,7 +1222,7 @@ const bomTot = { ea: [0, 0], mo: [0, 0] };   // [without, with] the knee add-on
       let num = ''; if (k) { BOM.push([k, BOM.length + 1]); num = `<span>${BOM.length}</span>`; }
       const lk = links.map(([l, u]) => `<a href="${u}"${u.startsWith('http') ? ' target="_blank" rel="noopener"' : ' download'}>${l}</a>`).join('') || (cls ? 'CAD to come' : '');
       const rc = [mo == null ? 'ea' : '', cls || ''].filter(Boolean).join(' ');
-      html += `<tr${rc ? ` class="${rc}"` : ''}><td class="n">${num}</td><td>${n}</td><td class="q">${typeof q === 'number' ? '×' + q : q}</td><td class="p mo">${$(mo)}</td><td class="p ea">${$(ea)}</td><td class="lk">${lk}</td></tr>`;
+      html += `<tr${rc ? ` class="${rc}"` : ''}${k ? ` data-k="${k}"` : ''}><td class="n">${num}</td><td>${n}</td><td class="q">${typeof q === 'number' ? '×' + q : q}</td><td class="p mo">${$(mo)}</td><td class="p ea">${$(ea)}</td><td class="lk">${lk}</td></tr>`;
     }
   }
   html += `</tbody><tfoot><tr><td></td><td>Total</td><td></td><td class="p mo" id="bomtmo"></td><td class="p ea" id="bomtea"></td><td class="lk"></td></tr></tfoot>`;
@@ -1368,6 +1375,104 @@ const balloons = BOM.map(([k, num]) => {
   const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 10);
   const tx = document.createElementNS(NS, 'text'); tx.textContent = num;
   g.append(l, d, c, tx); svg.append(g); return { k, g, l, d, c, tx };
+});
+
+// ---------- parts lists ↔ model ----------
+// Hovering or tapping a row lights its part on the model; hovering or tapping a part (or its balloon) lights its row. A tap pins
+// the pair until the next tap. Each list registers a set: the rows (data-k) under rowsRoot, roots(k) (the 3D groups a row stands for),
+// all() (every part's group, so a part nested in another isn't lit with it), active() (balloons up), bubbles() ([{k, x, y}] on screen).
+// The lit part draws with an emissive copy of its material; frame() keeps the copy's fades and clipping in step with the original.
+function partLinker(target, cam, box) {
+  const sets = [], ray = new THREE.Raycaster(), nd = new THREE.Vector2(), LIT = new Map();
+  let hover = null, pin = null, lit = null, litMeshes = [];
+  const same = (a, b) => a === b || (!!a && !!b && a.S === b.S && a.k === b.k);
+  const glow = (m) => { let h = LIT.get(m); if (!h) { h = m.clone(); if (h.emissive) { h.emissive.set(0x3d5cff); h.emissiveIntensity = .6; } else h.color?.lerp(new THREE.Color(0x3d5cff), .5); LIT.set(m, h); } return h; };
+  const own = (S, k) => {
+    if (S.own[k]) return S.own[k];
+    const roots = S.roots(k).filter(Boolean), stop = new Set(S.all()), out = [];
+    for (const r of roots) stop.delete(r);
+    const walk = (o) => { if (o.isMesh) out.push(o); for (const c of o.children) if (!stop.has(c)) walk(c); };
+    roots.forEach(walk); if (out.length) S.own[k] = out; return out;
+  };
+  const rows = (S) => [...(S.rowsRoot()?.querySelectorAll(S.sel) || [])];
+  const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+  const real = (m) => [].concat(m).some((x) => x.visible !== false && (!x.transparent || x.opacity > .05));
+  function apply() {
+    const cur = hover || pin; if (same(cur, lit)) return;
+    for (const o of litMeshes) { o.material = o.userData.plMat; delete o.userData.plMat; }
+    litMeshes = [];
+    for (const S of sets) { for (const r of rows(S)) r.classList.toggle('hl', !!cur && cur.S === S && r.dataset.k === cur.k); S.onLit?.(cur && cur.S === S ? cur.k : null); }
+    if (cur) for (const o of own(cur.S, cur.k)) { o.userData.plMat = o.material; o.material = Array.isArray(o.material) ? o.material.map(glow) : glow(o.material); litMeshes.push(o); }
+    lit = cur;
+  }
+  function pick(x, y) {
+    for (const S of sets) {
+      if (!S.active()) continue;
+      let best = null, bd = 14;
+      for (const b of S.bubbles()) { const d = Math.hypot(b.x - x, b.y - y); if (d < bd) { bd = d; best = b.k; } }
+      if (best != null) return { S, k: String(best) };
+      const r = box(); nd.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1); ray.setFromCamera(nd, cam());
+      const meshes = [], key = new Map();
+      for (const row of rows(S)) for (const o of own(S, row.dataset.k)) if (shown(o) && real(o.userData.plMat || o.material)) { meshes.push(o); key.set(o, row.dataset.k); }
+      const hit = ray.intersectObjects(meshes, false)[0];
+      if (hit) return { S, k: key.get(hit.object) };
+    }
+    return null;
+  }
+  // a row that is out of view in its own scrolling box is brought into it (never the page: that would move the story)
+  const reveal = (cur) => {
+    const r = rows(cur.S).find((x) => x.dataset.k === cur.k); if (!r) return;
+    const sc = r.closest('.bomwrap'); if (!sc) return;
+    const a = r.getBoundingClientRect(), b = sc.getBoundingClientRect();
+    if (a.top < b.top + 34 || a.bottom > b.bottom - 34) sc.scrollTop += a.top - b.top - b.height / 2 + a.height / 2;
+  };
+  let mv = null, raf = 0, down = null;
+  const onCard = (e) => e.target !== target && !!e.target.closest?.('.card, a, button, iframe, input');   // a card over the model takes its own pointer
+  target.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || e.buttons) return;
+    if (onCard(e)) { if (hover && !hover.S.rowsRoot()?.contains(e.target)) { hover = null; target.style.cursor = ''; apply(); } return; }
+    mv = e;
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; const h = pick(mv.clientX, mv.clientY); target.style.cursor = h ? 'pointer' : ''; if (!same(h, hover)) { hover = h; apply(); } });
+  });
+  target.addEventListener('pointerleave', () => { if (hover) { hover = null; target.style.cursor = ''; apply(); } });
+  target.addEventListener('pointerdown', (e) => { down = onCard(e) ? null : { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  target.addEventListener('pointerup', (e) => {
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 500) return;
+    const h = pick(e.clientX, e.clientY);
+    if (h) { pin = same(h, pin) ? null : h; if (pin) reveal(pin); } else if (pin) pin = null; else return;
+    apply();
+  });
+  return {
+    add(S) {
+      S.own = {}; S.sel = S.sel || '[data-k]'; sets.push(S);
+      const at = (e) => { const r = e.target.closest?.(S.sel); return r && S.rowsRoot()?.contains(r) ? r : null; };
+      S.events.addEventListener('pointerover', (e) => { const r = at(e); if (r && e.pointerType === 'mouse') { hover = { S, k: r.dataset.k }; apply(); } });
+      S.events.addEventListener('pointerout', (e) => { const r = at(e); if (r && !r.contains(e.relatedTarget) && hover?.S === S) { hover = null; apply(); } });
+      S.events.addEventListener('click', (e) => { const r = at(e); if (!r || e.target.closest('a, button')) return; const h = { S, k: r.dataset.k }; pin = same(h, pin) ? null : h; apply(); });
+      return S;
+    },
+    reset(S) { if (lit?.S === S || hover?.S === S || pin?.S === S) { hover = pin = null; apply(); } S.own = {}; },
+    lit: (S) => (lit && lit.S === S ? lit.k : null),
+    frame() {
+      if ((hover && !hover.S.active()) || (pin && !pin.S.active())) { if (hover && !hover.S.active()) hover = null; if (pin && !pin.S.active()) pin = null; apply(); }
+      for (const o of litMeshes) {
+        const src = [].concat(o.userData.plMat), dst = [].concat(o.material);
+        src.forEach((m, i) => { const h = dst[i]; h.opacity = m.opacity; h.transparent = m.transparent; h.depthWrite = m.depthWrite; h.visible = m.visible; h.clippingPlanes = m.clippingPlanes; h.side = m.side; });
+      }
+    },
+  };
+}
+const partLink = partLinker(canvas, () => camera, () => ({ left: 0, top: 0, width: innerWidth, height: innerHeight }));
+window.__partLinker = partLinker;
+// the Anti-thetis table: a row stands for its part and its numbered twins (planet1 → planets 1–4), the carrier for both halves
+const KICK_TWINS = { carriage: ['topcarriage'], pinTop: ['pinBot', 'screw1', 'screw2', 'screw3', 'screw4'] };
+partLink.add({
+  events: document.getElementById('bom'), rowsRoot: () => document.getElementById('bom'), sel: 'tr[data-k]',
+  roots: (k) => { const P = kicker.parts || {}, b = k.replace(/\d+$/, ''); return Object.keys(P).filter((x) => x === k || (b !== k && x.replace(/\d+$/, '') === b) || KICK_TWINS[k]?.includes(x)).map((x) => P[x].ex); },
+  all: () => Object.values(kicker.parts || {}).map((p) => p.ex),
+  active: () => +svg.style.opacity > .3,
+  bubbles: () => balloons.filter((b) => b.g.style.display !== 'none').map((b) => ({ k: b.k, x: +b.c.getAttribute('cx'), y: +b.c.getAttribute('cy') })),
+  onLit: (k) => balloons.forEach((b) => b.g.classList.toggle('hl', b.k === k)),
 });
 
 // ---------- timeline helpers ----------
@@ -1674,6 +1779,7 @@ function frameBody() {
       });
     }
   }
+  partLink.frame();
   renderer.render(scene, camera);
 }
 

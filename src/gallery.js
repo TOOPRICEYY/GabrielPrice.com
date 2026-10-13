@@ -131,6 +131,7 @@ section.gallery { display: block; min-height: 100vh; max-width: 1280px; margin-i
 #gxsvg line { stroke: var(--cobalt); stroke-width: 1; }
 #gxsvg circle { fill: var(--vellum); stroke: var(--cobalt); stroke-width: 1.2; }
 #gxsvg text { fill: var(--cobalt); font-family: var(--f-mono); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+#gxsvg g.hl circle:not(.dot) { fill: var(--cobalt); } #gxsvg g.hl text { fill: var(--vellum); }
 .gx-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; cursor: grab; }
 .gx-scroll.dragging { cursor: grabbing; }
 .gx-ch { min-height: 100%; display: flex; align-items: center; padding: 76px 28px 40px; box-sizing: border-box; }
@@ -414,7 +415,7 @@ const cur = { az: 0, el: 0, d: 0, pan: 0 };
 function chapterHTML(P, c, i) {
   const [h, p] = P.text[c.key] || ['', ''];
   let extra = '';
-  if (c.key === 'explode') extra = `<ol class="bom">${M.groups.map((g, j) => `<li><span class="n">${j + 1}</span><span>${g}</span><span class="q">×${M.parts.filter(q => q.name === g).length}</span></li>`).join('')}</ol>`;
+  if (c.key === 'explode') extra = `<ol class="bom">${M.groups.map((g, j) => `<li data-k="${j + 1}"><span class="n">${j + 1}</span><span>${g}</span><span class="q">×${M.parts.filter(q => q.name === g).length}</span></li>`).join('')}</ol>`;
   if (c.key === 'try') return `<div class="gx-ch wide"><div class="card"><div class="eyebrow">${String(i + 1).padStart(2, '0')} <b>${P.title}</b></div><h2>${h}</h2>${p ? `<p>${p}</p>` : ''}</div>
     <div class="gx-app"><iframe title="Holdfast interface in demo mode" data-src="holdfast/index.html?preview=1"></iframe></div></div>`;
   if (c.key === 'passage') extra = `<div class="gx-pass"><div class="gx-ladder">${['1st · 1×', '2nd · 2×', '3rd · 4×', '4th · 8×'].map((x, j) => `<span${j ? '' : ' class="on"'}>${x}</span>`).join('')}</div>
@@ -432,6 +433,7 @@ function openProject(id, from) {
   P = PROJECTS.find(p => p.id === id); if (!P || P.soon) return;
   initGL(); if (!MATS) mats();
   if (M) scene.remove(M.grp);
+  linkParts(); if (link) link.reset(linkSet);
   M = model(P); scene.add(M.grp); CH = P.chapters || (P.model ? CH_MODEL.filter(c => P.text[c.key]) : CH_PH);   // a project without text for a chapter skips it
   floor.scale.setScalar(M.R * 1.6);
   ov.querySelector('#gx-kind').textContent = P.kind; ov.querySelector('#gx-title').textContent = P.title;
@@ -456,7 +458,7 @@ function syncClips(force) {
   chEls.forEach((el, j) => el.querySelectorAll('video').forEach(v => { if (j === i) { v.muted = true; v.play().catch(() => {}); } else v.pause(); }));
 }
 function closeProject() {
-  if (!open) return; open = false; syncClips(true);
+  if (!open) return; open = false; syncClips(true); link?.reset(linkSet);
   bg.classList.remove('on'); ov.classList.remove('on'); document.documentElement.style.overflow = '';
   setTimeout(() => { if (!open) bg.hidden = ov.hidden = true; }, 350);
   lastFocus?.focus({ preventScroll: true });
@@ -523,15 +525,27 @@ function applyModel(t) {
 }
 const balloonsOn = (t) => { const ie = CH.findIndex(q => q.key === 'explode'); return ie < 0 ? 0 : Math.max(0, 1 - Math.max(0, Math.abs(t - ie) - .2) * 3); };
 const _v = new THREE.Vector3();
+// parts list ↔ model (partLinker in main.html): a row stands for every part sharing its name and balloon number
+let link, linkSet, bubbles = [];
+function linkParts() {
+  if (link || !window.__partLinker) return;
+  link = window.__partLinker(scroller, () => camera, () => canvasEl.getBoundingClientRect());
+  linkSet = link.add({ events: scroller, rowsRoot: () => scroller, sel: '.bom [data-k]',
+    roots: (k) => M.parts.filter((p) => String(p.n) === k).map((p) => p.mesh), all: () => M.parts.map((p) => p.mesh),
+    active: () => open && !!P.model && balloonsOn(tN) > .3,
+    bubbles: () => { const r = canvasEl.getBoundingClientRect(); return bubbles.map((b) => ({ k: b.k, x: b.x + r.left, y: b.y + r.top })); } });
+}
 function balloons(t) {
   const w = balloonsOn(t);
+  bubbles = [];
   if (!P.model || w < .02) { svg.innerHTML = ''; return; }
-  const W = ov.clientWidth, H = ov.clientHeight, seen = new Set(); let out = '';
+  const W = ov.clientWidth, H = ov.clientHeight, seen = new Set(), on = link?.lit(linkSet); let out = '';
   for (const p of M.parts) {
     if (seen.has(p.n)) continue; seen.add(p.n);
     p.mesh.updateMatrixWorld(); _v.copy(p.c).applyMatrix4(p.mesh.matrixWorld).project(camera);
     const x = (_v.x * .5 + .5) * W, y = (-_v.y * .5 + .5) * H, ox = x + (x > W / 2 ? 34 : -34), oy = y - 26;
-    out += `<g opacity="${w.toFixed(2)}"><circle class="dot" r="2.5" cx="${x}" cy="${y}" style="fill:var(--cobalt);stroke:none"/><line x1="${x}" y1="${y}" x2="${ox}" y2="${oy}"/><circle r="10" cx="${ox}" cy="${oy}"/><text x="${ox}" y="${oy}">${p.n}</text></g>`;
+    bubbles.push({ k: p.n, x: ox, y: oy });
+    out += `<g opacity="${w.toFixed(2)}"${String(p.n) === on ? ' class="hl"' : ''}><circle class="dot" r="2.5" cx="${x}" cy="${y}" style="fill:var(--cobalt);stroke:none"/><line x1="${x}" y1="${y}" x2="${ox}" y2="${oy}"/><circle r="10" cx="${ox}" cy="${oy}"/><text x="${ox}" y="${oy}">${p.n}</text></g>`;
   }
   svg.innerHTML = out;
 }
@@ -570,7 +584,7 @@ function tick() {
   tN += (tT - tN) * (1 - Math.pow(.0009, dt));
   applyModel(tN);
   if (!userCam) placeCam(keyAt(tN), dt);
-  controls.update(); renderer.render(scene, camera); balloons(tN);
+  link?.frame(); controls.update(); renderer.render(scene, camera); balloons(tN);
   const pi = CH.findIndex(q => q.key === 'passage'); if (pi >= 0) passage(tN - pi);
   ov.querySelector('#gx-sheet').textContent = String(Math.round(tN) + 1).padStart(2, '0') + ' / ' + String(CH.length).padStart(2, '0');
 }

@@ -812,7 +812,7 @@ function balloonSet(svgEl, bom) {
     svgEl.appendChild(g); return b;
   });
 }
-const bomHTML = (bom) => bom.map(([, n, q], i) => `<li><span class="n">${i + 1}</span><span>${n}</span><span class="q">×${q || 1}</span></li>`).join('');
+const bomHTML = (bom) => bom.map(([k, n, q], i) => `<li data-k="${k}"><span class="n">${i + 1}</span><span>${n}</span><span class="q">×${q || 1}</span></li>`).join('');
 function rigUI() {
   const $ = (id) => document.getElementById(id);
   // gait plot
@@ -958,6 +958,13 @@ function rigUI() {
   // Assym Restore: bill of materials and the balloons that point at each part
   $('bom2').innerHTML = bomHTML(ASSYM_BOM); ui.callouts2 = $('callouts2'); ui.balloons2 = balloonSet(ui.callouts2, ASSYM_BOM);
   $('bom3').innerHTML = bomHTML(SCOOT_BOM); ui.callouts3 = $('callouts3'); ui.balloons3 = balloonSet(ui.callouts3, SCOOT_BOM);
+  // parts lists ↔ model (partLink in main.html): the scooter's wheel row stands for all four wheels
+  const linkRig = (list, svgEl, bl, roots, all) => partLink.add({ events: list, rowsRoot: () => list, roots, all, active: () => +svgEl.style.opacity > .3,
+    bubbles: () => bl.map((b) => ({ k: b.k, x: +b.c.getAttribute('cx'), y: +b.c.getAttribute('cy') })),
+    onLit: (k) => bl.forEach((b) => b.c.parentNode.classList.toggle('hl', b.k === k)) });
+  const SX = rigs.scooter.ex, HP = rigs.hearth.P;
+  linkRig($('bom3'), ui.callouts3, ui.balloons3, (k) => (k === 'wRR' ? ['wRR', 'wRL', 'wFR', 'wFL'] : [k]).map((x) => SX[x]), () => Object.values(SX));
+  linkRig($('bom2'), ui.callouts2, ui.balloons2, (k) => [HP[k]?.ex], () => Object.values(HP).map((p) => p.ex));
   // clips play only while their card is on screen. They are muted, inline and short, so they autoplay even with Reduce Motion on.
   // Where the browser still refuses (iOS Low Power Mode, Android Data Saver), the clip shows a play badge and the next tap anywhere
   // starts every clip on screen.
