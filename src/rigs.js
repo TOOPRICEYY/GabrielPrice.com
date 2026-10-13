@@ -844,7 +844,7 @@ function rigUI() {
     if (rigs.couchOn && (k.length === 1 ? 'wasdqe '.includes(k) : k.startsWith('arrow') || k === 'shift')) {
       const Co = rigs.couch; Co.keys.add(k); if (rigs.onDrive) rigs.onDrive();
       if (Co.hold && !e.repeat && (k === 'w' || k === 'arrowup')) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); }   // waiting on the line after a lap: go again
-      if (!e.repeat && (k === 'w' || k === 'arrowup')) { const now = performance.now(); if (now - (Co.fwT || -1e9) < 300) { Co.fwT = -1e9; couchBoost(); } else Co.fwT = now; }   // forward twice, quickly: boost
+      if (!e.repeat && (k === 'w' || k === 'arrowup') && !Co.keys.has('shift')) { const now = performance.now(); if (now - (Co.fwT || -1e9) < 300) { Co.fwT = -1e9; couchBoost(); } else Co.fwT = now; }   // forward twice, quickly: boost (not the w the phone's Drift button sends with Shift)
       Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
       // (a quick double tap used to swing the steering 90° to drive sideways; Gabriel had it removed)
       const sd = k === 'a' || k === 'arrowleft' ? 1 : k === 'd' || k === 'arrowright' ? -1 : 0;
