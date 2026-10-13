@@ -360,6 +360,8 @@ test('a returning visitor is linked across visits, and only with a yes where one
   assert.equal(stored.vc, undefined, 'the consent flag only steers the Worker');
   const dash = fs.readFileSync(new URL('../worker/flow-dashboard.js', import.meta.url), 'utf8');
   assert.match(dash, /data-vid=/); assert.match(dash, /returning visitor/);
+  assert.match(dash, /data-col=/, 'headings sort and move the columns'); assert.match(dash, /id="grp"/, 'visits can be grouped');
+  assert.match(dash, /localStorage\.setItem\(PREF/, 'the table setup is kept per browser');
 });
 
 test('visits older than 90 days are deleted each day; layouts and leaderboards stay', async () => {
