@@ -500,7 +500,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
 #secnav { --rh: min(18px, calc((100vh - 48px) / var(--n))); --s: 0; --n: 19; position: fixed; z-index: 3; right: calc(2px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
   padding: 8px 0 8px 10px; border: 1px solid transparent; pointer-events: none; font-family: var(--f-mono);
   transition: opacity .3s, visibility .3s, background-color .2s, border-color .2s, --rh .35s cubic-bezier(.2, .7, .2, 1); }
-body.playing #secnav { opacity: 0; visibility: hidden; }
+body.playing #secnav, #secnav.early { opacity: 0; visibility: hidden; }   /* .early: before the ExoLeg reveal, like the orbit hint */
 #secnav ol { list-style: none; margin: 0; padding: 0; }
 #secnav li { height: var(--rh); }
 #secnav button { all: unset; box-sizing: border-box; width: 100%; height: 100%; display: flex; align-items: center; justify-content: flex-end; cursor: pointer; pointer-events: none; }
@@ -775,7 +775,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 </main>
-<nav id="secnav" aria-label="Sections"><span class="sn-line" aria-hidden="true"></span><span class="sn-fill" aria-hidden="true"></span><span class="sn-mark" aria-hidden="true"></span><span class="sn-now" aria-hidden="true"></span><ol></ol></nav>
+<nav id="secnav" class="early" aria-label="Sections"><span class="sn-line" aria-hidden="true"></span><span class="sn-fill" aria-hidden="true"></span><span class="sn-mark" aria-hidden="true"></span><span class="sn-now" aria-hidden="true"></span><ol></ol></nav>
 <script>
 // section index (#secnav, styles above). It works out s from the scroll the same way as readScroll() in the scene script, but on its own,
 // so it keeps working when the 3D can't start. Chapters come from data-ch on a build's first section; a row's label is the section's
@@ -822,17 +822,18 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     scrollTo({ top: Math.max(0, y), behavior: REDUCED.matches ? 'auto' : 'smooth' });
   }
   let last = -1, at = -1, hide;
+  function say(name) { flash.textContent = name; flash.classList.add('on'); clearTimeout(hide); hide = setTimeout(() => flash.classList.remove('on'), 1600); }
   function update() {
     const s = sOf();
     if (Math.abs(s - last) < .001) return;
     last = s; nav.style.setProperty('--s', s.toFixed(3));
     const i = Math.round(s), past = Math.floor(s + .02);
+    // hidden until the ExoLeg reveal (the brace is on by s 2.3, the same point the orbit hint waits for); it arrives saying where you are
+    const early = s < 2.3;
+    if (early !== nav.classList.contains('early')) { nav.classList.toggle('early', early); if (!early && at >= 0) say(rows[i].dataset.ch); }
     rows.forEach((r, j) => { r.classList.toggle('past', j <= past); r.classList.toggle('on', j === i); r.firstChild.toggleAttribute('aria-current', j === i); });
     if (i === at) return;
-    if (at >= 0 && rows[i].dataset.ch !== rows[at].dataset.ch) {   // into another build: its name rides beside the cursor for a moment
-      flash.textContent = rows[i].dataset.ch; flash.classList.add('on');
-      clearTimeout(hide); hide = setTimeout(() => flash.classList.remove('on'), 1600);
-    }
+    if (at >= 0 && !early && rows[i].dataset.ch !== rows[at].dataset.ch) say(rows[i].dataset.ch);   // into another build: its name rides beside the cursor for a moment
     at = i;
   }
   // every frame, not only on scroll: iOS can drop the last scroll event of a fling (see onScroll in the scene script)
