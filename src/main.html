@@ -1925,6 +1925,8 @@ function frameBody() {
 
     const hideDrive = bomTouched && bomVariant === 'mo';
     for (const k of ELECTRIC_PARTS) parts[k].ex.visible = !hideDrive;
+    const kneeOn = bomKnee || s > 6.5;   // the knee add-on: off until its toggle in Parts, but always on for the Full leg section
+    for (const k of KNEE_PARTS) parts[k].ex.visible = kneeOn;
     // explode, hold, rebound with a damped bounce
     const out = ease(seg(s, 4.7, 5.15));
     const back = seg(s, 5.6, 6.05);
@@ -1943,7 +1945,7 @@ function frameBody() {
       const drive = !hideDrive;
       balloons.forEach((b, i) => {
         const p = parts[b.k];
-        const off = (!drive && (ELECTRIC_PARTS.includes(b.k) || b.k.startsWith('planet'))) || (!bomKnee && KNEE_PARTS.includes(b.k));
+        const off = (!drive && (ELECTRIC_PARTS.includes(b.k) || b.k.startsWith('planet'))) || (!kneeOn && KNEE_PARTS.includes(b.k));
         b.g.style.display = off ? 'none' : '';
         if (off) return;
         p.m.localToWorld(wp.copy(p.c)); wp.project(camera);
