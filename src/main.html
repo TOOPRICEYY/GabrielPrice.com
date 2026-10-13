@@ -571,8 +571,9 @@ body.playing #secnav, #secnav.early { opacity: 0; visibility: hidden; }   /* .ea
 #secnav li.on .t { color: var(--cobalt); }
 #secnav .k { flex: none; position: relative; width: 22px; height: 100%; pointer-events: auto; }
 #secnav .k::before { content: ""; position: absolute; right: 5px; top: 50%; width: 5px; height: 1px; background: color-mix(in srgb, var(--graphite-2) 55%, transparent); }
-#secnav li.ch .k::before { right: 3px; width: 9px; background: var(--graphite-2); }
-#secnav li.past .k::before { background: var(--cobalt); }
+#secnav li.ch .k::before { right: 4px; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; box-sizing: border-box; background: var(--vellum); border: 1.5px solid var(--graphite-2);
+  transition: background-color .25s, border-color .25s; }   /* where each build starts: a hollow dot that fills in once you pass it */
+#secnav li.past .k::before { background: var(--cobalt); border-color: var(--cobalt); }
 #secnav button:focus-visible { outline: none; } #secnav button:focus-visible .t { outline: 2px solid var(--cobalt); outline-offset: 1px; }
 #secnav .sn-line, #secnav .sn-fill { position: absolute; right: 7px; width: 1px; top: calc(8px + var(--rh) / 2); height: calc(var(--rh) * (var(--n) - 1)); pointer-events: none; }
 #secnav .sn-line { background: color-mix(in srgb, var(--graphite-2) 30%, transparent); }
