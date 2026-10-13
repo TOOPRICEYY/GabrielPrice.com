@@ -59,6 +59,9 @@ const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-co
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
 const empty = (status) => new Response(null, { status, headers: NO_STORE });
 const num = (x) => typeof x === 'number' && Number.isFinite(x);
+// a sample's numbers (times in ms, positions in cm, states): far beyond any real visit, but small enough that the replay's
+// easing between two samples never overflows
+const near = (x) => num(x) && Math.abs(x) <= 1e9;
 const str = (x, n) => (typeof x === 'string' ? x.slice(0, n) : '');
 
 // ---------- ingest ----------
@@ -119,7 +122,7 @@ export function checkBatch(b) {
   const samples = [];
   for (const x of b.samples) {
     // 12, then a project page's scroll, then a driven vehicle: 1 (scooter) or 2 (couch) and its whole state (flow/client.js)
-    if (!Array.isArray(x) || x.length < 12 || x.length > 48 || !x.every(num)) return null;
+    if (!Array.isArray(x) || x.length < 12 || x.length > 48 || !x.every(near)) return null;
     if (x.length > 13 && ((x[13] !== 1 && x[13] !== 2) || x.length < 14 + VEHICLE_MIN)) return null;
     samples.push(x);
   }

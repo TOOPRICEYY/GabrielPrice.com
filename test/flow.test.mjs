@@ -165,6 +165,7 @@ test('event strings are trimmed and samples must be finite numbers', () => {
   const c = checkBatch(batch({ events: [[1, 'c', 0.1, 0.2, 3, 'y'.repeat(500)]] }));
   assert.equal(c.events[0][5].length, 80);
   assert.equal(checkBatch(batch({ samples: [[0, NaN, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] })), null);
+  assert.equal(checkBatch(batch({ samples: [[0, 1e308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] })), null, 'a runaway number');
 });
 
 test('dwell counts each sample until the next, capped at 2 s', () => {
