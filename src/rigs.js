@@ -1180,7 +1180,7 @@ const r2 = (v) => Math.round((+v || 0) * 100) / 100;
 const hazRec = (h) => [h.kind, h.side || 0, r2(h.x), r2(h.y), r2(h.z), r2(h.r), r2(h.spd), r2(h.peak), h.kind === 'puddle' ? r2(h.m.scale.y) : 0, h.kind === 'puddle' ? r2(h.m.rotation.z) : 0, r2(h.dx), r2(h.dz), h.tut ? 1 : 0];
 rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a seek lands mid-way)
   const [kind, side, x, y, z, r, spd, peak, sy, rz, dx, dz, tut] = a, H = rigs.scooter.CM.haz;
-  if (!H.proto[kind]) return;
+  if (!Object.hasOwn(H.proto, kind)) return;
   const h = hazGet(H, kind); h.t0 -= age; h.side = side; h.z = z; h.tut = !!tut;
   if (kind === 'crutch') { h.ang = 0; h.state = 0; h.g.position.set(side * (GAME.edge + 52), .6, z); h.g.rotation.set(0, 0, 0); h.fall.rotation.set(0, 0, 0); }
   else if (kind === 'ball') { Object.assign(h, { state: 0, spd, peak, wind: .55 }); h.g.position.set(side * 150, 100, z); }
@@ -1189,7 +1189,7 @@ rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a s
 };
 // a seek: clear the run's hazards and slabs and stand the rider up; a recorded wipe-out still under way knocks the rider down again,
 // and gameFrame rebuilds the slabs from the recorded collapse edge
-rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; rigs.scooter.CM.stars.got = {}; PIN.seek = true; };
+rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; rigs.scooter.CM.stars.got = {}; rigs.scooter.knock = {}; PIN.seek = true; };
 rigs.pinFall = (z, age) => { const h = rigs.scooter.CM.haz.list.find((x) => x.on && x.kind === 'crutch' && Math.abs(x.z - z) < 1); if (h) { h.state = 1; h.tf = clock.elapsedTime - age; } };   // a crutch already tipping or down
 rigs.pinStar = (n, age, ifMissed) => { const Q = rigs.scooter.CM.stars; if (!ifMissed || Q.got[n] == null) Q.got[n] = clock.elapsedTime - age; };   // a star taken a moment before the seek stays gone until it's back
 rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]

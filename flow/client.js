@@ -471,10 +471,11 @@
       const lit = new Set(); KEYS.forEach((key, j) => { if (a[5] & (1 << j)) lit.add(CAP[key] || key); });
       for (const b of document.querySelectorAll('.keys kbd[data-k]')) b.classList.toggle('on', lit.has(b.dataset.k));
       // after a seek, only the last state of what was open applies, and only hazards still in play come back
-      const late = {};
+      const late = {}, lateT = {};
       while (ei < E.length && E[ei][0] <= head) {
         const e = E[ei], age = (head - e[0]) / 1000;
-        if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
+        try {   // the endpoint is public: a malformed event is skipped, never fatal to the player
+        if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) { late[e[1]] = String(e[2] || ''); lateT[e[1]] = e[0]; } else put(e[1], String(e[2] || '')); }
         else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
         else if (e[1] === 'f') { if (seek && R.pinFall) R.pinFall(e[2], age); }   // a crutch began to fall (live otherwise, as the rider nears it)
@@ -486,9 +487,15 @@
         else if (E[ei][1] === 'l') { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view dropped out here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
         else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
+        } catch (err) { }
         ei++;
       }
-      if (seek) { seek = false; lateStars.length = 0; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); if (!late.p) gSettle = 0; }
+      if (seek) {
+        seek = false; lateStars.length = 0; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); if (!late.p) gSettle = 0;
+        // a clip open in the popup: as far in as the visitor was (it autoplays and loops from when they opened it)
+        const v = document.querySelector('#lb video');
+        if (v && lateT.b != null) { const at = () => { if (v.duration) v.currentTime = ((head - lateT.b) / 1000) % v.duration; }; if (v.readyState >= 1) at(); else v.addEventListener('loadedmetadata', at, { once: true }); }
+      }
       while (lateStars.length && head - lateStars[0][0] > 300) { const e = lateStars.shift(); if (R.pinStar) R.pinStar(e[2], (head - e[0]) / 1000, true); }
       // clips play with the replay: held while paused, at its speed otherwise
       for (const v of document.querySelectorAll('video')) {
