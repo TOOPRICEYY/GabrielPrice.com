@@ -825,7 +825,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
   function say(name) { flash.textContent = name; flash.classList.add('on'); clearTimeout(hide); hide = setTimeout(() => flash.classList.remove('on'), 1600); }
   function update() {
     const s = sOf();
-    if (Math.abs(s - last) < .001) return;
+    if (Math.abs(s - last) < .001 && (s < 2.3) === nav.classList.contains('early')) return;   // a tiny move still counts if it crosses the reveal
     last = s; nav.style.setProperty('--s', s.toFixed(3));
     const i = Math.round(s), past = Math.floor(s + .02);
     // hidden until the ExoLeg reveal (the brace is on by s 2.3, the same point the orbit hint waits for); it arrives saying where you are
