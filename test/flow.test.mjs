@@ -86,7 +86,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /section[^>]*data-s="0"/, 'sections carry data-s');
   assert.match(html, /<canvas id="stage"/, 'the WebGL canvas the recorder reads the GPU name from');
   assert.ok(rig[1].includes('clock'), '__rig exposes clock (the replay runs it at its own speed)');
-  for (const name of ['rigs.pin = ', 'rigs.scKeys = ', 'rigs.coKeys = ', 'rigs.scState = ', 'rigs.coState = ', 'rigs.hazPut = ', 'rigs.hazClear = ', 'rigs.pinRun = ', 'rigs.pinHit = ', 'rigs.pinTip = ', 'rigs.pinPop = ', "rigs.rec('k'", "rigs.rec('x'", "rigs.rec('o'"])
+  for (const name of ['rigs.pin = ', 'rigs.scKeys = ', 'rigs.coKeys = ', 'rigs.scState = ', 'rigs.coState = ', 'rigs.hazPut = ', 'rigs.hazClear = ', 'rigs.pinRun = ', 'rigs.pinHit = ', 'rigs.pinTip = ', 'rigs.pinPop = ', 'rigs.pinStar = ', "rigs.rec('s'", "rigs.rec('k'", "rigs.rec('x'", "rigs.rec('o'"])
     assert.ok(html.includes(name), `rigs.js still has ${name}`);
   assert.match(html, /window\.__lightbox = \{ sel: SEL, show, close \}/, 'the photo popup can be opened by the player');
   assert.match(html, /state: \(\) => open && P \?/, 'project pages report their state (gallery.js)');
@@ -147,10 +147,10 @@ test('samples carry a project page and a driven vehicle; popups, pages, hazards,
   const sc = [1, ...Array(25).fill(0.5)], co = [2, ...Array(18).fill(1)];
   const c = checkBatch(batch({ samples: [[...sample(0, 0), -1], [...sample(100, 11.7), -1, ...sc], [...sample(200, 13), -1, ...co], [...sample(300, 18), 0.4]],
     events: [[1, 'b', 'photos/kicker_white.webp'], [2, 'p', 'side-table'], [3, 'k', 'crutch', 1, 0, 0, 900, 0, 0, 0, 0, 0, 0, 0, 0], [4, 'x', 'legL', 22, 'Bonk', 0, 0],
-      [5, 't', 'jump|k|0'], [6, 'o', 1], [7, 'b', '']] }));
+      [5, 't', 'jump|k|0'], [6, 'o', 1], [7, 's', 2004], [8, 'b', '']] }));
   assert.ok(c, 'accepted');
   assert.deepEqual(c.samples.map((x) => x.length), [13, 39, 32, 13]);
-  assert.deepEqual(c.events.map((e) => e[1]), ['b', 'p', 'k', 'x', 't', 'o', 'b']);
+  assert.deepEqual(c.events.map((e) => e[1]), ['b', 'p', 'k', 'x', 't', 'o', 's', 'b']);
 });
 
 test('event strings are trimmed and samples must be finite numbers', () => {

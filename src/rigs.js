@@ -1132,7 +1132,7 @@ function starsFrame(S, T, dt, w, Zw, manual) {
     const got = Q.got[n], age = got != null ? T - got : 1e9;
     if (got != null && age > STAR.back) delete Q.got[n];
     if (got == null && manual && S.air && S.y > SC.rampH * .5 && !sp.skip && Math.abs(cx - sp.x) < STAR.r && Math.abs(cz - zG) < STAR.r * 1.3) {
-      Q.got[n] = T; Q.n++; Q.combo = T - Q.last < 6 ? Q.combo + 1 : 0; Q.last = T; S.game.stars++;
+      Q.got[n] = T; if (rigs.rec && !PIN.sc) rigs.rec('s', [n]); Q.n++; Q.combo = T - Q.last < 6 ? Q.combo + 1 : 0; Q.last = T; S.game.stars++;
       // burst at this star
       const pos = Q.sparks.geometry.attributes.position.array;
       for (let i = 0; i < pos.length; i += 3) {
@@ -1189,7 +1189,8 @@ rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a s
 };
 // a seek: clear the run's hazards and slabs and stand the rider up; a recorded wipe-out still under way knocks the rider down again,
 // and gameFrame rebuilds the slabs from the recorded collapse edge
-rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; PIN.seek = true; };
+rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; rigs.scooter.CM.stars.got = {}; PIN.seek = true; };
+rigs.pinStar = (n, age) => { rigs.scooter.CM.stars.got[n] = clock.elapsedTime - age; };   // a star taken a moment before the seek stays gone until it's back
 rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]
   const S = rigs.scooter, G = S.game; if (!G.on) return;
   PIN.hit = true; G.hurtT = -1e9;

@@ -23,7 +23,8 @@
 //          Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
 //          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message),
 //          b photo popup (the file, '' when closed), p project page (its id, '' when closed), k a scooter hazard appeared (rigs.js hazRec),
-//          x the rider was hit (part, amount, label, fell, ragdoll side), t a scooter tip showed (its key, '' when gone), o couch boost (full).
+//          x the rider was hit (part, amount, label, fell, ragdoll side), t a scooter tip showed (its key, '' when gone), o couch boost (full),
+//          s a scooter star taken (its number).
 //          The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
@@ -367,9 +368,14 @@
     let stallFrom = 0, stallUntil = 0;
     let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9, seek = false;
     const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
-    // the page's clock runs at the replay's speed and stops while it is paused, so the games' timers and hazards keep pace with the
-    // recorded poses (getDelta also moves elapsedTime, the time the rigs read)
-    const pace = (clk) => { if (!clk) return; const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); clk.pace = Math.max(1, k); return d * k; }; };   // pace: the page's dt cap scales too
+    // the page's clock follows the playhead: it moves as far as the replay did since the clock was last read (so not while paused,
+    // faster at 2× and 4×, and not across a seek or while a project page kept the page from reading it), and getDelta also moves
+    // elapsedTime, the time the rigs read, so the games' timers and hazards keep pace with the recorded poses
+    const clocks = [];
+    const pace = (clk) => {
+      if (!clk) return; const gd = clk.getDelta.bind(clk); let last = head; clocks.push(() => { last = head; });
+      clk.getDelta = () => { const t0 = clk.elapsedTime; gd(); const d = Math.max(0, head - last) / 1000; last = head; clk.elapsedTime = t0 + d; clk.pace = speed; return d; };   // pace: the page's dt cap scales too
+    };
     pace(rig.clock); pace(window.__gallery && window.__gallery.clock);   // and a project page's, whose model eases along its scroll
     let gSettle = 0;   // frames left to snap a project page's model to its scroll after a seek (its scroll event lands a frame later)
     const R = rig.rigs, pin = R.pin || {};
@@ -400,7 +406,7 @@
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    const jump = (ms) => { head = ms; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; gSettle = 3; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    const jump = (ms) => { head = ms; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; gSettle = 3; clocks.forEach((f) => f()); if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     range.oninput = () => jump(+range.value);
     // at the end it stops (and the page's clock with it); Play there starts over
     const setPlaying = (on) => { playing = on; bPlay.textContent = on ? 'Pause' : 'Play'; };
@@ -469,6 +475,7 @@
         if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
         else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
+        else if (e[1] === 's') { if (seek && R.pinStar) R.pinStar(e[2], age); }   // a star taken (played live otherwise, by the pinned rider)
         else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
         if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
