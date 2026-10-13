@@ -502,7 +502,7 @@ function placeCam(k, dt) {
 // model state from t: 0..1 explode, 1.25..2.25 parts come back in build order; on the cut chapter c a plane cuts in over c-.6..c+.2 and clears over c+.6..c+1
 function applyModel(t) {
   if (!P.model) {                                   // placeholder: a slow bob, and a lean-in on the demo chapter
-    M.grp.position.y = Math.sin(clock.elapsedTime / .9) * M.R * .02;   // the page clock, so a visit replay paces it plane.constant = 1e6;
+    M.grp.position.y = Math.sin(clock.elapsedTime / .9) * M.R * .02; plane.constant = 1e6;   // the page clock, so a visit replay paces it
     const io = CH.findIndex(q => q.key === 'open'), op = io < 0 ? 0 : sm((t - io + .7) / .55) * (1 - sm((t - io - .1) / .3));
     for (const p of M.parts) if (p.slide) p.mesh.position.copy(p.base).addScaledVector(p.slide, op);   // e.g. the desk top riding up its post
     if (P.anim) P.anim(M);                          // e.g. the hexacopter's props
