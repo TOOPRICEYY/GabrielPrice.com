@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 import { checkPost, merge } from '../worker/lb.js';
+import { lbBad, LB_ANY, LB_WORD } from '../worker/lbname.js';
+import fs from 'node:fs';
 
 const ORIGIN = 'https://gabrielprice.com';
 function fakeR2() {
@@ -75,4 +77,14 @@ test('without a bucket the boards read empty and posts are accepted quietly', as
   const e = { ASSETS: { fetch: () => new Response('asset') } };
   assert.deepEqual(await get(e), { sc: [], lap: [] });
   assert.equal((await post(e, { game: 'sc', id: 'aaaaaaaa1', tag: 'GAB', score: 5 })).status, 204);
+});
+
+test('names: rude ones post as ???, ordinary ones pass, and the page runs the same word lists', () => {
+  for (const n of ['f.u.c.k', 'sh1t', 'a s s', 'ASSS', 'Fuuuck', 'b1tch', 'tits']) assert.ok(lbBad(n), n);
+  for (const n of ['GAB', 'Gabriel P.', 'Hancock', 'Cassie', 'class', 'Dickens', 'Sussex', 'analyst', 'Peacock', 'grape']) assert.ok(!lbBad(n), n);
+  assert.equal(checkPost({ game: 'sc', id: 'aaaaaaaa1', tag: 'sh1t', score: 5 }).tag, '???');
+  assert.equal(checkPost({ game: 'sc', id: 'aaaaaaaa1', tag: 'GAB', score: 5 }).tag, 'GAB');
+  const rigs = fs.readFileSync(new URL('../src/rigs.js', import.meta.url), 'utf8');
+  const list = (name) => JSON.parse(new RegExp('const ' + name + ' = (\\[[^\\]]*\\])').exec(rigs)[1].replace(/'/g, '"'));
+  assert.deepEqual(list('LB_ANY'), LB_ANY); assert.deepEqual(list('LB_WORD'), LB_WORD);
 });

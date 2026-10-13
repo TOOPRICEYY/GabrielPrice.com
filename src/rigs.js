@@ -855,6 +855,7 @@ function rigUI() {
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and boost here instead of scrolling
     }
     if (rigs.scootOn && (k.length === 1 ? 'wasd '.includes(k) : k.startsWith('arrow'))) {
+      if (lbEndOpen('sc') && !e.repeat) lbAgain();
       const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false; if (rigs.onDrive) rigs.onDrive();
       if (k === ' ') { if (!e.repeat) { S.hop = true; S.hopHeld = true; } } else S.keys.add(k);
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and hop here instead of scrolling the page
@@ -888,7 +889,7 @@ function rigUI() {
     // a small ✕ in the top-left corner leaves a scooter run mid-game: the run ends (its score counts) and the autopilot takes back
     const gx = document.createElement('button'); gx.id = 'scexit'; gx.hidden = true; gx.textContent = '✕'; gx.setAttribute('aria-label', 'Exit the game'); document.body.appendChild(gx);
     gx.addEventListener('click', () => { const S = rigs.scooter; S.quit = true; S.touchRun = false; S.keys.clear(); S.hopHeld = false; S.last = -9; });
-    play.addEventListener('click', () => { const S = rigs.scooter; S.quit = false; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
+    play.addEventListener('click', () => { if (lbEndOpen('sc')) return lbAgain(); const S = rigs.scooter; S.quit = false; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
     // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap or swipe up to jump
     const sw = document.createElement('div'); sw.id = 'swipe'; sw.hidden = true; document.body.appendChild(sw); let t0 = null;
     sw.addEventListener('pointerdown', (e) => { e.preventDefault(); t0 = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, done: false }; sw.setPointerCapture?.(e.pointerId); });
@@ -1271,7 +1272,7 @@ function gameHurt(S, T, part, amt, label, fall) {
   starPop(label, S.g.localToWorld(R3.u.set(0, 120, 0)));
   if (G.hp <= 0) {
     // (phones stay down longer: the leaderboard shows then)
-    G.downUntil = T + (TOUCH ? 5.5 : 3.4); S.touchRun = false; G.ragT = T; G.ragV = Math.max(160, Math.abs(S.v) / .35); G.ragSide = Math.random() < .5 ? -1 : 1; G.ragFall = !!fall; S.v = fall ? 0 : .5 * G.ragV; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc);
+    G.downUntil = T + (TOUCH ? 5.5 : 3.4); S.touchRun = false; G.ragT = T; G.ragV = Math.max(160, Math.abs(S.v) / .35); G.ragSide = Math.random() < .5 ? -1 : 1; G.ragFall = !!fall; S.v = fall ? 0 : .5 * G.ragV; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbEnd('sc', sc, fall ? 'You fell' : 'Wiped out'); lbSubmit('sc', sc);
     const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = (fall ? 'Fell · ' : 'Wiped out · ') + sc;
     el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
   }
@@ -1507,6 +1508,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
   if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
+  if (G.on && G.downUntil > 0 && lbEndOpen('sc')) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed
   if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
   if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
     bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
@@ -1662,7 +1664,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   if (show && G.mini) G.mini = miniDraw(G, T);
   // the board: beside the run on wide screens; on phones only once you are down (it would cover the walk)
   { const pl = show && w > .5; if (hud.playing !== pl) { hud.playing = pl; document.body.classList.toggle('playing', pl); } }   // phones hide the orbit hint while you play
-  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0, (G.ragT != null && T < G.downUntil) || !G.on);
+  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0, (G.downUntil > 0 && T < G.downUntil) || !G.on);
   // the "Take the bars" card steps aside while a run is on
   { const c = ui.scCard || (ui.scCard = document.querySelector('section[data-s="12"] .card')); if (c) { const on = show && G.on && w > .5; if (c.classList.contains('playing') !== on) c.classList.toggle('playing', on); } }
 }
@@ -1931,7 +1933,7 @@ function courseFrame(Co, dt, w) {
     const G = C.gates[C.i];
     const ux = p.x - G.x, uz = p.z - G.z, along = ux * Math.sin(G.h) + uz * Math.cos(G.h), lat = ux * Math.cos(G.h) - uz * Math.sin(G.h);
     if (Math.abs(along) < 90 && Math.abs(lat) < G.W + 40) {     // through it, either way
-      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; }
+      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbEnd('lap', C.last * 1000, 'Lap complete'); lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; }
       G.pulse = T; C.i++; C.acc = 0; C.a0 = null;
     }
   } else {
@@ -2012,12 +2014,22 @@ function lbId() { try { let id = localStorage.getItem('gp.lbid'); if (!id) { id 
 function lbInit() {
   if (LB.el) return; LB.tag = lbTag();
   const el = LB.el = document.createElement('div'); el.id = 'lboard'; el.setAttribute('aria-label', 'Leaderboard');
-  el.innerHTML = '<div class="hd"><b>Leaderboard</b><span class="lv">live</span></div><ol></ol><div class="you"></div><label class="tg"><span>Your name</span><input maxlength="10" autocomplete="off" spellcheck="false" placeholder="name"></label>';
+  el.innerHTML = '<div class="hd"><b>Leaderboard</b><span class="lv">live</span></div><ol></ol><div class="you"></div><label class="tg"><span>Your name</span><input maxlength="10" autocomplete="off" spellcheck="false" placeholder="name"></label>' +
+    '<div class="acts"><button class="sv" type="button">Save score</button><button class="pa" type="button">Play again</button></div>';
+  el.insertAdjacentHTML('afterbegin', '<div class="ttl"><span></span><b></b><i></i></div>');   // the end menu's heading: how it ended, the score, a new best
   document.body.appendChild(el);
   const inp = el.querySelector('input'); inp.value = LB.tag;
   inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^A-Za-z0-9 ._-]/g, '').slice(0, 10); });
-  inp.addEventListener('change', () => { LB.tag = lbTag(inp.value.trim()); if (LB.tag.length) { for (const k of ['sc', 'lap']) if (LB.mine[k]) LB.pend[k] = LB.mine[k]; LB.drawn = ''; lbDraw(); lbFlush(); } });
-  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+  const save = () => {
+    const v = inp.value.trim(); LB.bad = !!v && lbBad(v); el.classList.toggle('bad', LB.bad); LB.drawn = '';
+    if (!LB.bad && v && v !== LB.tag) { LB.tag = lbTag(v); for (const k of ['sc', 'lap']) if (LB.mine[k]) LB.pend[k] = LB.mine[k]; lbFlush(); }
+    if (!LB.bad && v) LB.saved = true; lbDraw();
+  };
+  inp.addEventListener('input', () => { if (LB.bad) { LB.bad = false; el.classList.remove('bad'); LB.drawn = ''; lbDraw(); } LB.saved = false; });
+  inp.addEventListener('change', save);
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { save(); inp.blur(); } });
+  el.querySelector('.sv').addEventListener('click', save);
+  el.querySelector('.pa').addEventListener('click', lbAgain);
   const C = window.claude;
   if (C && C.use) {
     Promise.all([C.use('db'), C.use('user')]).then(async ([db, user]) => {
@@ -2050,6 +2062,32 @@ function lbSubmit(k, score) {
   score = Math.round(score); if (!(score > 0) || !lbBetter(k, score, LB.mine[k])) return;
   LB.mine[k] = score; LB.pend[k] = score; LB.fresh = true; LB.drawn = ''; lbFlush();
 }
+// the end of a run (a wipe-out or a finished lap) opens the board as a menu in the middle of the screen: how it went, the board,
+// a name box and Play again. The run waits until it is closed (Play again, a game key, or scrolling away).
+function lbEnd(k, score, title) {
+  if (REPLAY) return; score = Math.round(score);
+  LB.end = { k, score, title, best: score > 0 && lbBetter(k, score, LB.mine[k]), n: (LB.end ? LB.end.n : 0) + 1 }; LB.saved = false; LB.bad = false; LB.drawn = '';
+  if (LB.el) LB.el.classList.remove('bad');
+}
+function lbEndOpen(k) { return !!(LB.end && LB.end.k === k && LB.mode === k && LB.full); }
+function lbAgain() {
+  const E = LB.end; LB.end = null; LB.drawn = ''; lbDraw(); if (!E) return;
+  const T = clock.elapsedTime, a = document.activeElement; if (a && a.blur && LB.el && LB.el.contains(a)) a.blur();
+  if (E.k === 'sc') { const S = rigs.scooter; S.quit = false; S.last = T; S.game.downUntil = T; if (TOUCH) { S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); } }
+  else { const Co = rigs.couch; if (Co.hold) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); } Co.last = Co.kLast = T; }
+  if (rigs.onDrive) rigs.onDrive();
+}
+// names on the boards: a basic filter. LB_ANY is refused anywhere in a name (spaces, dots and look-alike digits ignored, so
+// "f.u.c.k" and "sh1t" are caught); the short words in LB_WORD only as a whole word, so "Hancock", "Cassie" and "class" pass.
+// The Worker runs the same check on every post and shows a refused name as ???.
+const LB_ANY = ['fuck', 'fuk', 'fck', 'fuq', 'shit', 'cunt', 'nigg', 'niga', 'nigr', 'faggot', 'bitch', 'whore', 'slut', 'nazi', 'hitler', 'kike', 'chink', 'retard', 'twat', 'wank', 'pussy', 'penis', 'vagina', 'porn', 'dildo', 'jizz', 'asshole', 'bastard', 'blowjob', 'handjob'];
+const LB_WORD = ['ass', 'arse', 'anal', 'anus', 'boob', 'boobs', 'cock', 'cok', 'cum', 'dick', 'dik', 'fag', 'hoe', 'kkk', 'rape', 'sex', 'spic', 'tit', 'tits'];
+const LB_LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', $: 's', '!': 'i' };
+function lbBad(tag) {
+  const n = String(tag).toLowerCase().replace(/[0134578@$!]/g, (c) => LB_LEET[c]), toks = n.split(/[^a-z]+/).filter(Boolean), all = toks.join('');
+  const sq = (s) => s.replace(/(.)\1+/g, '$1'), sq2 = (s) => s.replace(/(.)\1{2,}/g, '$1$1');
+  return [all, sq(all)].some((s) => LB_ANY.some((w) => s.includes(w))) || [...toks, all].some((t) => [t, sq(t), sq2(t)].some((u) => LB_WORD.includes(u)));
+}
 async function lbFlush() {
   if (LB.busy || !Object.keys(LB.pend).length) return;
   const tag = LB.tag || '???';
@@ -2066,26 +2104,30 @@ async function lbFlush() {
 }
 function lbDraw() {
   const el = LB.el; if (!el || !LB.mode) return;
-  const k = LB.mode, K = LBK[k], rows = LB.rows[k], key = k + '|' + LB.full + '|' + LB.fresh + '|' + LB.tag + '|' + LB.mine[k] + '|' + LB.ro + '|' + rows.map(x => x.tag + x.score + (x.you ? '*' : '')).join();
+  const k = LB.mode, K = LBK[k], rows = LB.rows[k], key = k + '|' + LB.full + '|' + LB.fresh + '|' + LB.tag + '|' + LB.mine[k] + '|' + LB.ro + '|' + LB.bad + LB.saved + (LB.end && LB.end.n) + '|' + rows.map(x => x.tag + x.score + (x.you ? '*' : '')).join();
   if (key === LB.drawn) return; LB.drawn = key;
   el.classList.toggle('mini', !LB.full);
+  const end = lbEndOpen(k), E = LB.end; el.classList.toggle('end', end);
+  if (end) { const t = el.querySelector('.ttl'); t.children[0].textContent = E.title; t.children[1].textContent = K.fmt(E.score); t.children[2].textContent = E.best ? 'New best!' : LB.mine[k] ? 'Your best ' + K.fmt(LB.mine[k]) : ''; }
   el.querySelector('.hd b').textContent = K.title;
   el.querySelector('.lv').hidden = !(LB.db || LB.api);
   const ol = el.querySelector('ol'); ol.replaceChildren();
   if (!rows.length) { const li = document.createElement('li'); li.className = 'em'; li.textContent = LB.db || LB.api ? 'No scores yet. Be first.' : 'Scores show here when you are signed in.'; ol.appendChild(li); }
   rows.forEach((x, i) => { const li = document.createElement('li'); li.className = x.you ? 'me' : ''; const t = document.createElement('span'); t.textContent = (i + 1) + '. ' + x.tag; const s = document.createElement('b'); s.textContent = K.fmt(x.score); li.append(t, s); ol.appendChild(li); });
   const you = el.querySelector('.you'), inTop = rows.some(x => x.you);
-  you.textContent = LB.ro ? (LB.mine[k] ? 'Your best ' + K.fmt(LB.mine[k]) + '. ' : '') + 'This link can view the board but not post to it.'
+  you.textContent = LB.bad ? 'Please pick a different name.' : LB.ro ? (LB.mine[k] ? 'Your best ' + K.fmt(LB.mine[k]) + '. ' : '') + 'This link can view the board but not post to it.'
+    : lbEndOpen(k) ? (!(LB.db || LB.api) ? 'Scores save when you are signed in.' : LB.saved ? 'Saved as ' + LB.tag + '.' : LB.tag ? 'Saving as ' + LB.tag + '. Change it below.' : 'Enter a name to save your score.')
     : LB.full && LB.fresh ? 'New best ' + K.fmt(LB.mine[k]) + '!' + (LB.tag ? '' : ' Add your name:') : LB.mine[k] && !inTop ? 'Your best ' + K.fmt(LB.mine[k]) : '';
   you.hidden = !you.textContent;
   el.querySelector('.tg').hidden = !LB.full || !(LB.db || LB.api) || !!LB.ro;   // the name box: at the end of a run
+  el.querySelector('.sv').hidden = el.querySelector('.tg').hidden;
 }
 // beside whichever game you are playing once you have taken over: small while you play, full (with the name box) at the end
 function lbShow(k, a, full) {
   if (!LB.el) lbInit();
   if (a > .5 && LB.mode !== k) { LB.mode = k; LB.drawn = ''; if (LB.api) lbPoll(); }
-  if (a <= .5 && LB.mode === k) { LB.mode = null; LB.fresh = false; }
-  if (LB.mode === k && LB.full !== !!full) { LB.full = !!full; if (!full) LB.fresh = false; LB.drawn = ''; }
+  if (a <= .5 && LB.mode === k) { LB.mode = null; LB.fresh = false; if (LB.end && LB.end.k === k) LB.end = null; }
+  if (LB.mode === k && LB.full !== !!full) { LB.full = !!full; if (!full) { LB.fresh = false; if (LB.end && LB.end.k === k) LB.end = null; } LB.drawn = ''; }
   if (LB.mode) lbDraw();
   const o = LB.mode ? 1 : 0; if (LB.a !== o) { LB.a = o; LB.el.classList.toggle('on', !!o); }
 }
@@ -2173,7 +2215,7 @@ function couchCues(Co, Tn, drive, st) {
     Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
     return;
   }
-  if (Co.hold) { if (Tn < Co.waitT + 10) Co.kLast = Tn; else { Co.hold = false; return; }   // waits 10 s on the line, then lets the autopilot back
+  if (Co.hold) { if (Tn < Co.waitT + 10 || lbEndOpen('lap')) Co.kLast = Tn; else { Co.hold = false; return; }   // waits 10 s on the line, then lets the autopilot back
     if (Co.cue === 'wait' && Tn > Co.waitT) { Co.cue = 'held'; bigCue('Ready', TOUCH ? '▲ to go again' : 'W to go again'); } return; }
   const P = Co.g.position, near = Math.hypot(P.x - CC.ring[0], P.z - CC.ring[1]) < CC.ringR + 120;   // at the roundabout itself, not just past the last gate
   if (C.i === n && near) {                          // on the roundabout

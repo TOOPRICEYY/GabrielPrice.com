@@ -9,6 +9,8 @@
 // its top 50, one row per player id. Writes are conditional on the object's etag and retried, so two posts at once don't
 // drop one. Player ids are random strings the page keeps in localStorage; they are never sent back out.
 
+import { lbBad } from './lbname.js';
+
 const KEY = 'lb/board.json';
 const KEEP = 50, SHOW = 10;
 // the range a score may take: well past any honest run either way, so a doctored post can't sit on top forever
@@ -32,7 +34,7 @@ export function checkPost(b) {
   const { game, id, score } = b, tag = typeof b.tag === 'string' ? b.tag.trim() : '';
   if (!Object.hasOwn(GAMES, game) || typeof id !== 'string' || !ID.test(id) || !TAG.test(tag)) return null;
   if (!Number.isInteger(score) || score < GAMES[game].min || score > GAMES[game].max) return null;
-  return { game, id, tag, score };
+  return { game, id, tag: lbBad(tag) ? '???' : tag, score };   // a refused name still counts, as ???
 }
 
 // the board with this post merged in (a player keeps their best; the tag follows their latest post), or null if unchanged.
