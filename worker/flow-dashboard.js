@@ -80,12 +80,15 @@ const gpuName = (g) => { const m = /^ANGLE \\([^,]*, (?:ANGLE Metal Renderer: )?
 const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); const h = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
 const picked = new Set();   // keys of the ticked visits
 let busy = false;   // a delete is under way: the minute refresh waits
+let loads = 0, failed = false;   // only the latest request counts (a range change can overtake a refresh)
 async function load(quiet) {
+  const n = ++loads;
   if (!quiet) $('status').textContent = 'Loading…';
   const r = await fetch('/admin/api/flow/sessions?days=' + $('days').value, { credentials: 'same-origin' });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { $('status').textContent = j.error || ('Error ' + r.status); return; }
-  data = j; if (!quiet) $('status').textContent = '';
+  if (n !== loads) return;
+  if (!r.ok) { $('status').textContent = j.error || ('Error ' + r.status); failed = true; return; }
+  data = j; if (!quiet || failed) $('status').textContent = ''; failed = false;
   // the OS filter lists the families in this range (iOS, Android, Windows …); visits from before OS capture have none
   const pick = $('os').value, fams = [...new Set(data.sessions.map(fam).filter(Boolean))].sort();
   $('os').innerHTML = '<option value="">All</option>' + fams.map((f) => '<option' + (f === pick ? ' selected' : '') + '>' + esc(f) + '</option>').join('');
