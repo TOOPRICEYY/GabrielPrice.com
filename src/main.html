@@ -2069,7 +2069,7 @@ addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach
     if (side && set.length > 1 && !e.target.closest('.lb-x')) step(side); else close();
   });
   let p0 = null;
-  lb.addEventListener('pointerdown', e => { p0 = e.isPrimary ? [e.clientX, e.clientY] : null; });
+  lb.addEventListener('pointerdown', e => { p0 = e.isPrimary && e.target.tagName !== 'VIDEO' ? [e.clientX, e.clientY] : null; });   // (a drag on a clip works its controls)
   lb.addEventListener('pointerup', e => {
     if (!p0) return; const dx = e.clientX - p0[0], dy = e.clientY - p0[1]; p0 = null;
     if (set.length > 1 && Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) { swiped = true; setTimeout(() => { swiped = false; }, 400); step(dx < 0 ? 1 : -1); }

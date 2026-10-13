@@ -458,7 +458,7 @@
         const on = 14 + R.scKeys.indexOf('on'), sd = 14 + R.scKeys.indexOf('seed');
         let j = i; while (j > 0 && S[j - 1][13] === 1 && S[j - 1][on] === 1 && S[j - 1][sd] === a[sd]) j--;
         if (a[on] === 1) { runStart = S[j][0]; behind = a[14 + R.scKeys.indexOf('Z')] - 320; if (R.pinRun) R.pinRun(); }   // and only those not yet left behind
-      }
+      } else if (pin.sc && pin.sc.on === 1 && R.pinRun) R.pinRun();   // playing into a run: start it before its first hazards land (a no-op once it runs)
       // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
       if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }
       if (a[3] >= 0 && (!touch || fg || head - lastPT < 600)) {
