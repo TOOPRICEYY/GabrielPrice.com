@@ -399,6 +399,8 @@
     // a recorded vehicle state at the playhead, as rigs.js reads it: numbers eased between samples, switches as they were
     const CAP = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' };
     const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, boost: 1, best: 1, drive: 1, boostOn: 1, hold: 1, ci: 1, cdone: 1, clap: 1, clast: 1, cbest: 1, claps: 1, cacc: 1 };
+    let courseKey = '';
+    const lapKey = (P) => P.ci + '|' + P.cdone + '|' + P.claps;
     let courseSync = true;   // set the couch's lap progress from the recording at the next couch sample (a seek, or arriving at the couch)
     function vehicle(keys, a, b, k) {
       if (a.length < 14 + keys.length) return null;   // a sample from before a field was added: leave the vehicle live
@@ -447,8 +449,8 @@
       if (!pin.co) courseSync = true;
       else if (courseSync && R.pinCourse) {   // with how long the visitor had been driving, from the first sample of this drive
         const dr = 14 + R.coKeys.indexOf('drive'); let j = i; while (j > 0 && S[j - 1][13] === 2 && S[j - 1][dr] === 1) j--;
-        R.pinCourse(pin.co, pin.co.drive ? Math.max(0, head - S[j][0]) / 1000 : null); courseSync = false;
-      }
+        R.pinCourse(pin.co, pin.co.drive ? Math.max(0, head - S[j][0]) / 1000 : null); courseSync = false; courseKey = lapKey(pin.co);
+      } else if (R.pinCourse && lapKey(pin.co) !== courseKey) { courseKey = lapKey(pin.co); R.pinCourse(pin.co, null); }   // a gate or lap the recording reached (a fast replay can step over a gate)
       if (seek && R.hazClear) R.hazClear();   // after a seek the run is rebuilt from the recording at the new playhead
       // a seek brings back every hazard of the run under way (from its first sample: on, with the same seed); the game drops those already behind
       let runStart = seek ? Infinity : 0, behind = -Infinity;
