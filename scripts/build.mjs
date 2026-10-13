@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const SRC = path.join(ROOT, 'src'), DIST = path.join(ROOT, 'dist');
 // folders the page loads files from, served next to index.html. A new one must be added here (test/build.test.mjs checks).
-const STATIC_DIRS = ['photos', 'holdfast', 'mittenmade'];
+const STATIC_DIRS = ['photos', 'holdfast', 'mittenmade', 'anti-thesistis'];
 const MARK = '/* ===== editor UI ===== */';
 const ID_OK = /^[\w.:@+~-]{1,200}$/;
 
