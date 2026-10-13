@@ -390,9 +390,10 @@
         const L = window.__lightbox; if (!L) return;
         if (!v) { L.close(); return; }
         // the photo or clip it was opened from; one no longer on the page opens on its own
+        // (only a path on this site: the ingest is public, so a recorded value never points the owner's browser elsewhere)
         const m = [...document.querySelectorAll(L.sel)].find((el) => [el.dataset.full, el.dataset.src, el.getAttribute('src'), el.currentSrc].some((x) => x && file(x) === v))
-          || Object.assign(document.createElement(/\.(mp4|webm|mov)$/i.test(v) ? 'video' : 'img'), { src: v });
-        L.show(m);
+          || (/^[\w-][\w\-./%]*$/.test(v) && Object.assign(document.createElement(/\.(mp4|webm|mov)$/i.test(v) ? 'video' : 'img'), { src: v }));
+        if (m) L.show(m); else L.close();
       }
     }
     // a recorded vehicle state at the playhead, as rigs.js reads it: numbers eased between samples, switches as they were

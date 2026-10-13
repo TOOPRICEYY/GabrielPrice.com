@@ -1195,7 +1195,8 @@ rigs.pinStar = (n, age, ifMissed) => { const Q = rigs.scooter.CM.stars; if (!ifM
 rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]
   const S = rigs.scooter, G = S.game; if (!G.on) return;
   PIN.hit = true; G.hurtT = -1e9;
-  try { gameHurt(S, clock.elapsedTime - age, a[0], a[1], a[2], !!a[3]); } finally { PIN.hit = false; }
+  // a recorded wipe-out takes whatever health the rebuilt run has left, so the rider goes down as they did
+  try { gameHurt(S, clock.elapsedTime - age, a[0], a[4] ? Math.max(+a[1] || 0, G.hp) : a[1], a[2], !!a[3]); } finally { PIN.hit = false; }
   if (a[4]) G.ragSide = a[4];
 };
 rigs.pinTip = (want) => { const [id, k, dir] = String(want || '').split('|'); tutHint(id || '', { touchRun: k === 't' }, +dir || 0); };
