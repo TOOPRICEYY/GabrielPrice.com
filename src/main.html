@@ -270,11 +270,18 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 .modtable div { border: 1px solid var(--rule); padding: 4px 2px; font-variant-numeric: tabular-nums; }
 .modtable b { display: block; color: var(--cobalt); font-weight: 500; }
 .readout { font-family: var(--f-mono); font-size: 12px; color: var(--cobalt); font-variant-numeric: tabular-nums; min-height: 1.5em; }
+/* contact: a small pane under the gallery, the last thing on the page */
+.contact { pointer-events: auto; margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  background: color-mix(in srgb, var(--vellum) 90%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--rule); padding: 14px 18px; }
+.contact p { font-family: var(--f-display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.contact-btn { font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-decoration: none;
+  color: var(--graphite); background: var(--sheet); border: 1px solid var(--graphite); padding: 8px 14px; transition: background .2s, color .2s; }
+.contact-btn:hover, .contact-btn:focus-visible { background: var(--graphite); color: var(--vellum); }
 .alsolist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
 /* the gallery is the last scroll stop (s 17): on wide screens it is a two-column panel on the left so the figure stays in view beside it */
 @media (min-width: 1100px) {
-  main section.gallery { display: flex; align-items: center; }
-  main section.gallery .gal-wrap { width: min(620px, 50vw); }
+  main section.gallery { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  main section.gallery .gal-wrap, main section.gallery .contact { width: min(620px, 50vw); box-sizing: border-box; }
   main section.gallery .gal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .starpop { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--f-mono); font-weight: 500; font-size: 13px; letter-spacing: .08em;
@@ -714,6 +721,10 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
       <h2 id="gallery-h">Other projects</h2>
       <div class="gal-grid" id="galgrid"></div>
+    </div>
+    <div class="contact">
+      <p>Collaborations, comments, concerns?</p>
+      <a class="contact-btn" href="mailto:iam@gabrielprice.com">Contact</a>
     </div>
   </section>
 </main>
