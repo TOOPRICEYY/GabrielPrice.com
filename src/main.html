@@ -1394,7 +1394,7 @@ const BOM_OTHER = { Frame: 'Bearings, fasteners, padding, straps', Drive: 'Gearb
 const BOM_NOTE = { ea: 'The full build: motor, two-stage gearbox and electronics.', mo: 'No motor, gearbox or battery. The springs do the work: functional for walking, hiking and light sports.' };
 // Mechanical only's column is highlighted from the start, but nothing is picked: the 3D keeps every part and no row dims
 // until the reader presses a build button
-let bomVariant = 'mo', bomKnee = false, bomTouched = false, kneeTouched = false;   // the knee add-on starts off, but its parts stay in the 3D until its toggle is pressed
+let bomVariant = 'mo', bomKnee = false, bomTouched = false;   // the knee add-on starts off, in the list and the 3D; its toggle puts it on
 function setBomVariant(v) {
   bomVariant = v;
   document.querySelectorAll('.variant button').forEach((b) => b.setAttribute('aria-pressed', bomTouched && b.dataset.v === v));
@@ -1407,11 +1407,11 @@ function setBomVariant(v) {
   document.getElementById('bomvmo').textContent = '$' + Math.round(bomTot.mo[+bomKnee]);
   document.getElementById('bomnote').textContent = BOM_NOTE[v];
   if (kicker.ready) {
-    for (const k of KNEE_PARTS) kicker.parts[k].ex.visible = bomKnee || !kneeTouched;
+    for (const k of KNEE_PARTS) kicker.parts[k].ex.visible = bomKnee;
   }
 }
 document.querySelectorAll('.variant button').forEach((b) => b.addEventListener('click', () => { bomTouched = true; setBomVariant(b.dataset.v); }));
-document.getElementById('bomknee').addEventListener('click', () => { bomKnee = !bomKnee; kneeTouched = true; setBomVariant(bomVariant); });
+document.getElementById('bomknee').addEventListener('click', () => { bomKnee = !bomKnee; setBomVariant(bomVariant); });
 // the full list (quantities, both builds, order links, STLs, every bearing and screw) sits behind one button; the short
 // list ends with a line that opens it, and picking a part (its row, number or 3D body) opens it at that part's row
 function setBomDet(on) {
@@ -1943,7 +1943,7 @@ function frameBody() {
       const drive = !hideDrive;
       balloons.forEach((b, i) => {
         const p = parts[b.k];
-        const off = (!drive && (ELECTRIC_PARTS.includes(b.k) || b.k.startsWith('planet'))) || (kneeTouched && !bomKnee && KNEE_PARTS.includes(b.k));
+        const off = (!drive && (ELECTRIC_PARTS.includes(b.k) || b.k.startsWith('planet'))) || (!bomKnee && KNEE_PARTS.includes(b.k));
         b.g.style.display = off ? 'none' : '';
         if (off) return;
         p.m.localToWorld(wp.copy(p.c)); wp.project(camera);
