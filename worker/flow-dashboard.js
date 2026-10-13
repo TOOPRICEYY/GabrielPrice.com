@@ -79,12 +79,13 @@ const fam = (s) => String(s.os || '').split(' ')[0];
 const gpuName = (g) => { const m = /^ANGLE \\([^,]*, (?:ANGLE Metal Renderer: )?(.+?)(?: \\(0x[0-9a-f]+\\))?(?: Direct3D.*?)?(?: OpenGL.*?)?(?:, [^,]*)?\\)$/i.exec(g || ''); return m ? m[1] : g || ''; };
 const median = (a) => { a = a.filter((x) => x > 0).sort((x, y) => x - y); const h = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
 const picked = new Set();   // keys of the ticked visits
-async function load() {
-  $('status').textContent = 'Loading…';
+let busy = false;   // a delete is under way: the minute refresh waits
+async function load(quiet) {
+  if (!quiet) $('status').textContent = 'Loading…';
   const r = await fetch('/admin/api/flow/sessions?days=' + $('days').value, { credentials: 'same-origin' });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { $('status').textContent = j.error || ('Error ' + r.status); return; }
-  data = j; $('status').textContent = '';
+  data = j; if (!quiet) $('status').textContent = '';
   // the OS filter lists the families in this range (iOS, Android, Windows …); visits from before OS capture have none
   const pick = $('os').value, fams = [...new Set(data.sessions.map(fam).filter(Boolean))].sort();
   $('os').innerHTML = '<option value="">All</option>' + fams.map((f) => '<option' + (f === pick ? ' selected' : '') + '>' + esc(f) + '</option>').join('');
@@ -312,8 +313,8 @@ function trend(V) {
     let base = H - bot;
     const segs = DEVS.map((d, j) => [d, c[j]]).filter(([, v]) => v);
     segs.forEach(([d, v], j) => {
-      const h = (H - top - bot) * v / max, gap = j ? 2 : 0;   // a 2px surface gap between stacked segments
-      svg += j === segs.length - 1 ? '<path d="' + colPath(x, base - h + gap, bw, h - gap, 3) + '" fill="' + d[2] + '"/>' : '<rect x="' + x + '" y="' + (base - h + gap) + '" width="' + bw + '" height="' + Math.max(0, h - gap) + '" fill="' + d[2] + '"/>';
+      const h = (H - top - bot) * v / max, gap = j ? Math.min(2, h / 2) : 0;   // a 2px surface gap between stacked segments, never more than half a thin one
+      svg += j === segs.length - 1 ? '<path d="' + colPath(x, base - h + gap, bw, h - gap, 3) + '" fill="' + d[2] + '"/>' : '<rect x="' + x + '" y="' + (base - h + gap) + '" width="' + bw + '" height="' + (h - gap) + '" fill="' + d[2] + '"/>';
       base -= h;
     });
     const tip = b.l + ': ' + tot + (tot === 1 ? ' visit' : ' visits') + (tot ? ' (' + segs.map(([d, v]) => d[1].toLowerCase() + ' ' + v).join(', ') + ')' : '');
@@ -393,7 +394,8 @@ let resizeT = 0; addEventListener('resize', () => { clearTimeout(resizeT); resiz
 // every visit shown, as a spreadsheet: all columns, in the table's order
 function csv() {
   const tmp = document.createElement('div'), txt = (h) => { tmp.innerHTML = h; return tmp.textContent.trim(); };
-  const q = (v) => { v = String(v == null ? '' : v); return /[",\\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  // visitors' own values (GPU, language …) could start like a formula; a leading apostrophe keeps a spreadsheet from running it
+  const q = (v) => { v = String(v == null ? '' : v); if (/^[=+@\\t\\r-]/.test(v)) v = "'" + v; return /[",\\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const cols = order.map((id) => C[id]);
   const lines = [['key'].concat(cols.map((c) => c.h), ['visitor id', 'replay']).map(q).join(',')];
   for (const s of sorted) lines.push([s.key].concat(cols.map((c) => txt(c.cell(s))), [s.vid || '', location.origin + '/admin/flow/replay?key=' + encodeURIComponent(s.key)]).map(q).join(','));
@@ -428,7 +430,7 @@ $('rows').addEventListener('click', (e) => {
 $('del').onclick = async () => {
   const keys = [...picked], n = keys.length;
   if (!n || !confirm('Delete ' + (n === 1 ? 'this visit' : 'these ' + n + ' visits') + ' for good? Their replays go too.')) return;
-  $('del').disabled = true; $('status').textContent = 'Deleting…';
+  $('del').disabled = true; $('status').textContent = 'Deleting…'; busy = true;
   // the Worker takes up to 500 visits a request, so a big selection (a whole group) goes in parts
   let done = 0, fail = '';
   for (let i = 0; i < n && !fail; i += 500) {
@@ -444,10 +446,13 @@ $('del').onclick = async () => {
     for (const k of part) picked.delete(k);
     done += j.deleted;
   }
-  last = -1;
+  last = -1; busy = false;
   $('status').textContent = (done ? 'Deleted ' + done + (done === 1 ? ' visit.' : ' visits.') : '') + (fail ? (done ? ' ' : '') + 'Could not delete ' + (done ? 'the rest' : 'them') + ': ' + fail : '');
   draw();
 };
 $('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = $('os').onchange = () => { last = -1; if (data) draw(); };
 load();
+// refresh every minute while the page is in view, so "on the site now" and today's numbers keep up
+setInterval(() => { if (!document.hidden && !busy && data) load(true).catch(() => {}); }, 60e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy && data) load(true).catch(() => {}); });
 </script></body></html>`;
