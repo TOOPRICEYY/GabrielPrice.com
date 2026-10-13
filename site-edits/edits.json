@@ -39,7 +39,7 @@
     },
     "s4.div1.h21": {
       "fp": "Two-stage mechanical transmission",
-      "html": "Two-stage mechanical reduction",
+      "html": "Hybrid power recovery",
       "key": "s4.div1.h21",
       "kind": "text",
       "name": "Heading",
@@ -47,7 +47,7 @@
       "sec": 4,
       "section": "05 Drive train",
       "tag": "h2",
-      "updatedAt": "2026-10-13T11:25:27.577Z"
+      "updatedAt": "2026-10-13T11:27:29.389Z"
     },
     "s7.div1.figure1.figcaption1": {
       "fp": "Oct 2026Strapping in at 10×, then running at ½ speed",
