@@ -19,7 +19,7 @@ import replayPage from './flow-replay.js';
 
 // event types (flow/client.js): c click, v video, h hidden, z resize, e error, l stall, g/r 3D context lost/back, b photo popup,
 // p project page, k scooter hazard, x scooter hit, t scooter tip, o couch boost
-const EVENTS = ['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r', 'b', 'p', 'k', 'x', 't', 'o', 's'];
+const EVENTS = ['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r', 'b', 'p', 'k', 'x', 't', 'o', 's', 'f'];
 const MAX_BODY = 64 * 1024, MAX_SEQ = 150, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 // crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
 // models such as the CUBOT X30 contain

@@ -24,7 +24,7 @@
 //          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message),
 //          b photo popup (the file, '' when closed), p project page (its id, '' when closed), k a scooter hazard appeared (rigs.js hazRec),
 //          x the rider was hit (part, amount, label, fell, ragdoll side), t a scooter tip showed (its key, '' when gone), o couch boost (full),
-//          s a scooter star taken (its number).
+//          s a scooter star taken (its number), f a crutch began to fall (its z).
 //          The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
@@ -475,6 +475,7 @@
         if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
         else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
+        else if (e[1] === 'f') { if (seek && R.pinFall) R.pinFall(e[2], age); }   // a crutch began to fall (live otherwise, as the rider nears it)
         else if (e[1] === 's') { if (seek && R.pinStar) R.pinStar(e[2], age); }   // a star taken (played live otherwise, by the pinned rider)
         else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
         if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }

@@ -35,7 +35,8 @@ Events are `[ms, type, …]`:
 - `x`: the rider was hit (body part, health lost, the label shown, whether he fell, and the ragdoll's side when it ended the run);
 - `t`: a first-run scooter tip showed (`''` when it went);
 - `o`: the couch's boost fired;
-- `s`: a scooter star was taken (its number), so a seek just after it keeps the star away until it comes back.
+- `s`: a scooter star was taken (its number), so a seek just after it keeps the star away until it comes back;
+- `f`: a crutch began to fall as the rider neared it (its position), so a seek past it shows it already down.
 
 The games are recorded as state, not replayed from the keys: their hazards are random and their physics depend on the frame rate, so the same keys would play a different game. The player holds the scooter and the couch to the recorded state (`rigs.pin` in src/rigs.js), spawns the recorded hazards and plays the recorded hits, and moves the page's clock with the playhead (stopped while paused, faster at 2× and 4×, still across a seek) so hazards and lap timers keep pace. A replay never posts to the leaderboards or keeps a best score, since it runs in your own browser. Photo popups and project pages open and close as they did, and a project page follows the visitor's scroll and camera.
 
