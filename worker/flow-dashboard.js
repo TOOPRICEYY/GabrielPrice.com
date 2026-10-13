@@ -59,7 +59,7 @@ svg .grid{stroke:var(--line);stroke-width:1}svg .base{stroke:var(--muted);stroke
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
 <div class="grid"><div class="card"><h2>Where visits ended <span class="hint">furthest section</span></h2><div class="bars" id="exits"></div></div>
 <div class="card"><h2>How long visits last</h2><div class="bars" id="lengths"></div></div></div>
-<div class="card full"><h2>When people visit <span class="hint">your time zone</span></h2><div class="heat" id="heat"></div>
+<div class="card full"><h2 id="heatT">When people visit <span class="hint">your time zone</span></h2><div class="heat" id="heat"></div>
 <div class="heatkey">Fewer <div class="hc" style="background:var(--line)"></div><div class="hc" style="background:var(--h1)"></div><div class="hc" style="background:var(--h2)"></div><div class="hc" style="background:var(--h3)"></div><div class="hc" style="background:var(--h4)"></div><div class="hc" style="background:var(--h5)"></div> More</div></div>
 <h2 style="margin:4px 0 10px">Where visitors come from <span class="hint">click a bar to show only those visits</span></h2>
 <div class="grid3"><div class="card"><h2>From</h2><div class="bars" id="bRef"></div></div><div class="card"><h2>Country</h2><div class="bars" id="bCountry"></div></div><div class="card"><h2>City</h2><div class="bars" id="bCity"></div></div>
@@ -293,7 +293,10 @@ document.addEventListener('pointermove', (e) => {
 });
 const DEVS = [['desktop', 'Desktop', 'var(--s1)'], ['phone', 'Phone', 'var(--s2)'], ['tablet', 'Tablet', 'var(--s3)'], ['', 'Unknown', 'var(--s0)']];
 const devOf = (s) => (DEVS.some((d) => d[0] && d[0] === s.dev) ? s.dev : '');
-const when = (s) => new Date(s.start || s.day + 'T12:00:00Z');
+// an hour of day is only known when the visit's upload time is; the hourly charts leave the rest out and say how many
+const when = (s) => new Date(s.start);
+const timed = (V) => V.filter((s) => s.start && !isNaN(Date.parse(s.start)));
+const untimed = (n) => n ? ' <span class="hint">' + n + (n === 1 ? ' visit' : ' visits') + ' without a time left out</span>' : '';
 const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const nice = (m) => { const p = Math.pow(10, Math.floor(Math.log10(Math.max(1, m)))), f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
 // a column with its top corners rounded, standing on the baseline
@@ -305,7 +308,8 @@ function trend(V) {
   if (hourly) for (let h = 0; h < 24; h++) buckets.push({ k: String(h), l: String(h).padStart(2, '0') + ':00' });
   else for (let i = +$('days').value - 1; i >= 0; i--) { const k = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10); buckets.push({ k, l: new Date(k + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) }); }
   const at = new Map(buckets.map((b, i) => [b.k, i])), counts = buckets.map(() => DEVS.map(() => 0));
-  for (const s of V) { const i = at.get(hourly ? String(when(s).getUTCHours()) : s.day); if (i != null) counts[i][DEVS.findIndex((x) => x[0] === devOf(s))]++; }
+  const T = hourly ? timed(V) : V;
+  for (const s of T) { const i = at.get(hourly ? String(when(s).getUTCHours()) : s.day); if (i != null) counts[i][DEVS.findIndex((x) => x[0] === devOf(s))]++; }
   const max = nice(Math.max(1, ...counts.map((c) => c.reduce((a, b) => a + b, 0)))), y = (v) => top + (H - top - bot) * (1 - v / max);
   const n = buckets.length, step = (W - left) / n, bw = Math.max(2, Math.min(28, step - 2));
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="Visits per ' + (hourly ? 'hour today' : 'day') + ', by device">';
@@ -325,18 +329,20 @@ function trend(V) {
     if (i % every === 0) svg += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle" class="ax">' + esc(hourly ? b.l.slice(0, 2) : b.l) + '</text>';
   });
   el.innerHTML = svg + '<line x1="' + left + '" x2="' + W + '" y1="' + (H - bot) + '" y2="' + (H - bot) + '" class="base"/></svg>';
-  $('trendT').innerHTML = (hourly ? 'Visits per hour today' : 'Visits per day') + ' <span class="hint">UTC</span>';
+  $('trendT').innerHTML = (hourly ? 'Visits per hour today' : 'Visits per day') + ' <span class="hint">UTC</span>' + untimed(V.length - T.length);
   $('trendKey').innerHTML = DEVS.filter((d) => V.some((s) => devOf(s) === d[0])).map((d) => '<span><i style="background:' + d[2] + '"></i>' + d[1] + '</span>').join('');
 }
 // day of week × hour, in this browser's time zone
 function heat(V) {
   const c = Array.from({ length: 7 }, () => Array(24).fill(0));
-  for (const s of V) { const d = when(s); c[(d.getDay() + 6) % 7][d.getHours()]++; }
+  const T = timed(V);
+  for (const s of T) { const d = when(s); c[(d.getDay() + 6) % 7][d.getHours()]++; }
   const max = Math.max(0, ...c.flat()), days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const lvl = (v) => (!v ? 0 : Math.min(5, 1 + Math.floor(5 * (v - 1) / Math.max(1, max))));
   let h = '<div></div>' + Array.from({ length: 24 }, (_, i) => '<div class="hx">' + (i % 3 ? '' : String(i).padStart(2, '0')) + '</div>').join('');
   c.forEach((row, d) => { h += '<div class="hy">' + days[d] + '</div>' + row.map((v, i) => '<div class="hc l' + lvl(v) + '" data-tip="' + days[d] + ' ' + String(i).padStart(2, '0') + ':00–' + String(i + 1).padStart(2, '0') + ':00: ' + v + (v === 1 ? ' visit' : ' visits') + '"></div>').join(''); });
   $('heat').innerHTML = h;
+  $('heatT').innerHTML = 'When people visit <span class="hint">your time zone</span>' + untimed(V.length - T.length);
 }
 // counts by a column's group, largest first; the rest folds into Other. Clicking a bar narrows the page to it.
 function breakdown(el, V, id, top) {
@@ -433,7 +439,7 @@ $('rows').addEventListener('click', (e) => {
 $('del').onclick = async () => {
   const keys = [...picked], n = keys.length;
   if (!n || !confirm('Delete ' + (n === 1 ? 'this visit' : 'these ' + n + ' visits') + ' for good? Their replays go too.')) return;
-  $('del').disabled = true; $('status').textContent = 'Deleting…'; busy = true;
+  $('del').disabled = true; $('status').textContent = 'Deleting…'; busy = true; loads++;   // a refresh already on its way would bring the deleted visits back
   // the Worker takes up to 500 visits a request, so a big selection (a whole group) goes in parts
   let done = 0, fail = '';
   for (let i = 0; i < n && !fail; i += 500) {
