@@ -2040,7 +2040,7 @@ function lbInit() {
       LB.db = db;
       try { const d = await db.doc('lb/' + LB.me).get(); if (d.exists) { const b = d.data(); LB.mine.sc = +b.sc || 0; LB.mine.lap = +b.lap || 0; if (!LB.tag && b.tag) { LB.tag = lbTag(b.tag); inp.value = LB.tag; } } } catch (e) {}
       for (const k of ['sc', 'lap']) db.collection('lb').where(k, '>', 0).orderBy(k, LBK[k].asc ? 'asc' : 'desc').limit(10).onSnapshot((snap) => {
-        LB.rows[k] = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => +x[k] > 0).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x[k], you: x.id === LB.me }));
+        LB.rows[k] = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => +x[k] > 0).map(x => ({ tag: lbClean(x.tag), score: +x[k], you: x.id === LB.me }));
         LB.drawn = ''; lbDraw();
       }, () => {});
       lbFlush();
@@ -2053,7 +2053,7 @@ function lbPoll() {
   if (!LB.api) return;
   fetch(LB.api + '?id=' + encodeURIComponent(LB.me), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
     if (!j) { LB.api = null; return; }
-    for (const k of ['sc', 'lap']) LB.rows[k] = (j[k] || []).map(x => ({ tag: String(x.tag || '???').slice(0, 10), score: +x.score || 0, you: !!x.you }));   // the Worker marks your own row; it never sends ids
+    for (const k of ['sc', 'lap']) LB.rows[k] = (j[k] || []).map(x => ({ tag: lbClean(x.tag), score: +x.score || 0, you: !!x.you }));   // the Worker marks your own row; it never sends ids
     LB.drawn = ''; lbDraw();
   }).catch(() => { LB.api = null; });
   clearTimeout(LB.pt); LB.pt = setTimeout(lbPoll, LB.mode ? 15000 : 60000);
@@ -2085,6 +2085,7 @@ function lbAgain() {
 const LB_ANY = ['fuck', 'fuk', 'fck', 'fuq', 'shit', 'cunt', 'nigg', 'niga', 'nigr', 'faggot', 'bitch', 'whore', 'slut', 'nazi', 'hitler', 'kike', 'chink', 'retard', 'twat', 'wank', 'pussy', 'penis', 'vagina', 'porn', 'dildo', 'jizz', 'asshole', 'bastard', 'blowjob', 'handjob'];
 const LB_WORD = ['ass', 'arse', 'anal', 'anus', 'boob', 'boobs', 'cock', 'cok', 'cum', 'dick', 'dik', 'fag', 'hoe', 'kkk', 'rape', 'sex', 'spic', 'tit', 'tits'];
 const LB_LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', $: 's', '!': 'i' };
+const lbClean = (t) => { t = String(t || '???').slice(0, 10); return lbBad(t) ? '???' : t; };   // stored names too, not just new ones
 function lbBad(tag) {
   const n = String(tag).toLowerCase().replace(/[0134578@$!]/g, (c) => LB_LEET[c]), toks = n.split(/[^a-z]+/).filter(Boolean), all = toks.join('');
   const sq = (s) => s.replace(/(.)\1+/g, '$1'), sq2 = (s) => s.replace(/(.)\1{2,}/g, '$1$1');

@@ -52,7 +52,8 @@ export async function lb(request, env, url) {
   if (request.method === 'GET') {
     if (!env.FLOW) return send({ sc: [], lap: [] });
     const me = url.searchParams.get('id') || '', { board } = await load(env);
-    const out = (rows) => rows.slice(0, SHOW).map((r) => (r.id === me ? { tag: r.tag, score: r.score, you: true } : { tag: r.tag, score: r.score }));
+    const tag = (t) => (lbBad(t) ? '???' : t);   // rows stored before the filter existed are cleaned on the way out
+    const out = (rows) => rows.slice(0, SHOW).map((r) => (r.id === me ? { tag: tag(r.tag), score: r.score, you: true } : { tag: tag(r.tag), score: r.score }));
     return send({ sc: out(board.sc), lap: out(board.lap) });
   }
   if (request.method !== 'POST') return empty(405);

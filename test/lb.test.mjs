@@ -79,11 +79,13 @@ test('without a bucket the boards read empty and posts are accepted quietly', as
   assert.equal((await post(e, { game: 'sc', id: 'aaaaaaaa1', tag: 'GAB', score: 5 })).status, 204);
 });
 
-test('names: rude ones post as ???, ordinary ones pass, and the page runs the same word lists', () => {
+test('names: rude ones post as ???, ordinary ones pass, and the page runs the same word lists', async () => {
   for (const n of ['f.u.c.k', 'sh1t', 'a s s', 'ASSS', 'Fuuuck', 'b1tch', 'tits']) assert.ok(lbBad(n), n);
   for (const n of ['GAB', 'Gabriel P.', 'Hancock', 'Cassie', 'class', 'Dickens', 'Sussex', 'analyst', 'Peacock', 'grape']) assert.ok(!lbBad(n), n);
   assert.equal(checkPost({ game: 'sc', id: 'aaaaaaaa1', tag: 'sh1t', score: 5 }).tag, '???');
   assert.equal(checkPost({ game: 'sc', id: 'aaaaaaaa1', tag: 'GAB', score: 5 }).tag, 'GAB');
+  const e = env(); e.FLOW.m.set('lb/board.json', { etag: 'e0', body: JSON.stringify({ sc: [{ id: 'aaaaaaaa1', tag: 'sh1t', score: 9, at: 0 }], lap: [] }) });
+  assert.equal((await get(e)).sc[0].tag, '???', 'a name stored before the filter shows as ???');
   const rigs = fs.readFileSync(new URL('../src/rigs.js', import.meta.url), 'utf8');
   const list = (name) => JSON.parse(new RegExp('const ' + name + ' = (\\[[^\\]]*\\])').exec(rigs)[1].replace(/'/g, '"'));
   assert.deepEqual(list('LB_ANY'), LB_ANY); assert.deepEqual(list('LB_WORD'), LB_WORD);
