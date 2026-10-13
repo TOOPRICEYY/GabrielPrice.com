@@ -857,6 +857,7 @@ function rigUI() {
     }
     if (rigs.scootOn && (k.length === 1 ? 'wasd '.includes(k) : k.startsWith('arrow'))) {
       if (lbEndOpen('sc') && !e.repeat) lbAgain();
+      if (!TOUCH) rigs.scooter.quit = false;   // after the ✕, a game key takes the bars again
       const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false; if (rigs.onDrive) rigs.onDrive();
       if (k === ' ') { if (!e.repeat) { S.hop = true; S.hopHeld = true; } } else S.keys.add(k);
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and hop here instead of scrolling the page
@@ -888,8 +889,7 @@ function rigUI() {
     const keys = (b) => b.dataset.k === ' ' ? [' '] : b.dataset.k.split(' ');
     const play = pad.querySelector('.tp-play');
     // a small ✕ in the top-left corner leaves a scooter run mid-game: the run ends (its score counts) and the autopilot takes back
-    const gx = document.createElement('button'); gx.id = 'scexit'; gx.hidden = true; gx.textContent = '✕'; gx.setAttribute('aria-label', 'Exit the game'); document.body.appendChild(gx);
-    gx.addEventListener('click', () => { const S = rigs.scooter; S.quit = true; S.touchRun = false; S.keys.clear(); S.hopHeld = false; S.last = -9; });
+    const gx = exitBtn();
     play.addEventListener('click', () => { if (lbEndOpen('sc')) return lbAgain(); const S = rigs.scooter; S.quit = false; S.touchRun = true; S.lane = Math.max(-1, Math.min(1, Math.round(S.X / 55))); S.last = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive(); });
     // the scooter on phones runs like Temple Run: it rides itself; swipe left/right to change lanes, swipe down to duck, tap or swipe up to jump
     const sw = document.createElement('div'); sw.id = 'swipe'; sw.hidden = true; document.body.appendChild(sw); let t0 = null;
@@ -923,7 +923,7 @@ function rigUI() {
       if (on && pad.hidden) pad.hidden = false;
       if (on && hop.hidden !== !!rigs.couchOn) { hop.hidden = !!rigs.couchOn; drift.hidden = !rigs.couchOn; }
       { const S = rigs.scooter, run = !!(rigs.scootOn && S.touchRun); if (!rigs.scootOn && S.touchRun) S.touchRun = false;
-        pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; gx.hidden = !(rigs.scootOn && (run || S.game.on)); if (sw.hidden !== !run) sw.hidden = !run; }
+        pad.classList.toggle('runner', !!rigs.scootOn); play.hidden = !rigs.scootOn || run; gx.hidden = !(rigs.scootOn && (run || S.game.on)) && !lbEndOpen(LB.mode); if (sw.hidden !== !run) sw.hidden = !run; }
       requestAnimationFrame(tick);
     };
     tick();
@@ -2133,6 +2133,19 @@ function lbShow(k, a, full) {
   if (LB.mode === k && LB.full !== !!full) { LB.full = !!full; if (!full) { LB.fresh = false; if (LB.end && LB.end.k === k) LB.end = null; } LB.drawn = ''; }
   if (LB.mode) lbDraw();
   const o = LB.mode ? 1 : 0; if (LB.a !== o) { LB.a = o; LB.el.classList.toggle('on', !!o); }
+  if (!TOUCH) { const x = exitBtn(), h = !lbEndOpen(LB.mode); if (x.hidden !== h) x.hidden = h; }   // desktop: the ✕ only on the end menu (phones: the touch pad's tick)
+}
+// the ✕ in the top-left corner: on phones it leaves a scooter run mid-game (the run ends, its score counts, the autopilot takes
+// back); on the end menu of either game it closes the menu and leaves the game the same way
+function exitBtn() {
+  if (ui.gx) return ui.gx;
+  const gx = ui.gx = document.createElement('button'); gx.id = 'scexit'; gx.hidden = true; gx.textContent = '✕'; gx.setAttribute('aria-label', 'Exit the game'); document.body.appendChild(gx);
+  gx.addEventListener('click', () => {
+    const k = LB.mode, end = lbEndOpen(k); if (end) { LB.end = null; LB.drawn = ''; lbDraw(); const a = document.activeElement; if (a && a.blur && LB.el.contains(a)) a.blur(); }
+    if (k === 'lap' && end) { const Co = rigs.couch; Co.hold = false; Co.keys.clear(); Co.kLast = Co.last = -9; return; }
+    const S = rigs.scooter; S.quit = true; S.touchRun = false; S.keys.clear(); S.hopHeld = false; S.last = -9;
+  });
+  return gx;
 }
 // the key legend leaving the page for its pinned spot (and back): measure both places and animate between them (FLIP), so
 // it shrinks down into the corner instead of jumping there
