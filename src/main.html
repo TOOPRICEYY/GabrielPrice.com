@@ -120,6 +120,26 @@ p { margin: 0; max-width: 62ch; }
 .bom li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; }
 .bom .n { width: 20px; height: 20px; border: 1px solid var(--cobalt); border-radius: 50%; color: var(--cobalt); display: grid; place-items: center; font-size: 10px; }
 .bom .q { color: var(--graphite-2); }
+/* Anti-thetis parts table: two builds side by side, a toggle picks one (and what the 3D shows) */
+.variant { display: flex; border: 1px solid var(--graphite); align-self: flex-start; }
+.variant button { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; border: 0; cursor: pointer;
+  background: transparent; color: var(--graphite); }
+.variant button[aria-pressed="true"] { background: var(--graphite); color: var(--vellum); }
+.bomwrap { max-height: 46vh; overflow-y: auto; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.bomt { width: 100%; border-collapse: collapse; font-family: var(--f-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bomt th, .bomt td { padding: 3px 4px; text-align: left; vertical-align: middle; }
+.bomt th { font-weight: 500; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--graphite-2); line-height: 1.15; }
+.bomt thead th, .bomt tfoot td { position: sticky; background: var(--vellum); z-index: 1; }
+.bomt thead th { top: 0; } .bomt tfoot td { bottom: 0; font-weight: 600; border-top: 1px solid var(--graphite); }
+.bomt .q, .bomt .p { text-align: right; white-space: nowrap; }
+.bomt .q { color: var(--graphite-2); }
+.bomt .n span { width: 18px; height: 18px; border: 1px solid var(--cobalt); border-radius: 50%; color: var(--cobalt); display: grid; place-items: center; font-size: 9px; }
+.bomt tr.g td { padding-top: 7px; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); }
+.bomt .x { color: var(--graphite-2); text-align: right; }
+.bomt td.p.on, .bomt th.p.on { background: color-mix(in srgb, var(--cobalt) 12%, var(--vellum)); }
+.card .bomnote { font-size: 12.5px; line-height: 1.35; color: var(--graphite-2); }
+.bomt.mo tr.ea td { opacity: .32; }
+.bomt.mo tr.ea td.p.mo { opacity: 1; }
 .chain { font-family: var(--f-mono); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
 .chain span { border: 1px solid var(--rule); padding: 2px 7px; }
 .note { font-size: 13px; color: var(--graphite-2); }
@@ -466,6 +486,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
   .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
   .bom .n { width: 16px; height: 16px; font-size: 9px; }
   .spec { font-size: 11px; }
+  .bomwrap { max-height: 22vh; } .bomt { font-size: 10px; } .card .bomnote { font-size: 11.5px; } .bomt th { font-size: 8.5px; } .variant button { font-size: 10px; padding: 5px 8px; }
 }
 @media (max-width: 720px) and (max-height: 720px) {   /* small phones: the docked card must stay under half the screen */
   .card h2 { font-size: 21px; }
@@ -483,6 +504,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
   .bom { grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 10px; }
   .bom li { grid-template-columns: 16px 1fr auto; gap: 5px; }
   .bom .n { width: 16px; height: 16px; font-size: 9px; }
+  .bomwrap { max-height: 34vh; } .bomt { font-size: 10px; }
   .titleblock { display: none; }
   section { min-height: 160vh; }
 }
@@ -567,7 +589,9 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     <div class="card">
       <div class="eyebrow">06 <b>Exploded view</b></div>
       <h2>Parts</h2>
-      <ol class="bom" id="bom"></ol>
+      <div class="variant" role="group" aria-label="Build"><button type="button" data-v="ea" aria-pressed="true">Electric Assist</button><button type="button" data-v="mo" aria-pressed="false">Mechanical only</button></div>
+      <p class="bomnote" id="bomnote"></p>
+      <div class="bomwrap"><table class="bomt" id="bom"></table></div>
     </div>
   </section>
 
@@ -1121,14 +1145,60 @@ const partMat = { calf: 'shell', shoe: 'shell', housing: 'dark', ring: 'steel', 
 const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), 400);
 for (const m of Object.values(mats)) { m.clippingPlanes = [clip]; m.transparent = true; m.opacity = 0; m.clipShadows = true; }
 
-const BOM = [
-  ['calf', 'Calf shell', 1], ['housing', 'Actuator housing', 1], ['motor', 'Tarot 5010 motor', 1], ['sun', 'Sun gear', 1],
-  ['planet1', 'Planet gear', 4], ['carriage', 'Planet carrier', 1], ['ring', 'Ring gear', 1], ['endcap', 'End cap', 1],
-  ['rack', 'Rack', 1], ['rail', '2020 V-slot rail', 1], ['wheel1', 'V-wheel', 4], ['shoe', 'Shoe cup', 1],
-  ['pinTop', 'M8 pivot pin', 2], ['brg1', '608 ankle bearing', 2], ['springs', 'Die spring', 2],
-  ['kneeShin', 'Knee hinge, shin side', 1], ['kneeThigh', 'Knee hinge, thigh side', 1], ['cuffs', 'Thigh cuff', 2],
+// Anti-thetis bill of materials, priced per unit (anti-thesistis/bom-pricing.md in the project files). Rows: [3D part key or null, name, qty,
+// Electric Assist $, Mechanical only $ (null: not in that build)]. Keyed rows get a numbered balloon on the exploded model.
+const BOM_GROUPS = [
+  ['Frame', [
+    ['calf', 'Calf shell (ABS)', 1, 2.61, 2.61], ['housing', 'Actuator housing (ABS)', 1, 1.42, 1.42],
+    ['shoe', 'Shoe cup and stirrup (ABS)', 1, 1.17, 1.17], ['railcap', 'Rail end cap (ABS)', 1, .14, .14],
+    ['rail', '2020 V-slot rail, 200 mm', 1, 4.19, 4.19], ['wheel1', 'V-wheel', 4, 2.28, 2.28], ['springs', 'Die spring', 2, 8, 8],
+    ['brg1', '608 ankle bearing', 2, 1.36, 1.36], [null, '6000 / 6200 mount bearing', 3, 2.74, 2.74],
+    ['pinTop', 'Pins, bolts and nuts (M3–M10)', 'set', 7.64, 4.95], [null, 'Neoprene padding', '1 ft²', 3.95, 3.95],
+    [null, 'Print supports and purge', '', .67, .53],
+  ]],
+  ['Drive', [
+    ['motor', 'Tarot 5010 motor', 1, 30, null], ['sun', 'Sun gear (ABS)', 1, .09, null], ['planet1', 'Planet gear (ABS)', 4, .21, null],
+    ['carriage', 'Planet carrier, 2 halves (ABS)', 1, .46, null], ['ring', 'Ring gear (ABS)', 1, .22, null], ['endcap', 'End cap (ABS)', 1, .24, null],
+    ['rack', 'Rack (ABS)', 1, .12, null], [null, 'MR148 / 6703 / 6709 gearbox bearing', 12, 8.7, null],
+  ]],
+  ['Electronics', [
+    [null, 'MKS XDrive Mini controller', 1, 41, null], [null, '6S 1300 mAh LiPo', 1, 30, null], [null, 'ESP32', 1, 4, null],
+    [null, 'Thin-film force sensor', 3, 21, null], [null, 'EC3 connector pair', 3, 3, null],
+  ]],
 ];
-document.getElementById('bom').innerHTML = BOM.map(([k, n, q], i) => `<li><span class="n">${i + 1}</span><span>${n}</span><span class="q">×${q}</span></li>`).join('');
+const BOM_EXTRA = [['kneeShin', 'Knee hinge, shin side', 1], ['kneeThigh', 'Knee hinge, thigh side', 1], ['cuffs', 'Thigh cuff', 2]];
+// parts the Mechanical only build leaves out; its 3D view hides them (planets ride inside the carrier)
+const ELECTRIC_PARTS = ['motor', 'sun', 'carriage', 'ring', 'endcap', 'rack'];
+const BOM = [];   // [key, number] for each balloon
+{
+  const $ = (v) => v == null ? '—' : '$' + v.toFixed(2);
+  let html = '<thead><tr><th></th><th>Part</th><th class="q">Qty</th><th class="p ea">Electric<br>Assist</th><th class="p mo">Mechanical<br>only</th></tr></thead><tbody>';
+  const tot = [0, 0];
+  for (const [g, rows] of BOM_GROUPS) {
+    html += `<tr class="g"><td></td><td colspan="4">${g}</td></tr>`;
+    for (const [k, n, q, ea, mo] of rows) {
+      tot[0] += ea; tot[1] += mo || 0;
+      let num = ''; if (k) { BOM.push([k, BOM.length + 1]); num = `<span>${BOM.length}</span>`; }
+      html += `<tr${mo == null ? ' class="ea"' : ''}><td class="n">${num}</td><td>${n}</td><td class="q">${typeof q === 'number' ? '×' + q : q}</td><td class="p ea">${$(ea)}</td><td class="p mo">${$(mo)}</td></tr>`;
+    }
+  }
+  html += '<tr class="g"><td></td><td colspan="4">Exoleg knee add-on</td></tr>';
+  for (const [k, n, q] of BOM_EXTRA) { BOM.push([k, BOM.length + 1]); html += `<tr><td class="n"><span>${BOM.length}</span></td><td>${n}</td><td class="q">×${q}</td><td class="x" colspan="2">not priced</td></tr>`; }
+  html += `</tbody><tfoot><tr><td></td><td>Total</td><td></td><td class="p ea">${$(tot[0])}</td><td class="p mo">${$(tot[1])}</td></tr></tfoot>`;
+  document.getElementById('bom').innerHTML = html;
+}
+const BOM_NOTE = { ea: 'The full build: motor, two-stage gearbox and electronics.', mo: 'No motor, gearbox or battery. The springs do the work: functional for walking, hiking and light sports.' };
+let bomVariant = 'ea';
+function setBomVariant(v) {
+  bomVariant = v;
+  document.querySelectorAll('.variant button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === v));
+  const tb = document.getElementById('bom'); tb.classList.toggle('mo', v === 'mo');
+  tb.querySelectorAll('.p').forEach((c) => c.classList.toggle('on', c.classList.contains(v)));
+  document.getElementById('bomnote').textContent = BOM_NOTE[v];
+  if (kicker.ready) for (const k of ELECTRIC_PARTS) kicker.parts[k].ex.visible = v === 'ea';
+}
+document.querySelectorAll('.variant button').forEach((b) => b.addEventListener('click', () => setBomVariant(b.dataset.v)));
+setBomVariant('ea');
 
 function decode() {
   const bin = b64(window.KICKER_B64);
@@ -1240,17 +1310,18 @@ function buildKicker() {
   for (const k in parts) parts[k].off = (offs[k] || new THREE.Vector3()).multiplyScalar(1.5);
 
   Object.assign(kicker, { parts, rail, footTilt, actPivot, unslim, shinMount, legA, legT, devAxis, yawPi, carrier, thighPivot, devShin, ready: true });
+  setBomVariant(bomVariant);
   document.getElementById('loading').hidden = true;
 }
 
 // ---------- callout balloons ----------
 const svg = document.getElementById('callouts');
 const NS = 'http://www.w3.org/2000/svg';
-const balloons = BOM.map(([k], i) => {
+const balloons = BOM.map(([k, num]) => {
   const g = document.createElementNS(NS, 'g');
   const l = document.createElementNS(NS, 'line'); const d = document.createElementNS(NS, 'circle'); d.setAttribute('class', 'dot'); d.setAttribute('r', 2);
   const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 10);
-  const tx = document.createElementNS(NS, 'text'); tx.textContent = i + 1;
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = num;
   g.append(l, d, c, tx); svg.append(g); return { k, g, l, d, c, tx };
 });
 
@@ -1540,8 +1611,12 @@ function frameBody() {
       parts.housing.m.getWorldPosition(wc); // device frame anchor
       const center = new THREE.Vector3();
       kicker.parts.ring.m.localToWorld(center.copy(G0)); center.project(camera);
+      const drive = bomVariant === 'ea';
       balloons.forEach((b, i) => {
         const p = parts[b.k];
+        const off = !drive && (ELECTRIC_PARTS.includes(b.k) || b.k.startsWith('planet'));
+        b.g.style.display = off ? 'none' : '';
+        if (off) return;
         p.m.localToWorld(wp.copy(p.c)); wp.project(camera);
         const x = (wp.x * .5 + .5) * W, y = (-wp.y * .5 + .5) * Hh;
         let dx = wp.x - center.x, dy = -(wp.y - center.y); const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
