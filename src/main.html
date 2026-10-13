@@ -98,6 +98,7 @@ section {
   max-width: 1280px; margin-inline: auto;
 }
 section.right { justify-content: flex-end; }
+main > section.skip { min-height: 0 !important; height: 0; padding: 0 !important; overflow: hidden; }   /* a removed scene that keeps its index (s) */
 section.hero { min-height: 100vh; align-items: flex-end; padding-block: 0 14vh; }
 .card {
   width: min(400px, 100%); min-width: 0;
@@ -702,17 +703,13 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section class="right" data-s="3">
-    <div class="card">
-      <div class="eyebrow">04 <b>Fit</b></div>
-      <h2>Like a Glove</h2>
-      <p>The calf shell is shaped from a scan of my own leg.</p>
-    </div>
-  </section>
+  <!-- (was "Like a Glove": taken out, so ExoLeg runs straight on to the drive train. It stays as an empty, zero-height section so every
+       later section keeps its s; the camera and pose simply pass through s = 3 between ExoLeg and Transmission) -->
+  <section class="skip" data-s="3" aria-hidden="true"></section>
 
   <section data-s="4" data-nav="Transmission">
     <div class="card">
-      <div class="eyebrow">05 <b>Drive train</b></div>
+      <div class="eyebrow">04 <b>Drive train</b></div>
       <h2>Two-stage mechanical transmission</h2>
       <div class="chain"><span>Motor</span><span>Sun gear</span><span>4 planets → carrier</span><span>Pinion → rack</span><span>Foot</span></div>
     </div>
@@ -720,7 +717,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="5">
     <div class="card">
-      <div class="eyebrow">06 <b>Exploded view</b></div>
+      <div class="eyebrow">05 <b>Exploded view</b></div>
       <h2>Parts</h2>
       <div class="bomctl"><div class="variant" role="group" aria-label="Build"><button type="button" data-v="mo" aria-pressed="false">Mech<span class="lf">anical only</span> <span class="vt" id="bomvmo"></span></button><button type="button" data-v="ea" aria-pressed="false">Electric<span class="lf"> Assist</span> <span class="vt" id="bomvea"></span></button></div>
         <button type="button" class="tg" id="bomknee" aria-pressed="false">+ Knee<span class="lf"> add-on</span></button><button type="button" class="tg build" id="bomdet" aria-pressed="false" title="Full parts list: quantities, STL files and order links">Build it →</button></div>
@@ -732,7 +729,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section data-s="6">
     <div class="card vid">
-      <div class="eyebrow">07 <b>Built</b></div>
+      <div class="eyebrow">06 <b>Built</b></div>
       <h2>Build log</h2>
       <figure class="lead"><video muted loop playsinline preload="none" poster="photos/kicker_bench_poster.jpg" data-src="photos/kicker_bench.mp4" aria-label="The Kicker motor and gearbox running on a bench while a laptop plots the run"></video><figcaption><b>Jul 2026</b>Bench test · 3× speed</figcaption></figure>
       <ol class="log">
@@ -746,7 +743,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="7" data-nav="Full leg">
     <div class="card vid">
-      <div class="eyebrow">08 <b>Exoleg · Full leg</b></div>
+      <div class="eyebrow">07 <b>Exoleg · Full leg</b></div>
       <h2>Running before you can walk</h2>
       <p>The calf portion powers my stride and the thigh portion prevents excess torque transmitted through my knee</p>
       <figure class="lead"><video muted loop playsinline preload="none" poster="photos/exoleg_hero_poster.jpg" data-src="photos/exoleg_hero.mp4" aria-label="Gabriel straps the exoleg on by a lake, then runs past the camera in it"></video><figcaption><b>Oct 2026</b>Strapping in at 10×, then running at ½ speed</figcaption></figure>
@@ -761,7 +758,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section data-s="8" data-ch="Water Break">
     <div class="card vid">
-      <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
+      <div class="eyebrow">08 <b>Water Break · Crutch</b></div>
       <h2>Crutch Refreshments</h2>
       <p>A printed cage that clips between the crutch rails and holds a water bottle. So simple even I could think of it.</p>
       <figure class="lead tall crop"><img style="--ar: 4 / 5; --arn: .8" loading="lazy" src="photos/crutch_cupholder.webp" alt="Black printed helical holder clamped between the rails of an aluminum crutch in a lecture hall"><figcaption><b>Built</b>In use, in a lecture hall</figcaption></figure>
@@ -773,7 +770,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="9" data-ch="QuadFather">
     <div class="card vid">
-      <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
+      <div class="eyebrow">09 <b>QuadFather · C6374 · HTD 3M</b></div>
       <h2>The Quad Father</h2>
       <p>A motorized knee scooter. What could go wrong?</p>
       <figure class="lead tall crop"><video style="--ar: 4 / 5; --arn: .8" muted loop playsinline preload="none" poster="photos/scooter_ride_poster.jpg" data-src="photos/scooter_ride.mp4" aria-label="Gabriel riding the scooter down a warehouse aisle"></video><figcaption><b>Ride</b>Warehouse test</figcaption></figure>
@@ -782,7 +779,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section data-s="10">
     <div class="card vid">
-      <div class="eyebrow">11 <b>QuadFather · Belt drive</b></div>
+      <div class="eyebrow">10 <b>QuadFather · Belt drive</b></div>
       <h2>Irresponsible Power</h2>
       <p>With a peak power of over 8Hp and a max speed of 30mph, this medical device is guaranteed to leave you more injured than you started.</p>
       <figure class="lead tall crop"><video style="--ar: 4 / 5; --arn: .8" muted loop playsinline preload="none" poster="photos/scooter_hubmotor_poster.jpg" data-src="photos/scooter_hubmotor.mp4" aria-label="The rear drive wheel spinning, filmed from under the deck"></video><figcaption><b>Drive</b>Rear wheel under power</figcaption></figure>
@@ -792,7 +789,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="11">
     <div class="card">
-      <div class="eyebrow">12 <b>Inside QuadFather</b></div>
+      <div class="eyebrow">11 <b>Inside QuadFather</b></div>
       <h2>Exploded BOM</h2>
       <ol class="bom" id="bom3"></ol>
     </div>
@@ -800,7 +797,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="12">
     <div class="card">
-      <div class="eyebrow">13 <b>QuadFather · Drive it</b></div>
+      <div class="eyebrow">12 <b>QuadFather · Drive it</b></div>
       <h2>Take the bars</h2>
       <p class="touchonly">Tap Play and it rides itself. Swipe left or right to change lanes, down to duck, tap or swipe up to jump (again in the air for a double jump). Outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
       <p class="kb"><kbd>W</kbd><kbd>A</kbd><kbd>D</kbd> to ride, <kbd>S</kbd> to duck, <kbd>Space</kbd> to hop, again in the air to double jump. Take over to play: outrun the crumbling walk, dodge what comes at you, catch stars off the ramps.</p>
@@ -813,7 +810,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section data-s="13" data-ch="Not So Lazy Boy">
     <div class="card vid">
-      <div class="eyebrow">14 <b>Not So Lazy Boy</b></div>
+      <div class="eyebrow">13 <b>Not So Lazy Boy</b></div>
       <h2>The Not So Lazy Boy</h2>
       <p>Staying on the couch or going out? Why choose!</p>
       <figure class="lead"><video style="--ar: 1 / 1; --arn: 1" muted loop playsinline preload="none" poster="photos/couch_campus_poster.jpg" data-src="photos/couch_campus.mp4" aria-label="The couch driving through a crowd on a campus walkway at sunset with four people on it"></video><figcaption><b>On campus</b>Four aboard · real time</figcaption></figure>
@@ -842,7 +839,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="15" data-ch="CatZoom">
     <div class="card">
-      <div class="eyebrow">15 <b>CatZoom</b></div>
+      <div class="eyebrow">14 <b>CatZoom</b></div>
       <h2>Cat Zoom</h2>
       <p>Your cat missed you today. Now you never have to leave them again! With a laser, camera, mic, speaker and Wi-Fi, your codependency can soar to new heights!</p>
       <div class="jsonly" hidden><div class="readout" id="asRead"></div></div>
@@ -851,7 +848,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section data-s="16">
     <div class="card">
-      <div class="eyebrow">16 <b>Up close</b></div>
+      <div class="eyebrow">15 <b>Up close</b></div>
       <h2>Up close</h2>
       <ol class="log">
         <li class="q"><figure><img loading="lazy" src="photos/catzoom_built_thumb.webp" data-full="photos/catzoom_built.webp" alt="CatZoom on a nightstand: a coral faceted printed shade on a white base, the laser and camera behind a slot in the side"><figcaption><b>Oct 2026</b>Built</figcaption></figure></li>
@@ -862,7 +859,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 
   <section class="right" data-s="17">
     <div class="card">
-      <div class="eyebrow">17 <b>Inside CatZoom</b></div>
+      <div class="eyebrow">16 <b>Inside CatZoom</b></div>
       <h2>Parts</h2>
       <ol class="bom" id="bom2"></ol>
     </div>
@@ -887,7 +884,8 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 // data-nav, else its heading, read again each time the index opens (the site editor can retitle a heading).
 (() => {
   const nav = document.getElementById('secnav'), list = nav.querySelector('ol'), flash = nav.querySelector('.sn-now');
-  const secs = [...document.querySelectorAll('main section[data-s]')];
+  const all = [...document.querySelectorAll('main section[data-s]')], secs = all.filter((e) => !e.matches('.skip'));   // .skip: a removed scene, no row
+  const row = (k) => { let j = 0; for (let m = 0; m < k; m++) if (!all[m].matches('.skip')) j++; return all[k].matches('.skip') ? j - .5 : j; };
   const HOVER = matchMedia('(hover: hover)'), REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
   const label = (sec) => sec.dataset.ch || sec.dataset.nav || ((sec.querySelector('h1, h2') || {}).firstChild || {}).textContent?.trim() || sec.getAttribute('aria-label') || '';
   let ch = '';
@@ -912,11 +910,11 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && nav.matches('.open, :focus-within')) { open(false); document.activeElement?.blur(); } });
 
   const centers = () => secs.map((e) => e.offsetTop + e.offsetHeight * .5);
-  function sOf() {   // the same s as readScroll(): section i's centre at the middle of the screen is s = i
-    const mid = scrollY + innerHeight * .5, c = centers();
+  function sOf() {   // the same s as readScroll() (section i's centre at the middle of the screen is s = i), then counted in rows
+    const mid = scrollY + innerHeight * .5, c = all.map((e) => e.offsetTop + e.offsetHeight * .5);
     if (mid <= c[0]) return 0;
-    for (let i = 0; i < c.length - 1; i++) if (mid <= c[i + 1]) return i + (mid - c[i]) / (c[i + 1] - c[i]);
-    return c.length - 1;
+    for (let i = 0; i < c.length - 1; i++) if (mid <= c[i + 1]) { const f = (mid - c[i]) / (c[i + 1] - c[i]); return row(i) + f * (row(i + 1) - row(i)); }
+    return secs.length - 1;
   }
   // where a jump lands: the hero at the top, the gallery at its heading, other sections at their key pose (s = i). On phones a card
   // docks only as its section ends, so there the section's end meets the bottom of the screen (card docked, scene just past s = i).
@@ -1776,6 +1774,7 @@ const qa = new THREE.Quaternion();
 
 // ---------- scroll → s ----------
 const sections = [...document.querySelectorAll('section[data-s]')];
+const sheetNo = sections.map((e, i) => sections.slice(0, i + 1).filter((x) => !x.matches('.skip')).length || 1), sheetN = sections.filter((e) => !e.matches('.skip')).length;   // sheet numbers skip removed scenes
 let sTarget = 0, sNow = 0;
 function readScroll() {
   const mid = scrollY + innerHeight * .5;
@@ -1858,7 +1857,7 @@ function frameBody() {
   const dt = Math.min(clock.getDelta(), .05 * (clock.pace || 1));   // pace: a visit replay at 2× or 4×
   sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
   const s = sNow;
-  sheetEl.textContent = String(Math.min(sections.length, Math.round(s) + 1)).padStart(2, '0') + ' / ' + String(sections.length).padStart(2, '0');
+  sheetEl.textContent = String(sheetNo[Math.min(sections.length - 1, Math.max(0, Math.round(s)))]).padStart(2, '0') + ' / ' + String(sheetN).padStart(2, '0');
 
   poseMix.w = rigs.ready ? walkWeight(s) : 0;
   if (poseMix.w > 0) poseMix.pose = walkPose(ui.gait.pc);
