@@ -321,11 +321,18 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 .modtable div { border: 1px solid var(--rule); padding: 4px 2px; font-variant-numeric: tabular-nums; }
 .modtable b { display: block; color: var(--cobalt); font-weight: 500; }
 .readout { font-family: var(--f-mono); font-size: 12px; color: var(--cobalt); font-variant-numeric: tabular-nums; min-height: 1.5em; }
+/* contact: a small pane under the gallery, the last thing on the page */
+.contact { pointer-events: auto; margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  background: color-mix(in srgb, var(--vellum) 90%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--rule); padding: 14px 18px; }
+.contact p { font-family: var(--f-display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.contact-btn { font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-decoration: none;
+  color: var(--graphite); background: var(--sheet); border: 1px solid var(--graphite); padding: 8px 14px; transition: background .2s, color .2s; }
+.contact-btn:hover, .contact-btn:focus-visible { background: var(--graphite); color: var(--vellum); }
 .alsolist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12px; }
 /* the gallery is the last scroll stop (s 17): on wide screens it is a two-column panel on the left so the figure stays in view beside it */
 @media (min-width: 1100px) {
-  main section.gallery { display: flex; align-items: center; }
-  main section.gallery .gal-wrap { width: min(620px, 50vw); }
+  main section.gallery { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  main section.gallery .gal-wrap, main section.gallery .contact { width: min(620px, 50vw); box-sizing: border-box; }
   main section.gallery .gal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .starpop { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--f-mono); font-weight: 500; font-size: 13px; letter-spacing: .08em;
@@ -539,6 +546,53 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
   .titleblock { display: none; }
   section { min-height: 160vh; }
 }
+/* section index (#secnav): a thin ruler on the right edge, one tick per section and a longer one where each build starts. The violet
+   fill and the cursor follow the scroll; crossing into another build flashes its name beside the cursor. Hovering the ruler (tapping it
+   on touch screens) unfolds it into a labelled index, and a label scrolls to its section. Hidden while a drive game has the screen. */
+@property --rh { syntax: '<length>'; inherits: true; initial-value: 18px; }
+#secnav { --rh: min(18px, calc((100vh - 48px) / var(--n))); --s: 0; --n: 19; position: fixed; z-index: 3; right: calc(2px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
+  padding: 8px 0 8px 10px; border: 1px solid transparent; pointer-events: none; font-family: var(--f-mono);
+  transition: opacity .3s, visibility .3s, background-color .2s, border-color .2s, --rh .35s cubic-bezier(.2, .7, .2, 1); }
+body.playing #secnav, #secnav.early { opacity: 0; visibility: hidden; }   /* .early: before the ExoLeg reveal, like the orbit hint */
+#secnav ol { list-style: none; margin: 0; padding: 0; }
+#secnav li { height: var(--rh); }
+#secnav button { all: unset; box-sizing: border-box; width: 100%; height: 100%; display: flex; align-items: center; justify-content: flex-end; cursor: pointer; pointer-events: none; }
+#secnav .t { padding-right: 6px; white-space: nowrap; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; font-size: 10.5px; line-height: 1.35; color: var(--graphite-2);
+  opacity: 0; transform: translateX(6px); transition: opacity .18s, transform .18s; }
+#secnav li.ch .t { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 500; color: var(--graphite); }
+#secnav li.on .t { color: var(--cobalt); }
+#secnav .k { flex: none; position: relative; width: 22px; height: 100%; pointer-events: auto; }
+#secnav .k::before { content: ""; position: absolute; right: 5px; top: 50%; width: 5px; height: 1px; background: color-mix(in srgb, var(--graphite-2) 55%, transparent); }
+#secnav li.ch .k::before { right: 3px; width: 9px; background: var(--graphite-2); }
+#secnav li.past .k::before { background: var(--cobalt); }
+#secnav button:focus-visible { outline: none; } #secnav button:focus-visible .t { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+#secnav .sn-line, #secnav .sn-fill { position: absolute; right: 7px; width: 1px; top: calc(8px + var(--rh) / 2); height: calc(var(--rh) * (var(--n) - 1)); pointer-events: none; }
+#secnav .sn-line { background: color-mix(in srgb, var(--graphite-2) 30%, transparent); }
+#secnav .sn-fill { background: var(--cobalt); transform-origin: top; transform: scaleY(calc(var(--s) / (var(--n) - 1))); }
+#secnav .sn-mark { position: absolute; right: 6px; top: calc(8px + var(--rh) / 2 - 6px); width: 3px; height: 12px; border-radius: 2px; pointer-events: none;
+  background: var(--cobalt); box-shadow: 0 0 6px color-mix(in srgb, var(--neon) 70%, transparent); transform: translateY(calc(var(--rh) * var(--s))); }
+#secnav .sn-now { position: absolute; right: 22px; top: calc(8px + var(--rh) / 2 - 9px); height: 18px; padding: 0 7px; display: flex; align-items: center; pointer-events: none; white-space: nowrap;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--cobalt); background: var(--sheet); border: 1px solid var(--rule);
+  transform: translateY(calc(var(--rh) * var(--s))); opacity: 0; transition: opacity .4s; }
+#secnav .sn-now.on { opacity: 1; transition-duration: .15s; }
+#secnav.open { background: var(--sheet); border-color: var(--rule); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#secnav.open button { pointer-events: auto; }
+#secnav.open .t { opacity: 1; transform: none; }
+#secnav.open .sn-now { opacity: 0; }
+@media (hover: hover) {   /* a short delay, so a pointer on its way to the scrollbar doesn't unfold it */
+  #secnav:hover, #secnav:focus-within { background: var(--sheet); border-color: var(--rule); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition-delay: 0s, 0s, .12s, .12s, 0s; }
+  #secnav:hover button, #secnav:focus-within button { pointer-events: auto; }
+  #secnav:hover .t, #secnav:focus-within .t { opacity: 1; transform: none; transition-delay: .12s; }
+  #secnav:hover .sn-now, #secnav:focus-within .sn-now { opacity: 0; }
+  #secnav li:not(.on) button:hover .t { color: var(--graphite); }
+}
+/* touch: a compact ruler in the gutter at rest; a tap unfolds it to finger-sized rows */
+@media (hover: none) {
+  #secnav { --rh: 11px; }
+  #secnav.open { --rh: clamp(16px, calc((100svh - 48px) / var(--n)), 34px); max-height: calc(100svh - 8px); overflow-y: auto; overscroll-behavior: contain; }   /* landscape phones: rows shrink to fit, and scroll if they still can't */
+  #secnav .t, #secnav li.ch .t { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { #secnav, #secnav .t { transition: none; } }
 </style>
 
 <canvas id="stage" aria-hidden="true"></canvas>
@@ -575,7 +629,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 </div>
 
 <main>
-  <section class="hero" data-s="0">
+  <section class="hero" data-s="0" data-ch="Intro">
     <div class="hero-wrap">
       <div class="eyebrow">Portfolio <b>Engineer · Builder</b></div>
       <h1>Gabriel <em>Price</em></h1>
@@ -584,7 +638,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section class="right" data-s="1">
+  <section class="right" data-s="1" data-nav="About">
     <div class="card">
       <div class="eyebrow">02 <b>About</b></div>
       <h2>I build things because I love to, <span class="sub">it just also happens that I have to</span></h2>
@@ -592,7 +646,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section data-s="2">
+  <section data-s="2" data-ch="ExoLeg">
     <div class="card">
       <div class="eyebrow">03 <b>Project · Anti-thetis</b></div>
       <h2>ExoLeg</h2>
@@ -608,7 +662,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section data-s="4">
+  <section data-s="4" data-nav="Transmission">
     <div class="card">
       <div class="eyebrow">05 <b>Drive train</b></div>
       <h2>Two-stage mechanical transmission</h2>
@@ -642,7 +696,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section class="right" data-s="7">
+  <section class="right" data-s="7" data-nav="Full leg">
     <div class="card vid">
       <div class="eyebrow">08 <b>Exoleg · Full leg</b></div>
       <h2>Running before you can walk</h2>
@@ -657,7 +711,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section data-s="8">
+  <section data-s="8" data-ch="Water Break">
     <div class="card vid">
       <div class="eyebrow">09 <b>Water Break · Crutch</b></div>
       <h2>Crutch Refreshments</h2>
@@ -669,7 +723,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section class="right" data-s="9">
+  <section class="right" data-s="9" data-ch="QuadFather">
     <div class="card vid">
       <div class="eyebrow">10 <b>QuadFather · C6374 · HTD 3M</b></div>
       <h2>The Quad Father</h2>
@@ -709,7 +763,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section data-s="13">
+  <section data-s="13" data-ch="Not So Lazy Boy">
     <div class="card vid">
       <div class="eyebrow">14 <b>Not So Lazy Boy</b></div>
       <h2>The Not So Lazy Boy</h2>
@@ -738,7 +792,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     <p class="keyhint touchonly">Drive with the pad below. Drifting fills the boost bar; double-tap to fire it. Or keep scrolling.</p>
   </section>
 
-  <section class="right" data-s="15">
+  <section class="right" data-s="15" data-ch="CatZoom">
     <div class="card">
       <div class="eyebrow">15 <b>CatZoom</b></div>
       <h2>Cat Zoom</h2>
@@ -766,14 +820,85 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     </div>
   </section>
 
-  <section class="gallery" id="gallery" data-s="18" aria-labelledby="gallery-h">
+  <section class="gallery" id="gallery" data-s="18" data-ch="Other projects" aria-labelledby="gallery-h">
     <div class="gal-wrap">
       <div class="eyebrow">Gallery <b>Smaller builds and works in progress</b></div>
       <h2 id="gallery-h">Other projects</h2>
       <div class="gal-grid" id="galgrid"></div>
     </div>
+    <div class="contact">
+      <p>Collaborations, comments, concerns?</p>
+      <a class="contact-btn" href="mailto:iam@gabrielprice.com">Contact</a>
+    </div>
   </section>
 </main>
+<nav id="secnav" class="early" aria-label="Sections"><span class="sn-line" aria-hidden="true"></span><span class="sn-fill" aria-hidden="true"></span><span class="sn-mark" aria-hidden="true"></span><span class="sn-now" aria-hidden="true"></span><ol></ol></nav>
+<script>
+// section index (#secnav, styles above). It works out s from the scroll the same way as readScroll() in the scene script, but on its own,
+// so it keeps working when the 3D can't start. Chapters come from data-ch on a build's first section; a row's label is the section's
+// data-nav, else its heading, read again each time the index opens (the site editor can retitle a heading).
+(() => {
+  const nav = document.getElementById('secnav'), list = nav.querySelector('ol'), flash = nav.querySelector('.sn-now');
+  const secs = [...document.querySelectorAll('main section[data-s]')];
+  const HOVER = matchMedia('(hover: hover)'), REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+  const label = (sec) => sec.dataset.ch || sec.dataset.nav || ((sec.querySelector('h1, h2') || {}).firstChild || {}).textContent?.trim() || sec.getAttribute('aria-label') || '';
+  let ch = '';
+  const rows = secs.map((sec, i) => {
+    ch = sec.dataset.ch || ch;
+    const li = document.createElement('li'), b = document.createElement('button');
+    li.className = sec.dataset.ch ? 'ch' : ''; li.dataset.ch = ch;
+    b.type = 'button'; b.innerHTML = '<span class="t"></span><span class="k"></span>';
+    b.addEventListener('click', (e) => {
+      if (!HOVER.matches && !nav.classList.contains('open')) return open(true);   // touch: the first tap unfolds the index
+      go(i); if (!HOVER.matches) open(false);
+      if (e.detail) b.blur();   // a mouse click: let the index fold once the pointer leaves (keyboard focus stays put)
+    });
+    li.append(b); list.append(li); return li;
+  });
+  const relabel = () => rows.forEach((r, i) => { r.querySelector('.t').textContent = label(secs[i]); });
+  relabel();
+  nav.style.setProperty('--n', secs.length);
+  nav.addEventListener('pointerenter', relabel); nav.addEventListener('focusin', relabel);
+  function open(on) { if (on) relabel(); nav.classList.toggle('open', on); }
+  addEventListener('pointerdown', (e) => { if (nav.classList.contains('open') && !nav.contains(e.target)) open(false); }, true);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && nav.matches('.open, :focus-within')) { open(false); document.activeElement?.blur(); } });
+
+  const centers = () => secs.map((e) => e.offsetTop + e.offsetHeight * .5);
+  function sOf() {   // the same s as readScroll(): section i's centre at the middle of the screen is s = i
+    const mid = scrollY + innerHeight * .5, c = centers();
+    if (mid <= c[0]) return 0;
+    for (let i = 0; i < c.length - 1; i++) if (mid <= c[i + 1]) return i + (mid - c[i]) / (c[i + 1] - c[i]);
+    return c.length - 1;
+  }
+  // where a jump lands: the hero at the top, the gallery at its heading, other sections at their key pose (s = i). On phones a card
+  // docks only as its section ends, so there the section's end meets the bottom of the screen (card docked, scene just past s = i).
+  function go(i) {
+    const e = secs[i], card = !e.matches('.hero, .drive, .gallery');
+    const y = i === 0 ? 0 : !card ? (e.matches('.gallery') ? e.getBoundingClientRect().top + scrollY : centers()[i] - innerHeight * .5)
+      : innerWidth <= 720 ? e.offsetTop + e.offsetHeight - innerHeight : centers()[i] - innerHeight * .5;
+    scrollTo({ top: Math.max(0, y), behavior: REDUCED.matches ? 'auto' : 'smooth' });
+  }
+  let last = -1, at = -1, hide;
+  function say(name) { flash.textContent = name; flash.classList.add('on'); clearTimeout(hide); hide = setTimeout(() => flash.classList.remove('on'), 1600); }
+  function update() {
+    const s = sOf();
+    if (Math.abs(s - last) < .001 && (s < 2.3) === nav.classList.contains('early')) return;   // a tiny move still counts if it crosses the reveal
+    last = s; nav.style.setProperty('--s', s.toFixed(3));
+    const i = Math.round(s), past = Math.floor(s + .02);
+    // hidden until the ExoLeg reveal (the brace is on by s 2.3, the same point the orbit hint waits for); it arrives saying where you are
+    const early = s < 2.3;
+    if (early !== nav.classList.contains('early')) { nav.classList.toggle('early', early); if (!early && at >= 0) say(rows[i].dataset.ch); }
+    rows.forEach((r, j) => { r.classList.toggle('past', j <= past); r.classList.toggle('on', j === i); r.firstChild.toggleAttribute('aria-current', j === i); });
+    if (i === at) return;
+    if (at >= 0 && !early && rows[i].dataset.ch !== rows[at].dataset.ch) say(rows[i].dataset.ch);   // into another build: its name rides beside the cursor for a moment
+    at = i;
+  }
+  // every frame, not only on scroll: iOS can drop the last scroll event of a fling (see onScroll in the scene script)
+  let seen = NaN, seenH = 0;
+  (function tick() { if (scrollY !== seen || innerHeight !== seenH) { seen = scrollY; seenH = innerHeight; update(); } requestAnimationFrame(tick); })();
+  new ResizeObserver(() => { last = -1; update(); }).observe(document.querySelector('main'));
+})();
+</script>
 <script>/*EDITOR*/</script>
 
 <script>/*KICKER_DATA*/</script>
