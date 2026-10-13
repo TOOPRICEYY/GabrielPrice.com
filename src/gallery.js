@@ -584,7 +584,7 @@ function tick() {
   tN += (tT - tN) * (1 - Math.pow(.0009, dt));
   applyModel(tN);
   if (!userCam) placeCam(keyAt(tN), dt);
-  link?.frame(); controls.update(); renderer.render(scene, camera); balloons(tN);
+  try { link?.frame(); } catch (e) { console.warn(e); } controls.update(); renderer.render(scene, camera); balloons(tN);
   const pi = CH.findIndex(q => q.key === 'passage'); if (pi >= 0) passage(tN - pi);
   ov.querySelector('#gx-sheet').textContent = String(Math.round(tN) + 1).padStart(2, '0') + ' / ' + String(CH.length).padStart(2, '0');
 }
