@@ -37,6 +37,18 @@
       "tag": "p",
       "updatedAt": "2026-10-13T11:24:17.419Z"
     },
+    "s4.div1.h21": {
+      "fp": "Two-stage mechanical transmission",
+      "html": "Two-stage mechanical reduction",
+      "key": "s4.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Two-stage mechanical transmission",
+      "sec": 4,
+      "section": "05 Drive train",
+      "tag": "h2",
+      "updatedAt": "2026-10-13T11:25:27.577Z"
+    },
     "s7.div1.figure1.figcaption1": {
       "fp": "Oct 2026Strapping in at 10×, then running at ½ speed",
       "html": "<b>Oct 2026</b>Strapping in and then running for the first time in over 9 months",
