@@ -455,7 +455,7 @@
       else if (courseSync && R.pinCourse) {   // with how long the visitor had been driving, from the first sample of this drive
         const dr = 14 + R.coKeys.indexOf('drive'); let j = i; while (j > 0 && S[j - 1][13] === 2 && S[j - 1][dr] === 1) j--;
         R.pinCourse(pin.co, pin.co.drive ? Math.max(0, head - S[j][0]) / 1000 : null); courseSync = false; courseKey = lapKey(pin.co);
-      } else if (R.pinCourse && lapKey(pin.co) !== courseKey) { courseKey = lapKey(pin.co); R.pinCourse(pin.co, null); }   // a gate or lap the recording reached (a fast replay can step over a gate)
+      } else if (R.pinCourse && lapKey(pin.co) !== courseKey) { courseKey = lapKey(pin.co); R.pinCourse(pin.co); }   // a gate or lap the recording reached (a fast replay can step over a gate)
       if (seek && R.hazClear) R.hazClear();   // after a seek the run is rebuilt from the recording at the new playhead
       // a seek brings back every hazard of the run under way (from its first sample: on, with the same seed); the game drops those already behind
       let runStart = seek ? Infinity : 0, behind = -Infinity;

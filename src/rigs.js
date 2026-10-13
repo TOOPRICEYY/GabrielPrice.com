@@ -1217,6 +1217,7 @@ rigs.coState = (Co) => { const C = rigs.course; return [Co.drive ? 1 : 0, ...CO_
 // since: seconds the visitor had been driving, so the countdown and cues pick up where they were (GO comes 2.4 s after taking over)
 rigs.pinCourse = (P, since) => {
   const T = clock.elapsedTime, Co = rigs.couch;
+  if (since !== undefined) Object.assign(Co, { dHold: 0, dOn: false, cueTn: undefined });   // a seek: no drift carried over from elsewhere in the visit
   if (P.ci != null) Object.assign(rigs.course, { i: P.ci, done: !!P.cdone, t0: P.clap >= 0 ? T - P.clap : -1, last: P.clast, best: P.cbest, laps: P.claps, acc: P.cacc, a0: null });
   if (!P.drive || since == null) return;
   Object.assign(Co, { goT: T + 2.4 - since, cue: since < 2.4 ? 'count' : P.hold ? 'wait' : 'ready', cn: 0, lapCue: rigs.course.flash, waitT: T });
