@@ -75,6 +75,7 @@ The dashboard's Replay link opens `/admin/flow/replay?key=<day>/<sid>` (`worker/
 The player itself runs in the page at `/#replay=<day>/<sid>`, which also works on its own at the viewer's window size. It gets the merged visit from the frame host, or on its own from `/admin/api/flow/session` (Access login needed), and drives the page:
 - it scrolls the window to match `s` and pins it with `__rig.setS`;
 - it sets the camera through `window.__cam`;
-- it feeds the pointer into `ui.ptr`, so the laser follows it, and replays the drive keys.
+- it feeds the pointer into `ui.ptr`, so the laser follows it, and lights the drive keys that were held;
+- it holds the scooter and the couch to their recorded state and plays the game events (see above).
 
-The couch and scooter physics run live, so a replay of driving is close to what the visitor did but not exact.
+Visits recorded before October 13, 2026 carry no vehicle state, so their drives run on the live physics from the recorded keys and come out close to what the visitor did but not exact.
