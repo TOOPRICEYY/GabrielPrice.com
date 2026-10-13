@@ -497,7 +497,7 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
    fill and the cursor follow the scroll; crossing into another build flashes its name beside the cursor. Hovering the ruler (tapping it
    on touch screens) unfolds it into a labelled index, and a label scrolls to its section. Hidden while a drive game has the screen. */
 @property --rh { syntax: '<length>'; inherits: true; initial-value: 18px; }
-#secnav { --rh: 18px; --s: 0; --n: 19; position: fixed; z-index: 3; right: 2px; top: 50%; transform: translateY(-50%);
+#secnav { --rh: min(18px, calc((100vh - 48px) / var(--n))); --s: 0; --n: 19; position: fixed; z-index: 3; right: calc(2px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
   padding: 8px 0 8px 10px; border: 1px solid transparent; pointer-events: none; font-family: var(--f-mono);
   transition: opacity .3s, visibility .3s, background-color .2s, border-color .2s, --rh .35s cubic-bezier(.2, .7, .2, 1); }
 body.playing #secnav { opacity: 0; visibility: hidden; }
@@ -536,7 +536,7 @@ body.playing #secnav { opacity: 0; visibility: hidden; }
 /* touch: a compact ruler in the gutter at rest; a tap unfolds it to finger-sized rows */
 @media (hover: none) {
   #secnav { --rh: 11px; }
-  #secnav.open { --rh: clamp(24px, calc((100svh - 120px) / var(--n)), 34px); }
+  #secnav.open { --rh: clamp(16px, calc((100svh - 48px) / var(--n)), 34px); max-height: calc(100svh - 8px); overflow-y: auto; overscroll-behavior: contain; }   /* landscape phones: rows shrink to fit, and scroll if they still can't */
   #secnav .t, #secnav li.ch .t { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { #secnav, #secnav .t { transition: none; } }
