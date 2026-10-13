@@ -525,10 +525,10 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
   .bom .n { width: 16px; height: 16px; font-size: 9px; }
   .spec { font-size: 11px; }
   .bomwrap { max-height: 22vh; } .bomt { font-size: 10px; } .card .bomnote { font-size: 11.5px; } .bomt th { font-size: 8.5px; } .variant button, .bomctl .tg { font-size: 10px; padding: 5px 8px; }
-  /* parts card on phones: every control on one row with short labels, no note or second Build it line, and the short
+  /* parts card on phones: short labels so every control fits on one row (they wrap on the narrowest phones), no note or second Build it line, and the short
      list as bare rows (no header, group titles or switched-off knee rows) so the parts themselves get the space */
   section:has(#bom) .card { gap: 6px; } section:has(#bom) .card h2 { font-size: 20px; }
-  .bomctl { flex-wrap: nowrap; gap: 4px; } .variant button, .bomctl .tg { letter-spacing: .03em; padding: 5px 6px; white-space: nowrap; }
+  .bomctl { gap: 4px; } .variant button, .bomctl .tg { letter-spacing: .03em; padding: 5px 6px; white-space: nowrap; }
   .variant .vt { margin-left: 2px; } .bomctl .lf, #bomnote, #bomall { display: none; }
   .bomwrap { max-height: 26vh; }
   .bomt:not(.det) thead, .bomt:not(.det) tr.g, .bomt.nokn:not(.det) tr.kn { display: none; }
