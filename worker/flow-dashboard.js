@@ -115,13 +115,13 @@ const hw = (s) => [s.cores ? s.cores + ' cores' : '', s.mem ? s.mem + ' GB' : ''
 const loc = (s) => [s.city, s.region, s.cc].filter(Boolean).join(', ');
 const fpsTip = (s) => [s.stalls ? 'Froze ' + s.stalls + (s.stalls === 1 ? ' time, ' : ' times, ') + (s.stallMs / 1000).toFixed(1) + ' s in all' : '', s.gl > 0 ? 'The 3D view crashed' + (s.gl > 1 ? ' ' + s.gl + ' times' : '') : ''].filter(Boolean).join('. ');
 const isOld = (s) => s.layout !== data.current.layout;
-// Each column: heading h (gh names it in "Group by"), cell html, the value it sorts by, and the group a visit falls in.
+// Each column: heading h (gh names it in "Group by"), cell html, the value it sorts by, and the group a visit falls in (name: how a group is labelled).
 // n: numbers, right-aligned, first click sorts largest first. off: hidden until switched on in Columns.
 const COLS = [
   { id: 'start', h: 'Started', gh: 'Day', down: 1, cell: (s) => esc(s.start ? new Date(s.start).toLocaleString() : s.day), sort: (s) => s.start || s.day, group: (s) => s.day },
   { id: 'vid', h: 'Visitor', gh: 'Visitor (device)', tip: () => 'Returning visitors: the device keeps an id (asked first in the EU, EEA, UK and Switzerland)',
     cell: (s) => (s.vid ? '<button type="button" class="who" data-vid="' + esc(s.vid) + '" title="Show only visits from this device">' + (s.vn > 1 ? 'Visit ' + s.vn : 'First visit') + '</button>' : ''),
-    sort: (s) => (s.vid ? s.vid + String(s.vn || 0).padStart(4, '0') : null), group: (s) => (s.vid ? 'Device ' + s.vid.slice(0, 6) : 'Not remembered') },
+    sort: (s) => (s.vid ? s.vid + String(s.vn || 0).padStart(4, '0') : null), group: (s) => s.vid, name: (l) => (l === '(none)' ? 'Not remembered' : 'Device ' + l.slice(0, 8)) },
   { id: 'len', h: 'Length', n: 1, cell: (s) => fmt(s.ms), sort: (s) => s.ms },
   { id: 'far', h: 'Furthest section', down: 1, cell: (s) => esc(far(s)), sort: (s) => s.maxS, group: far },
   { id: 'dev', h: 'Device', cell: (s) => esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : ''), sort: (s) => s.dev || null, group: (s) => s.dev },
@@ -195,10 +195,11 @@ function table(V) {
     groups.forEach(([l, list], i) => {
       const open = opened.has(l), n = list.length, on = list.filter((s) => picked.has(s.key)).length;
       const end = list.filter((s) => s.maxS >= L(s).length - 1.5).length, avg = list.reduce((a, s) => a + s.ms, 0) / n;
-      html += '<tr class="grp"><td class="ck"><input type="checkbox" data-grp="' + i + '"' + (on && on === n ? ' checked' : '') + (on && on < n ? ' data-some="1"' : '') + ' aria-label="Select every visit in ' + esc(l) + '"></td>'
-        + '<td colspan="' + (cols.length + 1) + '"><button type="button" class="fold" data-grp="' + i + '" aria-expanded="' + open + '">' + (open ? '▾ ' : '▸ ') + esc(l) + '</button> <span class="old">'
+      html += '<tr class="grp"><td class="ck"><input type="checkbox" data-grp="' + i + '"' + (on && on === n ? ' checked' : '') + (on && on < n ? ' data-some="1"' : '') + ' aria-label="Select every visit in this group"></td>'
+        + '<td colspan="' + (cols.length + 1) + '"><button type="button" class="fold" data-grp="' + i + '" aria-expanded="' + open + '">' + (open ? '▾ ' : '▸ ') + esc(C[group].name ? C[group].name(l) : l) + '</button> <span class="old">'
         + n + (n === 1 ? ' visit' : ' visits') + ' · average ' + fmt(avg) + ' · ' + Math.round(100 * end / n) + '% reached the end</span></td></tr>';
-      if (open) for (const s of list) if (shown.length < 300) { html += row(s); shown.push(s.key); }
+      if (open) for (const s of list.slice(0, 300)) { html += row(s); shown.push(s.key); }   // each open group shows up to 300
+      if (open && n > 300) html += '<tr><td></td><td colspan="' + (cols.length + 1) + '" class="old">Showing the first 300 of ' + n + '. Its tick box still selects all of them.</td></tr>';
     });
   }
   $('rows').innerHTML = html;
@@ -268,16 +269,23 @@ $('del').onclick = async () => {
   const keys = [...picked], n = keys.length;
   if (!n || !confirm('Delete ' + (n === 1 ? 'this visit' : 'these ' + n + ' visits') + ' for good? Their replays go too.')) return;
   $('del').disabled = true; $('status').textContent = 'Deleting…';
-  let r = null, j = {};
-  try {
-    r = await fetch('/admin/api/flow/delete', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-editor': '1' }, body: JSON.stringify({ keys }) });
-    j = await r.json().catch(() => ({}));
-  } catch (e) {}
-  if (!r || !r.ok) { $('status').textContent = 'Could not delete: ' + (j.error || (r ? 'error ' + r.status : 'offline')); ticks(); return; }
-  const gone = new Set(keys);
-  data.sessions = data.sessions.filter((s) => !gone.has(s.key));
-  picked.clear(); last = -1;
-  $('status').textContent = 'Deleted ' + j.deleted + (j.deleted === 1 ? ' visit.' : ' visits.');
+  // the Worker takes up to 500 visits a request, so a big selection (a whole group) goes in parts
+  let done = 0, fail = '';
+  for (let i = 0; i < n && !fail; i += 500) {
+    const part = keys.slice(i, i + 500);
+    let r = null, j = {};
+    try {
+      r = await fetch('/admin/api/flow/delete', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-editor': '1' }, body: JSON.stringify({ keys: part }) });
+      j = await r.json().catch(() => ({}));
+    } catch (e) {}
+    if (!r || !r.ok) { fail = j.error || (r ? 'error ' + r.status : 'offline'); break; }
+    const gone = new Set(part);
+    data.sessions = data.sessions.filter((s) => !gone.has(s.key));
+    for (const k of part) picked.delete(k);
+    done += j.deleted;
+  }
+  last = -1;
+  $('status').textContent = (done ? 'Deleted ' + done + (done === 1 ? ' visit.' : ' visits.') : '') + (fail ? (done ? ' ' : '') + 'Could not delete ' + (done ? 'the rest' : 'them') + ': ' + fail : '');
   draw();
 };
 $('whoX').onclick = () => { who = ''; picked.clear(); last = -1; draw(); };
