@@ -148,6 +148,10 @@ p { margin: 0; max-width: 62ch; }
 .bomctl .tg { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; cursor: pointer;
   background: transparent; color: var(--graphite); border: 1px dashed var(--graphite); }
 .bomctl .tg[aria-pressed="true"] { border-style: solid; background: color-mix(in srgb, var(--cobalt) 14%, var(--vellum)); }
+/* the way in for builders: solid, in the accent colour, so it isn't missed */
+.bomctl .tg.build { border: 1px solid var(--cobalt); background: var(--cobalt); color: var(--vellum); font-weight: 600; }
+.bomctl .tg.build:hover, .bomctl .tg.build:focus-visible { background: var(--graphite); border-color: var(--graphite); }
+.bomctl .tg.build[aria-pressed="true"] { background: transparent; color: var(--cobalt); font-weight: 500; }
 .bomt .lk { display: none; white-space: nowrap; }
 .bomt.det .lk { display: table-cell; }
 .bomt .lk a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid currentColor; margin-right: 6px; }
@@ -617,7 +621,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       <div class="eyebrow">06 <b>Exploded view</b></div>
       <h2>Parts</h2>
       <div class="bomctl"><div class="variant" role="group" aria-label="Build"><button type="button" data-v="mo" aria-pressed="false">Mechanical only <span class="vt" id="bomvmo"></span></button><button type="button" data-v="ea" aria-pressed="false">Electric Assist <span class="vt" id="bomvea"></span></button></div>
-        <button type="button" class="tg" id="bomknee" aria-pressed="false">+ Knee add-on</button><button type="button" class="tg" id="bomdet" aria-pressed="false">Full parts list + STLs</button></div>
+        <button type="button" class="tg" id="bomknee" aria-pressed="false">+ Knee add-on</button><button type="button" class="tg build" id="bomdet" aria-pressed="false" title="Full parts list: quantities, STL files and order links">Build it →</button></div>
       <p class="bomnote" id="bomnote"></p>
       <div class="bomwrap"><table class="bomt" id="bom"></table></div>
       <button type="button" class="bomall" id="bomall"></button>
@@ -1280,13 +1284,14 @@ function setBomDet(on) {
   document.getElementById('bom').classList.toggle('det', on);
   document.getElementById('bomdet').setAttribute('aria-pressed', on);
   document.getElementById('bomall').hidden = on;
+  document.getElementById('bomdet').textContent = on ? 'Short list' : 'Build it →';
 }
 document.getElementById('bomdet').addEventListener('click', () => setBomDet(!document.getElementById('bom').classList.contains('det')));
 document.getElementById('bomall').addEventListener('click', () => setBomDet(true));
 {
   const nParts = BOM_GROUPS.reduce((a, [, rows]) => a + rows.length, 0);
   const nStl = new Set(BOM_GROUPS.flatMap(([, rows]) => rows.flatMap((r) => r[5].map(([, u]) => u).filter((u) => u.endsWith('.stl'))))).size;
-  document.getElementById('bomall').textContent = `${nParts} parts, ${nStl} STL files and order links: open the full list →`;
+  document.getElementById('bomall').textContent = `Build it: ${nParts} parts, ${nStl} STL files and order links →`;
 }
 setBomVariant('mo');
 
