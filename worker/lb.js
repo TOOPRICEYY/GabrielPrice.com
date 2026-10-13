@@ -9,6 +9,8 @@
 // its top 50, one row per player id. Writes are conditional on the object's etag and retried, so two posts at once don't
 // drop one. Player ids are random strings the page keeps in localStorage; they are never sent back out.
 
+import { lbBad } from './lbname.js';
+
 const KEY = 'lb/board.json';
 const KEEP = 50, SHOW = 10;
 // the range a score may take: well past any honest run either way, so a doctored post can't sit on top forever
@@ -32,7 +34,7 @@ export function checkPost(b) {
   const { game, id, score } = b, tag = typeof b.tag === 'string' ? b.tag.trim() : '';
   if (!Object.hasOwn(GAMES, game) || typeof id !== 'string' || !ID.test(id) || !TAG.test(tag)) return null;
   if (!Number.isInteger(score) || score < GAMES[game].min || score > GAMES[game].max) return null;
-  return { game, id, tag, score };
+  return { game, id, tag: lbBad(tag) ? '???' : tag, score };   // a refused name still counts, as ???
 }
 
 // the board with this post merged in (a player keeps their best; the tag follows their latest post), or null if unchanged.
@@ -50,7 +52,8 @@ export async function lb(request, env, url) {
   if (request.method === 'GET') {
     if (!env.FLOW) return send({ sc: [], lap: [] });
     const me = url.searchParams.get('id') || '', { board } = await load(env);
-    const out = (rows) => rows.slice(0, SHOW).map((r) => (r.id === me ? { tag: r.tag, score: r.score, you: true } : { tag: r.tag, score: r.score }));
+    const tag = (t) => (lbBad(t) ? '???' : t);   // rows stored before the filter existed are cleaned on the way out
+    const out = (rows) => rows.slice(0, SHOW).map((r) => (r.id === me ? { tag: tag(r.tag), score: r.score, you: true } : { tag: tag(r.tag), score: r.score }));
     return send({ sc: out(board.sc), lap: out(board.lap) });
   }
   if (request.method !== 'POST') return empty(405);

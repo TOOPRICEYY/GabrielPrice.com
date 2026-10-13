@@ -460,6 +460,25 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
 #lboard.mini { width: 168px; padding: 5px 8px 6px; font-size: 11px; } #lboard.mini.on { opacity: .85; }   /* (opacity only with .on, or it never hides) */
 #lboard.mini li:nth-child(n+4), #lboard.mini .tg, #lboard.mini .you { display: none; }
 #lboard.mini .hd { margin-bottom: 3px; font-size: 9px; }
+/* the end of a run: the board becomes a menu in the middle of the screen (how it went, the board, a name box, Play again) */
+#lboard .ttl, #lboard .acts { display: none; }
+body #lboard.end { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(340px, calc(100vw - 32px)); padding: 16px 18px 18px; z-index: 31; font-size: 13px;
+  box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--graphite) 22%, transparent), 0 12px 40px color-mix(in srgb, var(--cobalt) 30%, transparent); border-color: var(--cobalt); transition: opacity .35s .9s; }
+body #lboard.end li:nth-child(n+7) { display: flex; }
+#lboard.end .ttl { display: grid; justify-items: center; gap: 2px; margin-bottom: 12px; text-align: center; }
+#lboard.end .ttl span { font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--graphite-2); }
+#lboard.end .ttl b { font-family: var(--f-display); font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+#lboard.end .ttl i { font-style: normal; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--cobalt); min-height: 1em; }
+#lboard.end .hd { margin-bottom: 4px; }
+#lboard.end .you { margin-top: 10px; font-size: 12px; text-align: center; }
+#lboard.end .tg { margin-top: 8px; font-size: 11px; }
+#lboard.end input { flex: 1; width: auto; font-size: 16px; padding: 8px 10px; }   /* 16 px: phones don't zoom in on it */
+#lboard.end.bad input { border-color: var(--neon); } #lboard.end.bad .you { color: var(--neon); }
+#lboard.end .acts { display: flex; gap: 8px; margin-top: 12px; }
+#lboard.end .acts button { flex: 1; font: 600 12px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; padding: 12px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--vellum); color: var(--graphite); }
+#lboard.end .acts button.sv { background: var(--cobalt); border-color: var(--cobalt); color: var(--vellum); }
+#lboard.end .acts button[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { body #lboard.end { transition-delay: 0s; } }
 #lboard input { width: 9em; min-width: 0; font: 500 12px var(--f-mono); letter-spacing: .04em; text-align: center; padding: 2px 4px; color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); }
 @media (hover: none), (pointer: coarse) { #lboard { left: 12px; top: calc(170px + env(safe-area-inset-top, 0px)); transform: none; width: 168px; font-size: 11px; padding: 6px 8px 8px; } #lboard li:nth-child(n+7) { display: none; } }
 /* couch: big cues (3, 2, 1, GO, DRIFT, Keep going); each pops up in the middle and then shrinks off to the top-left corner */
