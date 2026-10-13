@@ -37,6 +37,18 @@
       "tag": "p",
       "updatedAt": "2026-10-13T11:24:17.419Z"
     },
+    "s4.div1.div2.span4": {
+      "fp": "Pinion → rack",
+      "html": "Pinion → rack + die spring",
+      "key": "s4.div1.div2.span4",
+      "kind": "text",
+      "name": "Chain step",
+      "origHtml": "Pinion → rack",
+      "sec": 4,
+      "section": "05 Drive train",
+      "tag": "span",
+      "updatedAt": "2026-10-13T11:29:40.521Z"
+    },
     "s4.div1.h21": {
       "fp": "Two-stage mechanical transmission",
       "html": "Hybrid energy recovery",
