@@ -288,6 +288,12 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #lb .lb-x { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%;
   display: grid; place-items: center; font: 22px/1 var(--f-mono); color: #fff; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .3); cursor: pointer; }
 #lb .lb-x:hover { background: rgba(255, 255, 255, .24); }
+#lb .lb-nav { position: fixed; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border-radius: 22px; display: grid; place-items: center; font: 28px/1 var(--f-mono);
+  color: #fff; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .26); cursor: pointer; }
+#lb .lb-nav:hover { background: rgba(255, 255, 255, .22); }
+#lb .lb-prev { left: calc(10px + env(safe-area-inset-left, 0px)); } #lb .lb-next { right: calc(10px + env(safe-area-inset-right, 0px)); }
+#lb .lb-n { position: fixed; top: calc(24px + env(safe-area-inset-top, 0px)); left: calc(16px + env(safe-area-inset-left, 0px)); font: 12px var(--f-mono); letter-spacing: .1em; color: rgba(232, 234, 246, .8); }
+#lb figure { touch-action: pan-y pinch-zoom; }
 .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
 .media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .media img, .media video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); }
@@ -2045,16 +2051,37 @@ addEventListener('keydown', e => keycaps(e).forEach(b => b.classList.add('on')))
 addEventListener('keyup', e => keycaps(e).forEach(b => b.classList.remove('on')));   // only the key let go
 addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
 // lightbox: tap a photo or clip (build log rows, card leads, gallery project pages) to see it large; tap it again, the ✕ or Esc to close.
-// window.__lightbox lets the visit replay player open and close it the way the visitor did.
+// The other photos and clips of the same card (its section, or the open project page) are a swipe, a tap on either side, the ‹ › buttons
+// or the arrow keys away, round in a loop. window.__lightbox lets the visit replay player open and close it the way the visitor did.
 (() => {
   const lb = document.createElement('div'); lb.id = 'lb'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', 'Build photo'); document.body.appendChild(lb);
-  const close = () => { lb.classList.remove('on'); lb.innerHTML = ''; };
-  lb.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') close(); });
-  addEventListener('keydown', e => { if (e.key === 'Escape' && lb.classList.contains('on')) { close(); e.stopImmediatePropagation(); } }, true);   // Esc shuts the viewer, not the project page under it
+  let set = [], at = 0, swiped = false;
+  const close = () => { lb.classList.remove('on'); lb.innerHTML = ''; set = []; };
+  const step = (d) => { if (set.length > 1) show(set[(at + d + set.length) % set.length]); };
+  lb.addEventListener('click', e => {
+    if (swiped) { swiped = false; return; }   // the click that ends a swipe
+    const nav = e.target.closest('.lb-nav'); if (nav) { step(+nav.dataset.d); return; }
+    if (e.target.tagName === 'VIDEO') return;
+    const side = e.clientX < innerWidth * .25 ? -1 : e.clientX > innerWidth * .75 ? 1 : 0;   // a tap on either side steps; the middle closes
+    if (side && set.length > 1 && !e.target.closest('.lb-x')) step(side); else close();
+  });
+  let p0 = null;
+  lb.addEventListener('pointerdown', e => { p0 = e.isPrimary ? [e.clientX, e.clientY] : null; });
+  lb.addEventListener('pointerup', e => {
+    if (!p0) return; const dx = e.clientX - p0[0], dy = e.clientY - p0[1]; p0 = null;
+    if (set.length > 1 && Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) { swiped = true; setTimeout(() => { swiped = false; }, 400); step(dx < 0 ? 1 : -1); }
+  });
+  addEventListener('keydown', e => {
+    if (!lb.classList.contains('on')) return;
+    if (e.key === 'Escape') { close(); e.stopImmediatePropagation(); }   // Esc shuts the viewer, not the project page under it
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { step(e.key === 'ArrowLeft' ? -1 : 1); e.stopImmediatePropagation(); e.preventDefault(); }   // and doesn't drive the couch
+  }, true);
   const SEL = '.log img, .log video, .lead img, .lead video, .gx-gal img, .gx-hf img, .gx-vid video';
   document.addEventListener('click', e => { const m = e.target.closest(SEL); if (m) show(m); });
   window.__lightbox = { sel: SEL, show, close };
   function show(m) {
+    const card = m.closest('section, .gx-scroll');
+    set = card ? [...card.querySelectorAll(SEL)].filter(x => x === m || x.getClientRects().length) : [m]; at = Math.max(0, set.indexOf(m));
     const cap = m.closest('figure')?.querySelector('figcaption'), fig = document.createElement('figure'); fig.style.margin = 0;
     let el;
     if (m.tagName === 'IMG') { el = new Image(); el.src = m.dataset.full || m.src; el.alt = m.alt; }
@@ -2062,6 +2089,11 @@ addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach
     fig.append(el); if (cap) { const p = document.createElement('p'), b = cap.querySelector('b'); p.textContent = (b ? b.textContent + '  ' : '') + [...cap.childNodes].filter(n => n !== b).map(n => n.textContent).join(''); fig.append(p); }
     const x = document.createElement('button'); x.type = 'button'; x.className = 'lb-x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Close');
     lb.innerHTML = ''; lb.append(fig, x); lb.classList.add('on');
+    if (set.length > 1) {
+      const n = document.createElement('span'); n.className = 'lb-n'; n.textContent = (at + 1) + ' / ' + set.length;
+      const nav = (d, t, l) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lb-nav ' + l; b.dataset.d = d; b.textContent = t; b.setAttribute('aria-label', d < 0 ? 'Previous' : 'Next'); return b; };
+      lb.append(n, nav(-1, '‹', 'lb-prev'), nav(1, '›', 'lb-next'));
+    }
   }
 })();
 </script>
