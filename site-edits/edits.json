@@ -25,6 +25,42 @@
       "tag": "p",
       "updatedAt": "2026-10-12T04:02:36.844Z"
     },
+    "s2.div1.p1": {
+      "fp": "A 2HP bio-adaptive ankle exoskeleton",
+      "html": "A powered bio-adaptive ankle exoskeleton",
+      "key": "s2.div1.p1",
+      "kind": "text",
+      "name": "Paragraph",
+      "origHtml": "A 2HP bio-adaptive ankle exoskeleton",
+      "sec": 2,
+      "section": "03 Project · Anti-thetis",
+      "tag": "p",
+      "updatedAt": "2026-10-13T11:24:17.419Z"
+    },
+    "s4.div1.div2.span4": {
+      "fp": "Pinion → rack",
+      "html": "Pinion → rack + die spring",
+      "key": "s4.div1.div2.span4",
+      "kind": "text",
+      "name": "Chain step",
+      "origHtml": "Pinion → rack",
+      "sec": 4,
+      "section": "05 Drive train",
+      "tag": "span",
+      "updatedAt": "2026-10-13T11:29:40.521Z"
+    },
+    "s4.div1.h21": {
+      "fp": "Two-stage mechanical transmission",
+      "html": "Hybrid energy recovery",
+      "key": "s4.div1.h21",
+      "kind": "text",
+      "name": "Heading",
+      "origHtml": "Two-stage mechanical transmission",
+      "sec": 4,
+      "section": "05 Drive train",
+      "tag": "h2",
+      "updatedAt": "2026-10-13T11:29:19.323Z"
+    },
     "s7.div1.figure1.figcaption1": {
       "fp": "Oct 2026Strapping in at 10×, then running at ½ speed",
       "html": "<b>Oct 2026</b>Strapping in and then running for the first time in over 9 months",
