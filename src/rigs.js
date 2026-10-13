@@ -1202,13 +1202,15 @@ rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: st
 rigs.pinTip = (want) => { const [id, k, dir] = String(want || '').split('|'); tutHint(id || '', { touchRun: k === 't' }, +dir || 0); };
 rigs.pinPop = (text) => { const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = text; el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); };
 // the recorded vehicle states (the flow capture reads and writes these lists in this order)
-rigs.scKeys = ['m', 'X', 'Z', 'psi', 'v', 'delta', 'y', 'p', 'duck', 'air', 'run', 'lane', 'on', 'seed', 'dist', 'stars', 'hp', 'zc', 'tut', ...DMG];
+// (boost: seconds of a star boost left; best: the visitor's own best, which the HUD shows)
+rigs.scKeys = ['m', 'X', 'Z', 'psi', 'v', 'delta', 'y', 'p', 'duck', 'air', 'run', 'lane', 'on', 'seed', 'dist', 'stars', 'hp', 'zc', 'tut', ...DMG, 'boost', 'best'];
 const CO_KEYS = ['drive', 'x', 'z', 'h', 'vx', 'vz', 'w', 'sp', 'slip', 'dl', 'df', 'r', 'tk', 'oriS', 'phi', 'nitro', 'boostOn', 'hold'];
 // and the lap's progress: gate, lap done, seconds into the lap (-1 before one starts), last and best lap, laps, the roundabout's swept angle
 const COURSE_KEYS = ['ci', 'cdone', 'clap', 'clast', 'cbest', 'claps', 'cacc'];
 rigs.coKeys = [...CO_KEYS, ...COURSE_KEYS];
 rigs.scState = (S) => { const G = S.game; return [S.manual ? 1 : 0, r2(S.X), r2(S.Z), r2(S.psi), r2(S.v), r2(S.delta), r2(S.y), r2(S.p), r2(S.duck), S.air ? 1 : 0, S.touchRun ? 1 : 0, S.lane || 0,
-  G.on ? 1 : 0, G.seed, r2(G.dist), G.stars, r2(G.hp), r2(Math.max(-1e4, G.zc - S.Z)), G.tut ? 1 : 0, ...DMG.map((k) => r2(G.dmg[k]))]; };
+  G.on ? 1 : 0, G.seed, r2(G.dist), G.stars, r2(G.hp), r2(Math.max(-1e4, G.zc - S.Z)), G.tut ? 1 : 0, ...DMG.map((k) => r2(G.dmg[k])),
+  r2(Math.max(0, G.boostUntil - clock.elapsedTime)), gameBest()]; };
 rigs.coState = (Co) => { const C = rigs.course; return [Co.drive ? 1 : 0, ...CO_KEYS.slice(1).map((k) => r2(Co[k])),
   C.i, C.done ? 1 : 0, C.t0 >= 0 ? r2(clock.elapsedTime - C.t0) : -1, r2(C.last), r2(C.best), C.laps || 0, r2(C.acc)]; };
 // after a seek, or when the replay reaches the couch: the lap as it stood then (the gates are crossed by the pinned couch from there)
@@ -1230,7 +1232,7 @@ function pinScooter(S, P) {
 const BEST_KEY = 'gp.scooter.best';
 let bestLoaded = null;
 function gameBest(v) {
-  try { if (v != null && !REPLAY) localStorage.setItem(BEST_KEY, String(v)); else if (bestLoaded == null) bestLoaded = +(localStorage.getItem(BEST_KEY) || 0) || 0; } catch (e) { }
+  try { if (v != null && !REPLAY) localStorage.setItem(BEST_KEY, String(v)); else if (bestLoaded == null) bestLoaded = REPLAY ? 0 : +(localStorage.getItem(BEST_KEY) || 0) || 0; } catch (e) { }   // a replay shows the visitor's (pinned)
   if (v != null) bestLoaded = v; return bestLoaded || 0;
 }
 function gameNew() { return { on: false, t0: 0, z0: 0, dist: 0, score: 0, stars: 0, hp: GAME.hp, dmg: { head: 0, torso: 0, armL: 0, armR: 0, legL: 0, legR: 0 },
@@ -1505,7 +1507,8 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
   if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
-  if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; } }   // a replay: the run as recorded
+  if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
+    bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
   if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
   const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;

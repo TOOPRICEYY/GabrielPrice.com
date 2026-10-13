@@ -398,7 +398,7 @@
     }
     // a recorded vehicle state at the playhead, as rigs.js reads it: numbers eased between samples, switches as they were
     const CAP = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' };
-    const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, drive: 1, boostOn: 1, hold: 1, ci: 1, cdone: 1, clap: 1, clast: 1, cbest: 1, claps: 1, cacc: 1 };
+    const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, boost: 1, best: 1, drive: 1, boostOn: 1, hold: 1, ci: 1, cdone: 1, clap: 1, clast: 1, cbest: 1, claps: 1, cacc: 1 };
     let courseSync = true;   // set the couch's lap progress from the recording at the next couch sample (a seek, or arriving at the couch)
     function vehicle(keys, a, b, k) {
       if (a.length < 14 + keys.length) return null;   // a sample from before a field was added: leave the vehicle live

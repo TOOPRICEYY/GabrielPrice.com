@@ -155,6 +155,12 @@ test('samples carry a project page and a driven vehicle; popups, pages, hazards,
   assert.deepEqual(c.events.map((e) => e[1]), ['b', 'p', 'k', 'x', 't', 'o', 's', 'f', 'b']);
 });
 
+test('replay events that do not fit their shape are dropped, not stored', () => {
+  const c = checkBatch(batch({ events: [[1, 'k', 'ball', 1, 0, 0, 900, 0, -1e300, 0, 0, 0, 0, 0, 0], [2, 'k', 'toString', 1, 0, 0, 900, 0, 0, 0, 0, 0, 0, 0, 0],
+    [3, 'x', '__proto__', 22, 'Bonk', 0, 0], [4, 'x', 'legL', 22, 'Bonk', 0], [5, 'b', 7], [6, 's', -1], [7, 'k', 'bird', -1, 10, 120, 900, 0, 300, 0, 0, 0, 0, 0, 1]] }));
+  assert.deepEqual(c.events.map((e) => e[0]), [7]);
+});
+
 test('event strings are trimmed and samples must be finite numbers', () => {
   const c = checkBatch(batch({ events: [[1, 'c', 0.1, 0.2, 3, 'y'.repeat(500)]] }));
   assert.equal(c.events[0][5].length, 80);
