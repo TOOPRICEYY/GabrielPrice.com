@@ -499,7 +499,7 @@
         const v = document.querySelector('#lb video');
         if (v && lateT.b != null) { const at = () => { if (v.duration) v.currentTime = ((head - lateT.b) / 1000) % v.duration; }; if (v.readyState >= 1) at(); else v.addEventListener('loadedmetadata', at, { once: true }); }
       }
-      while (lateStars.length && head - lateStars[0][0] > 300) { const e = lateStars.shift(); if (R.pinStar) R.pinStar(e[2], (head - e[0]) / 1000, true); }
+      while (lateStars.length && (head - lateStars[0][0] > 300 || head >= dur)) { const e = lateStars.shift(); if (R.pinStar) R.pinStar(e[2], (head - e[0]) / 1000, true); }
       // clips play with the replay: held while paused, at its speed otherwise
       for (const v of document.querySelectorAll('video')) {
         if (!playing) { if (!v.paused) { v.pause(); heldClips.add(v); } }

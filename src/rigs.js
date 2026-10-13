@@ -2161,7 +2161,8 @@ function couchCues(Co, Tn, drive, st) {
   // after GO the cues follow the course: DRIFT at the roundabout, Keep going while you slide round it, Return to start once the
   // lap is done, and the lap time when you cross gate 1. A slide has to hold .25 s to count and lapse .8 s to end, so they don't flicker.
   const C = rigs.course, n = CC.gates.length, sl = Math.abs(Co.slip) / RD, raw = sl > 10 && Math.abs(Co.sp) > 90;
-  Co.dHold = raw ? Math.max(0, Co.dHold || 0) + .016 : Math.min(0, Co.dHold || 0) - .016;
+  const dd = Math.min(.25, Math.max(0, Tn - (Co.cueTn ?? Tn))); Co.cueTn = Tn;   // seconds since the last frame (a replay's run faster)
+  Co.dHold = raw ? Math.max(0, Co.dHold || 0) + dd : Math.min(0, Co.dHold || 0) - dd;
   if (Co.dHold > .25) Co.dOn = true; else if (Co.dHold < -.8) Co.dOn = false;
   if (C.flash && Co.lapCue !== C.flash) {          // over the line: the lap time
     Co.lapCue = C.flash; Co.cue = 'wait'; Co.waitT = Tn + 1.8; const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
