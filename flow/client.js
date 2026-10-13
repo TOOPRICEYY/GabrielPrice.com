@@ -17,15 +17,22 @@
 // browser did, and puts its controls in the host's bar.
 //
 // Sample: [t ms, s, free 0|1, pointer x, pointer y (0..1 of the viewport, -1 when idle), keys bitmask,
-//          camera x, y, z, look x, y, z]. Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
-//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message). The first batch's meta carries the site version and its
+//          camera x, y, z, look x, y, z, project page (how far down it, 0..1; -1 when none is open), then while the scooter or
+//          the couch can be driven: 1 and rigs.scKeys, or 2 and rigs.coKeys (its state: pose, speed, the run's score and health)].
+//          With a project page open, the camera is the page's own. Older visits have the first 12 only.
+//          Events: [t ms, type, ...]: c click (x, y, section, label), v video play,
+//          h tab hidden, z resize (w, h), l stall (ms the page drew nothing), g the 3D view lost its GPU context (s), r it came back, e capture error (message),
+//          b photo popup (the file, '' when closed), p project page (its id, '' when closed), k a scooter hazard appeared (rigs.js hazRec),
+//          x the rider was hit (part, amount, label, fell, ragdoll side), t a scooter tip showed (its key, '' when gone), o couch boost (full).
+//          The first batch's meta carries the site version and its
 //          section layout (window.__flowBuild, written by scripts/build.mjs), so visits stay readable after the page changes.
 //          It also carries the phone model and OS version where the browser offers them (Chromium's user-agent client hints);
 //          the Worker reads the device type, OS and browser from the user agent itself. And the device (hw): screen size and
 //          orientation, CPU cores, memory, GPU, network, time zone, languages, reduced motion, and how long the 3D scene took
 //          to appear (load) and until the page's load event, when every file it asks for up front has arrived (full). All of it is read once, in the first batch; each batch adds only its average frame rate (fps).
 (() => {
-  const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 60, MAX_MS = 30 * 60 * 1000;
+  const HZ = 10, FLUSH_MS = 30000, MAX_SEQ = 150, MAX_MS = 30 * 60 * 1000;
+  const FLUSH_N = 200;   // samples: a driven vehicle adds its state to each, so a batch goes out early to stay under the Worker's 64 KB
   const KEYS = ['w', 'a', 's', 'd', 'q', 'e', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
   const r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000;
   const hash = location.hash;
@@ -50,6 +57,7 @@
   const vis = { id: '', n: 0, ok: false };   // the returning-visitor id, once known (see visitor())
   let quit = false;   // opted out while this page was open (see optOut)
   let samples = [], events = [], seq = 0, last = null, lastT = -1e9, lastFlush = t0, stopped = false, hw = null, hwSent = false, ready = 0, full = 0, fullSent = false;
+  const shown = { b: '', p: '', t: '' };   // the photo popup, project page and scooter tip on screen at the last sample
   // frame rate: frames and visible time since the last batch. A freeze counts as the time it took (it is what the visitor
   // saw); hidden time doesn't, since visibilitychange resets prevT
   let frames = 0, frameMs = 0, prevT = 0, stalls = 0;
@@ -70,6 +78,8 @@
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 2000));
     idle(() => { try { hw = device(); } catch {} }, { timeout: 5000 });
     idle(() => { try { visitor(rig); } catch {} }, { timeout: 8000 });
+    // the games report their hazards, hits and boosts as they happen (rigs.js); a busy batch goes out early
+    rig.rigs.rec = (type, a) => { if (stopped) return; events.push([now(), type, ...a]); if (events.length >= 400) flush(); };
     function tick(t) {
       if (stopped) return;
       if (prevT && document.visibilityState === 'visible') { frames++; frameMs += Math.min(60000, t - prevT); }
@@ -94,10 +104,19 @@
         for (let i = 0; i < KEYS.length; i++) if (held.some((k) => k && k.has(KEYS[i]))) keys |= 1 << i;
         const x = [now(), r3(rig.s), rig.free.on ? 1 : 0, live ? r3(ui.ptr.x / innerWidth) : -1, live ? r3(ui.ptr.y / innerHeight) : -1, keys,
           r2(p.x), r2(p.y), r2(p.z), r2(p.x + dir.x * 100), r2(p.y + dir.y * 100), r2(p.z + dir.z * 100)];
-        let same = !!last;
+        // a project page (gallery.js) covers the scene: its camera and scroll instead; the scene holds still under it
+        const gs = window.__gallery && window.__gallery.state ? window.__gallery.state() : null;
+        if (gs) { x.splice(6, 6, ...gs.cam[0].map(r2), ...gs.cam[1].map(r2)); x.push(r3(gs.top)); } else x.push(-1);
+        const R = rig.rigs;
+        if (R.scootOn && R.scState) x.push(1, ...R.scState(R.scooter)); else if (R.couchOn && R.coState) x.push(2, ...R.coState(R.couch));
+        let same = !!last && last.length === x.length;
         for (let i = 1; same && i < x.length; i++) if (x[i] !== last[i]) same = false;
         if (!same) { samples.push(x); last = x; }
-        if (t - lastFlush > FLUSH_MS) flush();
+        // what is open over the page: a photo popup, a project page, a scooter tip
+        const lb = document.getElementById('lb'), m = lb && lb.classList.contains('on') && lb.querySelector('img, video');
+        const over = { p: gs ? gs.id : '', b: m ? file(m.getAttribute('src')) : '', t: (R.tut && R.tut.hint) || '' };
+        for (const k of ['p', 'b', 't']) if (over[k] !== shown[k]) { shown[k] = over[k]; events.push([now(), k, over[k]]); }
+        if (t - lastFlush > FLUSH_MS || samples.length >= FLUSH_N) flush();
         if (t - t0 > MAX_MS) { flush(); stopped = true; }
       }
     }
@@ -251,6 +270,7 @@
       g.appendChild(a); };
     if (document.readyState === 'loading') addEventListener('DOMContentLoaded', at, { once: true }); else at();
   }
+  function file(src) { try { return new URL(src, location.href).pathname.replace(/^\//, '').slice(0, 80); } catch { return ''; } }
   function refHost() { try { const u = new URL(document.referrer); return u.host === location.host ? '' : u.host.slice(0, 80); } catch { return ''; } }
 
   function waitRig(cb, onTimeout) {
@@ -345,13 +365,41 @@
     }
     const [bPlay, bSpeed] = hud.querySelectorAll('button'), range = hud.querySelector('input'), time = hud.querySelector('[data-a=time]'), stall = hud.querySelector('[data-a=stall]');
     let stallFrom = 0, stallUntil = 0;
-    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9;
+    let playing = true, speed = 1, head = 0, prev = performance.now(), i = 0, ei = 0, lastP = [-1, -1], lastPT = -1e9, seek = false;
     const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
+    // the page's clock runs at the replay's speed and stops while it is paused, so the games' timers and hazards keep pace with the
+    // recorded poses (getDelta also moves elapsedTime, the time the rigs read)
+    const clk = rig.clock;
+    if (clk) { const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); return d * k; }; }
+    const R = rig.rigs, pin = R.pin || {};
+    // what is open over the page (photo popup b, project page p, scooter tip t), as the replay has put it
+    const shown = { b: '', p: '', t: '' };
+    function put(k, v) {
+      if (shown[k] === v) return; shown[k] = v;
+      if (k === 'p') { const G = window.__gallery; if (!G) return; if (v) G.open(v, null); else { G.close(); window.__gcam = null; } }
+      else if (k === 't') { if (R.pinTip) R.pinTip(v); }
+      else {
+        const L = window.__lightbox; if (!L) return;
+        if (!v) { L.close(); return; }
+        // the photo or clip it was opened from; one no longer on the page opens on its own
+        const m = [...document.querySelectorAll(L.sel)].find((el) => [el.dataset.full, el.dataset.src, el.getAttribute('src'), el.currentSrc].some((x) => x && file(x) === v))
+          || Object.assign(document.createElement(/\.(mp4|webm|mov)$/i.test(v) ? 'video' : 'img'), { src: v });
+        L.show(m);
+      }
+    }
+    // a recorded vehicle state at the playhead, as rigs.js reads it: numbers eased between samples, switches as they were
+    const CAP = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' };
+    const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, drive: 1, boostOn: 1, hold: 1 };
+    function vehicle(keys, a, b, k) {
+      const o = {}, same = b.length === a.length && b[13] === a[13];
+      keys.forEach((key, j) => { const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
+      return o;
+    }
     bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; if (R.hazClear) R.hazClear(); if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
     let C = centers();
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
@@ -370,7 +418,16 @@
       // scroll the page so the cards match, then pin s and the camera to the recording
       scrollTo(0, C[fi] + (s - fi) * (C[fi + 1] - C[fi]) - innerHeight * .5);
       rig.setS(s);
-      window.__cam = [[lerp(a[6], b[6], k), lerp(a[7], b[7], k), lerp(a[8], b[8], k)], [lerp(a[9], b[9], k), lerp(a[10], b[10], k), lerp(a[11], b[11], k)]];
+      const gal = a.length > 12 && a[12] >= 0, kc = gal === (b.length > 12 && b[12] >= 0) ? k : 0;   // the camera fields are a project page's while one is open
+      const cam = [[lerp(a[6], b[6], kc), lerp(a[7], b[7], kc), lerp(a[8], b[8], kc)], [lerp(a[9], b[9], kc), lerp(a[10], b[10], kc), lerp(a[11], b[11], kc)]];
+      if (gal && window.__gallery && shown.p) {
+        window.__gcam = cam;
+        const sc = window.__gallery.scroller, top = lerp(a[12], kc ? b[12] : a[12], kc) * Math.max(0, sc.scrollHeight - sc.clientHeight);
+        if (Math.abs(sc.scrollTop - top) > .5) sc.scrollTop = top;
+      } else { window.__cam = cam; window.__gcam = null; }
+      // the scooter and the couch, held to what the visitor's did (rigs.js PIN); older visits drive them from the keys alone
+      pin.sc = a[13] === 1 && R.scKeys ? vehicle(R.scKeys, a, b, k) : null;
+      pin.co = a[13] === 2 && R.coKeys ? vehicle(R.coKeys, a, b, k) : null;
       // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
       if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }
       if (a[3] >= 0 && (!touch || fg || head - lastPT < 600)) {
@@ -382,14 +439,25 @@
         if (!set) continue; set.clear();
         KEYS.forEach((key, j) => { if (a[5] & (1 << j)) set.add(key); });
       }
+      // the key legend lights the keys held (the page lights it from real key presses)
+      const lit = new Set(); KEYS.forEach((key, j) => { if (a[5] & (1 << j)) lit.add(CAP[key] || key); });
+      for (const b of document.querySelectorAll('.keys kbd[data-k]')) b.classList.toggle('on', lit.has(b.dataset.k));
+      // after a seek, only the last state of what was open applies, and only hazards still in play come back
+      const late = {};
       while (ei < E.length && E[ei][0] <= head) {
-        if (E[ei][1] === 'c') ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight);
+        const e = E[ei], age = (head - e[0]) / 1000;
+        if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
+        else if (e[1] === 'k') { if (age < 6 && R.hazPut) R.hazPut(e.slice(2), age); }
+        else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < 3.4)) && R.pinHit) R.pinHit(e.slice(2), age); }
+        else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
+        if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
         else if (E[ei][1] === 'l') { stall.textContent = 'Their page froze ' + (E[ei][2] / 1000).toFixed(1) + ' s here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         else if (E[ei][1] === 'g') { stall.textContent = 'Their 3D view dropped out here'; stallFrom = E[ei][0]; stallUntil = stallFrom + 4000; }
         else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         ei++;
       }
+      if (seek) { seek = false; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); }
       if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);

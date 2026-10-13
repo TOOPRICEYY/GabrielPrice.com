@@ -1169,11 +1169,48 @@ function starsFrame(S, T, dt, w, Zw, manual) {
     Q.ring.quaternion.copy(camera.quaternion).premultiply(S.course.getWorldQuaternion(R3.q).invert());   // face the camera
   }
 }
+// ----- visit replays: the player holds the scooter and the couch to the recorded state (rigs.pin) instead of
+// driving them, and spawns the recorded hazards and plays the recorded hits. On a live visit rigs.rec, when the capture sets it,
+// hears those hazards and hits as they happen. A replay never posts a score or keeps a best: it runs in Gabriel's own browser. -----
+const PIN = rigs.pin = { sc: null, co: null, hit: false };
+const REPLAY = /^#replay=/.test(location.hash);
+const DMG = ['head', 'torso', 'armL', 'armR', 'legL', 'legR'];
+const r2 = (v) => Math.round((+v || 0) * 100) / 100;
+// a hazard as the capture keeps it, and back: [kind, side, x, y, z, r, spd, peak, puddle scale y, puddle turn, duck dx, dz, tip]
+const hazRec = (h) => [h.kind, h.side || 0, r2(h.x), r2(h.y), r2(h.z), r2(h.r), r2(h.spd), r2(h.peak), h.kind === 'puddle' ? r2(h.m.scale.y) : 0, h.kind === 'puddle' ? r2(h.m.rotation.z) : 0, r2(h.dx), r2(h.dz), h.tut ? 1 : 0];
+rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a seek lands mid-way)
+  const [kind, side, x, y, z, r, spd, peak, sy, rz, dx, dz, tut] = a, H = rigs.scooter.CM.haz;
+  if (!H.proto[kind]) return;
+  const h = hazGet(H, kind); h.t0 -= age; h.side = side; h.z = z; h.tut = !!tut;
+  if (kind === 'crutch') { h.ang = 0; h.state = 0; h.g.position.set(side * (GAME.edge + 52), .6, z); h.g.rotation.set(0, 0, 0); h.fall.rotation.set(0, 0, 0); }
+  else if (kind === 'ball') { Object.assign(h, { state: 0, spd, peak, wind: .55 }); h.g.position.set(side * 150, 100, z); }
+  else if (kind === 'puddle') { Object.assign(h, { r, x, dx, dz, dvy: 0, dy: 0 }); h.g.position.set(x, 0, z); h.m.scale.set(r, sy, 1); h.m.rotation.z = rz; }
+  else if (kind === 'bird') { Object.assign(h, { x, y, spd }); h.z = z - spd * age; h.g.position.set(x, y, h.z); h.g.rotation.set(0, 0, 0); if (age < .3) chirp(); }
+};
+rigs.hazClear = () => { for (const h of rigs.scooter.CM.haz.list) if (h.kind !== 'chunk') { h.on = false; h.g.visible = false; } };
+rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]
+  const S = rigs.scooter, G = S.game; if (!G.on) return;
+  PIN.hit = true; G.hurtT = -1e9;
+  try { gameHurt(S, clock.elapsedTime - age, a[0], a[1], a[2], !!a[3]); } finally { PIN.hit = false; }
+  if (a[4]) G.ragSide = a[4];
+};
+rigs.pinTip = (want) => { const [id, k, dir] = String(want || '').split('|'); tutHint(id || '', { touchRun: k === 't' }, +dir || 0); };
+rigs.pinPop = (text) => { const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = text; el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); };
+// the recorded vehicle states (the flow capture reads and writes these lists in this order)
+rigs.scKeys = ['m', 'X', 'Z', 'psi', 'v', 'delta', 'y', 'p', 'duck', 'air', 'run', 'lane', 'on', 'seed', 'dist', 'stars', 'hp', 'zc', 'tut', ...DMG];
+rigs.coKeys = ['drive', 'x', 'z', 'h', 'vx', 'vz', 'w', 'sp', 'slip', 'dl', 'df', 'r', 'tk', 'oriS', 'phi', 'nitro', 'boostOn', 'hold'];
+rigs.scState = (S) => { const G = S.game; return [S.manual ? 1 : 0, r2(S.X), r2(S.Z), r2(S.psi), r2(S.v), r2(S.delta), r2(S.y), r2(S.p), r2(S.duck), S.air ? 1 : 0, S.touchRun ? 1 : 0, S.lane || 0,
+  G.on ? 1 : 0, G.seed, r2(G.dist), G.stars, r2(G.hp), r2(Math.max(-1e4, G.zc - S.Z)), G.tut ? 1 : 0, ...DMG.map((k) => r2(G.dmg[k]))]; };
+rigs.coState = (Co) => [Co.drive ? 1 : 0, ...rigs.coKeys.slice(1).map((k) => r2(Co[k]))];
+function pinScooter(S, P) {
+  Object.assign(S, { X: P.X, Z: P.Z, psi: P.psi, v: P.v, delta: P.delta, y: P.y, p: P.p, duck: P.duck, duckT: P.duck > .5 ? 1 : 0, air: !!P.air, touchRun: !!P.run, lane: P.lane, hop: false });
+}
+
 // ----- the scooter game: score, combo, best, boosts and barriers; it runs only while the reader drives -----
 const BEST_KEY = 'gp.scooter.best';
 let bestLoaded = null;
 function gameBest(v) {
-  try { if (v != null) localStorage.setItem(BEST_KEY, String(v)); else if (bestLoaded == null) bestLoaded = +(localStorage.getItem(BEST_KEY) || 0) || 0; } catch (e) { }
+  try { if (v != null && !REPLAY) localStorage.setItem(BEST_KEY, String(v)); else if (bestLoaded == null) bestLoaded = +(localStorage.getItem(BEST_KEY) || 0) || 0; } catch (e) { }
   if (v != null) bestLoaded = v; return bestLoaded || 0;
 }
 function gameNew() { return { on: false, t0: 0, z0: 0, dist: 0, score: 0, stars: 0, hp: GAME.hp, dmg: { head: 0, torso: 0, armL: 0, armR: 0, legL: 0, legR: 0 },
@@ -1204,7 +1241,7 @@ function whoosh() {
 }
 // a hit: lose health on the part that was struck, slow down, flash the little body; at zero health the run is over
 function gameHurt(S, T, part, amt, label, fall) {
-  const G = S.game; if (!G.on || T < G.downUntil || (T - G.hurtT < .5 && !fall)) return;
+  const G = S.game; if (!G.on || T < G.downUntil || (T - G.hurtT < .5 && !fall) || (PIN.sc && !PIN.hit)) return;
   if (G.tut && !fall) amt = 0;                                    // learning: a hit slows you but costs no health
   G.hurtT = T; G.hp = Math.max(0, G.hp - amt); G.mini = true; G.dmg[part] = Math.min(1, G.dmg[part] + amt / 45); G.lastPart = part;
   G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud();
@@ -1215,6 +1252,7 @@ function gameHurt(S, T, part, amt, label, fall) {
     const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = (fall ? 'Fell · ' : 'Wiped out · ') + sc;
     el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
   }
+  if (rigs.rec && !PIN.sc) rigs.rec('x', [part, amt, label, fall ? 1 : 0, G.hp <= 0 ? G.ragSide : 0]);
 }
 // wipe-out: the rider is thrown off the front, tumbles face-down with flailing limbs, bounces and lies there; the scooter tips over.
 // A scripted fall over the pose the rig just solved (no physics engine): it blends out at the end as the next run starts.
@@ -1319,7 +1357,7 @@ function hazGet(H, kind) {
 // again and a run that ends mid-way picks up at the same tip.
 const TUT = { key: 'gp.scooter.tut', steps: ['lane', 'jump', 'dbl', 'duck'], n: null, k: 1, kT: 1, rdt: 0, hint: '', el: null };
 function tutStep(v) {
-  if (v != null) { TUT.n = v; try { sessionStorage.setItem(TUT.key, String(v)); } catch (e) { } }
+  if (v != null) { TUT.n = v; try { if (!REPLAY) sessionStorage.setItem(TUT.key, String(v)); } catch (e) { } }
   else if (TUT.n == null) { try { TUT.n = +(sessionStorage.getItem(TUT.key) || 0) || 0; } catch (e) { TUT.n = 0; } }
   return TUT.n;
 }
@@ -1441,12 +1479,13 @@ function tutFrame(S, T, G, H, live, rz, v) {
   return G.tut;
 }
 function gameFrame(S, T, dt, w, Zw, manual, L) {
-  const G = S.game, H = S.CM.haz;
+  const G = S.game, H = S.CM.haz, pin = PIN.sc;
   H.g.position.z = -Zw;
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
   if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
+  if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
   if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
   const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;
@@ -1468,8 +1507,8 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   }
   if (G.on && T >= G.downUntil && S.Z < zc + 4) gameHurt(S, T, 'legL', 999, 'Fell', true);
   const v = Math.max(120, S.v), rz = S.Z + 28, live = G.on && T >= G.downUntil && w > .6;
-  const tut = tutFrame(S, T, G, H, live, rz, v);   // the first-run tips own the run until they are done
-  if (live && !tut) {
+  const tut = pin ? !!G.tut : tutFrame(S, T, G, H, live, rz, v);   // the first-run tips own the run until they are done
+  if (live && !tut && !pin) {
     const lvl = clamp01(G.dist / 12000);                      // 0 at the start, 1 after 120 m
     const spawnZ = S.Z + Math.min(GAME.ahead, Math.max(380, v * 1.7));
     const clear = (z) => H.list.every(h => !h.on || Math.abs(h.z - z) > 110);
@@ -1496,6 +1535,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
       G.next.bird = T + 6 - 2.5 * lvl + Math.random() * 2;
     }
   }
+  if (rigs.rec && !pin) for (const h of H.list) if (h.on && h.t0 === T && h.kind !== 'chunk' && h.rt !== T) { h.rt = T; rigs.rec('k', hazRec(h)); }   // new this frame (a run's or a tip's)
   const xs = [S.X - 14, S.X, S.X + 14];
   for (const h of H.list) {
     if (!h.on) continue;
@@ -1634,7 +1674,9 @@ function scooterFrame(s, dt, w) {
   ui.scKneeOut.textContent = (kneeH > 0 ? '+' : '') + kneeH + ' cm';
   // driver: keys (or the slider) if touched in the last 3 s, else the autopilot
   const K = S.keys; if (K.size) S.last = T;                    // a held key keeps it yours
-  const manual = rigs.scootOn && !S.quit && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
+  const pin = rigs.scootOn ? PIN.sc : null; if (pin) pinScooter(S, pin);   // a replay: where the visitor's scooter was
+  const manual = pin ? !!pin.m : rigs.scootOn && !S.quit && (T - S.last < 3 || (S.game.on && (S.game.ragT == null || T < S.game.downUntil)));   // mid-run it stays yours, so the walk can catch you
+  S.manual = manual;
   let vT, dT;
   if (manual) {
     const run = S.touchRun; if (run) S.last = T;
@@ -1689,7 +1731,7 @@ function scooterFrame(s, dt, w) {
   const hipL = wpos(bones.lUp);
   solve2(bones.lUp, bones.lLeg, bones.lFoot, new THREE.Vector3(hipL.x + 3, 9.5 + up, hipL.z + 6), hipL.clone().add(new THREE.Vector3(0, -10, 60)), w);
   // ducking: the spine folds forward over the bars, the neck tips the head back up to watch the walk
-  S.duck = (S.duck || 0) + (((manual && S.duckT) || 0) - (S.duck || 0)) * (1 - Math.pow(.0005, dt));
+  S.duck = pin ? pin.duck : (S.duck || 0) + (((manual && S.duckT) || 0) - (S.duck || 0)) * (1 - Math.pow(.0005, dt));
   if (S.duck > .005 && w > 0) {
     const ax = new THREE.Vector3(Math.cos(S.psi), 0, -Math.sin(S.psi)), pq = new THREE.Quaternion(), dq = new THREE.Quaternion();
     for (const [k, a] of [['spine', .42], ['spine1', .58], ['spine2', .5], ['neck', -.75]]) {
@@ -1774,6 +1816,7 @@ function scooterFrame(s, dt, w) {
     S.p += (pT - S.p) * (1 - Math.pow(1e-4, dt));
   }
   if (w <= 0 || moving < .5) { S.y = 0; S.vy = 0; S.p = 0; S.air = false; }
+  if (pin) pinScooter(S, pin);
   S.spin += S.v / RW * dt; for (const wh of S.wheels) wh.p.rotation.x = -S.spin;   // Fusion x is the rider's right, so rolling forward is −x
   S.motor.p.rotation.x = -S.spin * S.ratio;           // the belt steps the motor's speed down to the rear right wheel
   const rear = SCF.a.set(S.g.position.x, 0, S.g.position.z + S.rearY);
@@ -1928,6 +1971,7 @@ function nitroFrame(Co, dt) {
 function couchBoost() {
   const Co = rigs.couch; if (!rigs.couchOn || Co.hold || Co.boostOn || Co.nitro < NITRO.min || (Co.goT != null && clock.elapsedTime < Co.goT)) return false;
   Co.boostOn = true; Co.last = Co.kLast = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive();
+  if (rigs.rec) rigs.rec('o', [Co.nitro >= 1 ? 1 : 0]);
   const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = Co.nitro >= 1 ? 'Full boost!' : 'Boost!';
   el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
   whoosh(); return true;
@@ -1978,6 +2022,7 @@ function lbPoll() {
 }
 // a new personal best: remember it and send it (one write at a time); the end-of-run board then asks for your name
 function lbSubmit(k, score) {
+  if (REPLAY) return;
   score = Math.round(score); if (!(score > 0) || !lbBetter(k, score, LB.mine[k])) return;
   LB.mine[k] = score; LB.pend[k] = score; LB.fresh = true; LB.drawn = ''; lbFlush();
 }
@@ -2028,7 +2073,7 @@ function keysPin(K, on) {
   const s = a.width / b.width, end = on ? 'translateX(-50%)' : 'none', start = `translate(${(a.left - b.left).toFixed(1)}px, ${(a.top - b.top).toFixed(1)}px) ${on ? 'translateX(-50%) ' : ''}scale(${s.toFixed(3)})`;
   K.animate([{ transform: start, transformOrigin: '0 0' }, { transform: end, transformOrigin: '0 0' }], { duration: 520, easing: 'cubic-bezier(.2, .8, .2, 1)' });
 }
-function couchBest(v) { try { if (v != null) localStorage.setItem('gp.couch.best', v); return +localStorage.getItem('gp.couch.best') || 0; } catch (e) { return v || 0; } }
+function couchBest(v) { try { if (v != null && !REPLAY) localStorage.setItem('gp.couch.best', v); return +localStorage.getItem('gp.couch.best') || 0; } catch (e) { return v || 0; } }
 // the couch's score panel (top middle) and speed dial (bottom right; top right on touch screens)
 function couchHud(Co, show, live, target) {
   const H = ui.cohud, D = ui.scdial; if (!H) return;
@@ -2145,7 +2190,9 @@ function couchFrame(s, dt, w) {
   const VMAX = 70, WMAX = .8, k = 1 - Math.pow(.02, dt);
   // keys: driven like a car (Ackermann on the front modules, rear fixed) with the back end stepping out in a drift; the camera
   // pulls in behind for a third-person view. Left alone for 3 s, it goes back to showing off what a holonomic base can do.
-  const drive = rigs.couchOn && Tn - Co.kLast < 3;
+  const pin = rigs.couchOn ? PIN.co : null;                   // a replay: the visitor's couch, as recorded
+  const drive = pin ? !!pin.drive : rigs.couchOn && Tn - Co.kLast < 3;
+  Co.drive = drive;
   Co.dr += ((drive ? 1 : 0) - Co.dr) * (1 - Math.pow(.15, dt));
   couchCues(Co, Tn, drive && w > .5, (K.has('a') || K.has('arrowleft') || K.has('d') || K.has('arrowright')) ? 1 : 0);
   const ch0 = Math.cos(Co.h), sh0 = Math.sin(Co.h);
@@ -2191,6 +2238,11 @@ function couchFrame(s, dt, w) {
     Co.x += Co.vx * dt; Co.z += Co.vz * dt; Co.h += Co.w * dt;
     Co.u = sh0 * Co.vx + ch0 * Co.vz; Co.v = ch0 * Co.vx - sh0 * Co.vz; Co.r = Co.w; Co.dl *= 1 - k; Co.slip = 0;
     Co.ori = 0; Co.tk = 0; Co.oriS *= 1 - k; Co.sp = Co.u; Co.phi = Co.h;          // so a takeover starts from how it is moving, steering square
+  }
+  if (pin) {
+    for (const key of rigs.coKeys) if (key !== 'drive') Co[key] = pin[key];
+    Co.boostOn = !!pin.boostOn; Co.hold = !!pin.hold; Co.u = Co.sp * Math.cos(Co.slip); Co.v = -Co.sp * Math.sin(Co.slip);
+    if (!drive) { Co.u = Math.sin(Co.h) * Co.vx + Math.cos(Co.h) * Co.vz; Co.v = Math.cos(Co.h) * Co.vx - Math.sin(Co.h) * Co.vz; }
   }
   // the shown pose blends from free driving to the parking spot; module speeds come from how the shown pose moves
   const X = Co.x + (PARK.x - Co.x) * pk, Z = Co.z + (PARK.z - Co.z) * pk, H = Co.h * (1 - pk);

@@ -285,6 +285,9 @@ section.drive { min-height: 110vh; flex-direction: column; justify-content: flex
 #lb img, #lb video { max-width: 100%; max-height: 84vh; display: block; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
 #lb video { width: min(92vw, 1100px); background: #000; }
 #lb p { margin: 10px 0 0; font-family: var(--f-mono); font-size: 12px; color: #e8eaf6; text-align: center; }
+#lb .lb-x { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; font: 22px/1 var(--f-mono); color: #fff; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .3); cursor: pointer; }
+#lb .lb-x:hover { background: rgba(255, 255, 255, .24); }
 .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
 .media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .media img, .media video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--rule); background: var(--vellum-2); }
@@ -2028,7 +2031,7 @@ resize(); themeColors(); readScroll(); sNow = sTarget;
 buildFigure().then(() => {
   buildKicker(); rigBuild();
   window.__rig = { THREE, rigs, bones, figure, camera, ui, kicker, poses, poseMix, setS(v) { sTarget = sNow = v; },
-    scene, renderer, controls, free, get s() { return sNow; } }; // debug hook for render checks; the site editor (editor.js) reads scene, camera and s from it
+    scene, renderer, controls, free, clock, get s() { return sNow; } }; // debug hook for render checks; the site editor (editor.js) reads scene, camera and s from it
   requestAnimationFrame(frame);
   requestAnimationFrame(() => requestAnimationFrame(() => { try { warmShaders(); } catch (e) { console.warn(e); } }));
 })
@@ -2041,21 +2044,25 @@ const keycaps = e => document.querySelectorAll(`.keys kbd[data-k="${KEYCAP[e.key
 addEventListener('keydown', e => keycaps(e).forEach(b => b.classList.add('on')));
 addEventListener('keyup', e => keycaps(e).forEach(b => b.classList.remove('on')));   // only the key let go
 addEventListener('blur', () => document.querySelectorAll('.keys kbd.on').forEach(b => b.classList.remove('on')));
-// lightbox: tap a photo or clip (build log rows, card leads, gallery project pages) to see it large; tap again or Esc to close
+// lightbox: tap a photo or clip (build log rows, card leads, gallery project pages) to see it large; tap it again, the ✕ or Esc to close.
+// window.__lightbox lets the visit replay player open and close it the way the visitor did.
 (() => {
   const lb = document.createElement('div'); lb.id = 'lb'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', 'Build photo'); document.body.appendChild(lb);
   const close = () => { lb.classList.remove('on'); lb.innerHTML = ''; };
   lb.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') close(); });
   addEventListener('keydown', e => { if (e.key === 'Escape' && lb.classList.contains('on')) { close(); e.stopImmediatePropagation(); } }, true);   // Esc shuts the viewer, not the project page under it
-  document.addEventListener('click', e => {
-    const m = e.target.closest('.log img, .log video, .lead img, .lead video, .gx-gal img, .gx-hf img, .gx-vid video'); if (!m) return;
+  const SEL = '.log img, .log video, .lead img, .lead video, .gx-gal img, .gx-hf img, .gx-vid video';
+  document.addEventListener('click', e => { const m = e.target.closest(SEL); if (m) show(m); });
+  window.__lightbox = { sel: SEL, show, close };
+  function show(m) {
     const cap = m.closest('figure')?.querySelector('figcaption'), fig = document.createElement('figure'); fig.style.margin = 0;
     let el;
     if (m.tagName === 'IMG') { el = new Image(); el.src = m.dataset.full || m.src; el.alt = m.alt; }
     else { el = document.createElement('video'); Object.assign(el, { src: m.dataset.src || m.currentSrc || m.src, poster: m.poster, muted: true, loop: true, playsInline: true, autoplay: true, controls: true }); }
     fig.append(el); if (cap) { const p = document.createElement('p'), b = cap.querySelector('b'); p.textContent = (b ? b.textContent + '  ' : '') + [...cap.childNodes].filter(n => n !== b).map(n => n.textContent).join(''); fig.append(p); }
-    lb.innerHTML = ''; lb.append(fig); lb.classList.add('on');
-  });
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'lb-x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Close');
+    lb.innerHTML = ''; lb.append(fig, x); lb.classList.add('on');
+  }
 })();
 </script>
 <script type="module">/*GALLERY*/</script>

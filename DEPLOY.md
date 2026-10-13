@@ -65,7 +65,7 @@ Open gabrielprice.com and click the top-left corner three times, quickly. Access
 
 ### 6. Turn on visitor analytics (R2 bucket)
 
-The site records how visitors move through it: how far they scroll, the time they spend on each section, and whether they drive the couch or the scooter. The page sends one small batch to `/api/flow` every 30 seconds and when the visitor leaves. The Worker stores the batches in a Cloudflare R2 bucket. Nothing goes to GitHub, because the repo is public. `flow/README.md` explains what is recorded and why it doesn't slow the page down.
+The site records how visitors move through it: how far they scroll, the time they spend on each section, which photos and project pages they open, and how they drive the couch or play the scooter game. The page sends one small batch to `/api/flow` every 30 seconds and when the visitor leaves. The Worker stores the batches in a Cloudflare R2 bucket. Nothing goes to GitHub, because the repo is public. `flow/README.md` explains what is recorded and why it doesn't slow the page down.
 
 **Do steps 1 and 2 before the analytics pull request merges.** `wrangler.jsonc` binds the bucket `gabrielprice-flow`, and a deploy fails while that bucket doesn't exist. If a deploy has already failed, the previous version stays live: create the bucket, then re-run the deploy (Actions → Deploy → Run workflow, or **Retry build** in Workers Builds).
 

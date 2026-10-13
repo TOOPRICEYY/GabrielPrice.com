@@ -584,6 +584,7 @@ function tick() {
   tN += (tT - tN) * (1 - Math.pow(.0009, dt));
   applyModel(tN);
   if (!userCam) placeCam(keyAt(tN), dt);
+  if (Array.isArray(window.__gcam)) { camera.position.fromArray(window.__gcam[0]); controls.target.fromArray(window.__gcam[1]); camera.lookAt(controls.target); }   // a visit replay: the visitor's view
   try { link?.frame(); } catch (e) { console.warn(e); } controls.update(); renderer.render(scene, camera); balloons(tN);
   const pi = CH.findIndex(q => q.key === 'passage'); if (pi >= 0) passage(tN - pi);
   ov.querySelector('#gx-sheet').textContent = String(Math.round(tN) + 1).padStart(2, '0') + ' / ' + String(CH.length).padStart(2, '0');
@@ -610,4 +611,6 @@ async function thumbs() {
   }
 }
 new IntersectionObserver((es, io) => { if (es.some(e => e.isIntersecting)) { io.disconnect(); thumbs(); } }, { rootMargin: '800px' }).observe(grid);
-window.__gallery = { open: openProject, close: closeProject, PROJECTS };
+// state(): the open project, how far down its page (0..1) and its camera, for the visit capture and replay
+window.__gallery = { open: openProject, close: closeProject, PROJECTS, scroller,
+  state: () => open && P ? { id: P.id, top: scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight), cam: [camera.position.toArray(), controls.target.toArray()] } : null };
