@@ -416,11 +416,12 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 #cohud.pulse .sc { animation: copulse .35s ease-out; } @keyframes copulse { 40% { transform: scale(1.18); color: var(--cobalt); } }
 #cohud .row { display: flex; gap: 12px; font-size: 12px; letter-spacing: .08em; color: var(--graphite-2); }
 /* the drift bar: sliding fills it; full, it glows and shimmers; firing it, it drains in a hot pink */
-#cohud .nb { position: relative; width: 200px; max-width: 100%; height: 14px; margin-top: 4px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--graphite) 8%, transparent); overflow: hidden; }
+#cohud .nb { position: relative; width: 300px; max-width: 100%; height: 24px; margin-top: 6px; border-radius: 12px; transition: transform .2s; border: 1px solid var(--rule); background: color-mix(in srgb, var(--graphite) 8%, transparent); overflow: hidden; }
 #cohud .nb i { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); transition: transform .12s linear;
   background: linear-gradient(90deg, var(--cobalt), var(--neon)); }
-#cohud .nb span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--graphite); mix-blend-mode: normal; }
+#cohud .nb span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--graphite); mix-blend-mode: normal; }
 #cohud .nb.ready span, #cohud .nb.full span, #cohud .nb.burn span { color: #fff; text-shadow: 0 0 4px rgba(0,0,0,.35); }
+#cohud .nb.full, #cohud .nb.burn { transform: scale(1.08); }
 #cohud .nb.full { border-color: var(--neon); box-shadow: 0 0 14px color-mix(in srgb, var(--neon) 70%, transparent); animation: nbglow .8s ease-in-out infinite alternate; }
 #cohud .nb.full i { background: linear-gradient(90deg, var(--cobalt), var(--neon), #fff, var(--neon), var(--cobalt)); background-size: 300% 100%; animation: nbshine 1.1s linear infinite; }
 #cohud .nb.burn { border-color: var(--neon); box-shadow: 0 0 22px color-mix(in srgb, var(--neon) 90%, transparent); }
@@ -428,7 +429,13 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 @keyframes nbglow { to { box-shadow: 0 0 26px color-mix(in srgb, var(--neon) 95%, transparent); } }
 @keyframes nbshine { to { background-position: -300% 0; } }
 @keyframes nbburn { to { background-position: 28px 0; } }
-@media (prefers-reduced-motion: reduce) { #cohud .nb.full, #cohud .nb.full i, #cohud .nb.burn i { animation: none; } }
+/* a ready boost: the screen edges glow, faintly once it can fire, pulsing pink when the bar is full */
+#bready { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s;
+  box-shadow: inset 0 0 60px 6px color-mix(in srgb, var(--neon) 55%, transparent), inset 0 0 160px 20px color-mix(in srgb, var(--cobalt) 25%, transparent); }
+#bready.ready { opacity: .35; }
+#bready.full { opacity: 1; animation: brpulse .9s ease-in-out infinite alternate; }
+@keyframes brpulse { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #cohud .nb.full, #cohud .nb.full i, #cohud .nb.burn i, #bready.full { animation: none; } }
 #cohud .tg { font-size: 11px; color: var(--graphite-2); text-wrap: balance; }
 #cohud.live { border-color: var(--cobalt); box-shadow: 0 0 18px color-mix(in srgb, var(--cobalt) 45%, transparent); }
 @media (hover: none), (pointer: coarse) { #cohud { top: calc(56px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 220px); min-width: 150px; padding: 4px 12px 6px; } #cohud .sc { font-size: 38px; } }
@@ -492,7 +499,7 @@ body #lboard.end li:nth-child(n+7) { display: flex; }
   body.playing .viewbar { opacity: 0; pointer-events: none; }
   #cohud { top: calc(10px + env(safe-area-inset-top, 0px)); min-width: 132px; max-width: calc(100vw - 200px); padding: 3px 10px 5px; gap: 0; }
   #cohud .lb { display: none; } #cohud .sc { font-size: 28px; }
-  #cohud .nb { width: 120px; height: 12px; margin-top: 2px; } #cohud .nb span { font-size: 7.5px; letter-spacing: .12em; }
+  #cohud .nb { width: 100%; min-width: 150px; height: 20px; margin-top: 3px; border-radius: 10px; } #cohud .nb span { font-size: 9px; letter-spacing: .1em; }
   #cohud .row { font-size: 10px; gap: 6px; } #cohud .tg { font-size: 9.5px; line-height: 1.3; }
   #codial { top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; width: 62px; padding: 2px 2px 0; }
   #bigcue.pop { animation-name: cuepopT; }
@@ -828,8 +835,8 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       <div class="krow"><kbd class="wide" data-k="shift">Shift</kbd><span>drift</span></div>
       <div class="krow"><kbd class="wide" data-k=" ">Space</kbd><span>boost</span></div>
     </div>
-    <p class="keyhint">Take the wheel. Drifting fills the boost bar. Or keep scrolling.</p>
-    <p class="keyhint touchonly">Drive with the pad below. Drifting fills the boost bar; double-tap to fire it. Or keep scrolling.</p>
+    <p class="keyhint">Take the wheel. Drifting fills the boost bar; tap W twice to fire it. Or keep scrolling.</p>
+    <p class="keyhint touchonly">Drive with the pad below. Drifting fills the boost bar; tap ▲ twice to fire it. Or keep scrolling.</p>
   </section>
 
   <section class="right" data-s="15" data-ch="CatZoom">

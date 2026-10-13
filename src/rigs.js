@@ -844,6 +844,7 @@ function rigUI() {
     if (rigs.couchOn && (k.length === 1 ? 'wasdqe '.includes(k) : k.startsWith('arrow') || k === 'shift')) {
       const Co = rigs.couch; Co.keys.add(k); if (rigs.onDrive) rigs.onDrive();
       if (Co.hold && !e.repeat && (k === 'w' || k === 'arrowup')) { Co.hold = false; Co.cue = 'go'; bigCue('GO', ''); }   // waiting on the line after a lap: go again
+      if (!e.repeat && (k === 'w' || k === 'arrowup')) { const now = performance.now(); if (now - (Co.fwT || -1e9) < 300) { Co.fwT = -1e9; couchBoost(); } else Co.fwT = now; }   // forward twice, quickly: boost
       Co.last = clock.elapsedTime; if (k !== 'q' && k !== 'e') Co.kLast = clock.elapsedTime;
       // (a quick double tap used to swing the steering 90° to drive sideways; Gabriel had it removed)
       const sd = k === 'a' || k === 'arrowleft' ? 1 : k === 'd' || k === 'arrowright' ? -1 : 0;
@@ -945,6 +946,7 @@ function rigUI() {
   ui.cohud = document.createElement('div'); ui.cohud.id = 'cohud'; ui.cohud.setAttribute('aria-live', 'off');
   ui.cohud.innerHTML = '<span class="lb">Lap</span><b class="sc">0</b><div class="row"><span class="be"></span></div><div class="nb"><i></i><span></span></div><div class="tg"></div>';
   document.body.appendChild(ui.cohud);
+  ui.bready = document.createElement('div'); ui.bready.id = 'bready'; ui.bready.setAttribute('aria-hidden', 'true'); document.body.appendChild(ui.bready);   // the screen edges glow while a boost is ready
   document.body.appendChild(ui.schud);
   // the little body: each part reddens with the damage it has taken and flashes when hit (seen from behind, like the rider)
   ui.schurt = document.createElement('div'); ui.schurt.id = 'schurt'; ui.schurt.setAttribute('aria-hidden', 'true');
@@ -1995,7 +1997,7 @@ function nitroFrame(Co, dt) {
   Co.bst = (Co.bst || 0) + ((Co.boostOn ? 1 : 0) - (Co.bst || 0)) * (1 - Math.pow(Co.boostOn ? .001 : .05, dt));   // eased, for the juice
 }
 function couchBoost() {
-  const Co = rigs.couch; if (!rigs.couchOn || Co.hold || Co.boostOn || Co.nitro < NITRO.min || (Co.goT != null && clock.elapsedTime < Co.goT)) return false;
+  const Co = rigs.couch; if (!rigs.couchOn || !Co.drive || Co.hold || Co.boostOn || Co.nitro < NITRO.min || (Co.goT != null && clock.elapsedTime < Co.goT)) return false;
   Co.boostOn = true; Co.last = Co.kLast = clock.elapsedTime; if (rigs.onDrive) rigs.onDrive();
   if (rigs.rec) rigs.rec('o', [Co.nitro >= 1 ? 1 : 0]);
   const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = Co.nitro >= 1 ? 'Full boost!' : 'Boost!';
@@ -2148,7 +2150,7 @@ function couchHud(Co, show, live, target) {
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
   { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K && K.classList.contains('pin') !== show) keysPin(K, show); }   // the key legend stays put while you drive
   if (H.hintOn !== show) { H.hintOn = show; for (const e of H.hints || (H.hints = document.querySelectorAll('section.drive[data-s="14"] .keyhint'))) e.style.opacity = show ? 0 : ''; }   // the "take the wheel" hint has done its job once you drive
-  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) return;
+  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) { if (ui.bready && H.nb) { ui.bready.className = ''; H.nb.st = null; } return; }
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
   // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
   const C = rigs.course, T = clock.elapsedTime, fmt = LBK.lap.fmt, run = C.t0 >= 0 ? (T - C.t0) * 1000 : 0, held = Co.hold && C.last;
@@ -2163,7 +2165,9 @@ function couchHud(Co, show, live, target) {
   // the drift bar: fills while you slide, glows when it can fire, drains while it burns
   { const N = H.nb || (H.nb = H.querySelector('.nb')), f = Co.nitro || 0, st = Co.boostOn ? 'burn' : f >= 1 ? 'full' : f >= NITRO.min ? 'ready' : 'fill';
     N.firstChild.style.transform = `scaleX(${f.toFixed(3)})`;
-    if (N.st !== st) { N.st = st; N.className = 'nb ' + st; N.lastChild.textContent = st === 'burn' ? 'Boost!' : st === 'fill' ? 'Drift to fill' : TOUCH ? 'Double-tap to boost' : 'Space to boost'; }
+    if (N.st !== st) { N.st = st; N.className = 'nb ' + st; N.lastChild.textContent = st === 'burn' ? 'Boost!' : st === 'fill' ? 'Drift to fill boost' : TOUCH ? 'Boost ready · ▲▲' : 'Boost ready · W W or Space';
+      if (ui.bready) ui.bready.className = st === 'full' ? 'full' : st === 'ready' ? 'ready' : '';
+      if (st === 'full' && !rigs.boostTold && !Co.hold) { rigs.boostTold = true; bigCue('BOOST', TOUCH ? 'double-tap ▲' : 'double-tap W or Space'); } }   // the first full bar gets the big cue
     H.classList.toggle('live', st === 'full' || st === 'burn'); }
   if (C.flash && H.fl !== C.flash) { H.fl = C.flash; H.classList.remove('pulse'); void H.offsetWidth; H.classList.add('pulse'); }
   const kmh = Math.abs(Co.sp) * .036, f = clamp01(kmh / 40), a = D.A0 + D.SW * f;
