@@ -137,6 +137,8 @@ test('ingest refuses other origins, junk and oversize bodies, and accepts quietl
   assert.equal((await post(batch({ samples: [[1, 2, 3]] }))).status, 400, 'short sample');
   assert.equal((await post(batch({ events: [[1, 'zz']] }))).status, 400, 'unknown event');
   assert.equal((await post(batch({ samples: [[...sample(0, 0), -1, 1, ...Array(40).fill(0)]] }))).status, 400, 'long sample');
+  assert.equal((await post(batch({ samples: [[...sample(0, 0), -1, 1]] }))).status, 400, 'a vehicle without its state');
+  assert.equal((await post(batch({ samples: [[...sample(0, 0), -1, 3, ...Array(25).fill(0)]] }))).status, 400, 'an unknown vehicle');
   assert.equal((await post('x'.repeat(70000))).status, 413);
   assert.equal((await worker.fetch(new Request(ORIGIN + '/api/flow', { method: 'PUT' }), env)).status, 405);
   const noBucket = { ...env, FLOW: undefined };
@@ -144,12 +146,12 @@ test('ingest refuses other origins, junk and oversize bodies, and accepts quietl
 });
 
 test('samples carry a project page and a driven vehicle; popups, pages, hazards, hits, tips and boosts are events', () => {
-  const sc = [1, ...Array(25).fill(0.5)], co = [2, ...Array(18).fill(1)];
+  const sc = [1, ...Array(25).fill(0.5)], co = [2, ...Array(25).fill(1)];
   const c = checkBatch(batch({ samples: [[...sample(0, 0), -1], [...sample(100, 11.7), -1, ...sc], [...sample(200, 13), -1, ...co], [...sample(300, 18), 0.4]],
     events: [[1, 'b', 'photos/kicker_white.webp'], [2, 'p', 'side-table'], [3, 'k', 'crutch', 1, 0, 0, 900, 0, 0, 0, 0, 0, 0, 0, 0], [4, 'x', 'legL', 22, 'Bonk', 0, 0],
       [5, 't', 'jump|k|0'], [6, 'o', 1], [7, 's', 2004], [7, 'f', 900], [8, 'b', '']] }));
   assert.ok(c, 'accepted');
-  assert.deepEqual(c.samples.map((x) => x.length), [13, 39, 32, 13]);
+  assert.deepEqual(c.samples.map((x) => x.length), [13, 39, 39, 13]);
   assert.deepEqual(c.events.map((e) => e[1]), ['b', 'p', 'k', 'x', 't', 'o', 's', 'f', 'b']);
 });
 

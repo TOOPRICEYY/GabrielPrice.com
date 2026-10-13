@@ -1191,7 +1191,7 @@ rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a s
 // and gameFrame rebuilds the slabs from the recorded collapse edge
 rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; rigs.scooter.CM.stars.got = {}; PIN.seek = true; };
 rigs.pinFall = (z, age) => { const h = rigs.scooter.CM.haz.list.find((x) => x.on && x.kind === 'crutch' && Math.abs(x.z - z) < 1); if (h) { h.state = 1; h.tf = clock.elapsedTime - age; } };   // a crutch already tipping or down
-rigs.pinStar = (n, age) => { rigs.scooter.CM.stars.got[n] = clock.elapsedTime - age; };   // a star taken a moment before the seek stays gone until it's back
+rigs.pinStar = (n, age, ifMissed) => { const Q = rigs.scooter.CM.stars; if (!ifMissed || Q.got[n] == null) Q.got[n] = clock.elapsedTime - age; };   // a star taken a moment before the seek stays gone until it's back
 rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]
   const S = rigs.scooter, G = S.game; if (!G.on) return;
   PIN.hit = true; G.hurtT = -1e9;

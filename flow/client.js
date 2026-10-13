@@ -377,6 +377,7 @@
       clk.getDelta = () => { const t0 = clk.elapsedTime; gd(); const d = Math.max(0, head - last) / 1000; last = head; clk.elapsedTime = t0 + d; clk.pace = speed; return d; };   // pace: the page's dt cap scales too
     };
     pace(rig.clock); pace(window.__gallery && window.__gallery.clock);   // and a project page's, whose model eases along its scroll
+    const lateStars = [], heldClips = new Set();
     let gSettle = 0;   // frames left to snap a project page's model to its scroll after a seek (its scroll event lands a frame later)
     const R = rig.rigs, pin = R.pin || {};
     // what is open over the page (photo popup b, project page p, scooter tip t), as the replay has put it
@@ -399,8 +400,9 @@
     const STEP = { m: 1, air: 1, run: 1, lane: 1, on: 1, seed: 1, tut: 1, drive: 1, boostOn: 1, hold: 1, ci: 1, cdone: 1, clap: 1, clast: 1, cbest: 1, claps: 1, cacc: 1 };
     let courseSync = true;   // set the couch's lap progress from the recording at the next couch sample (a seek, or arriving at the couch)
     function vehicle(keys, a, b, k) {
+      if (a.length < 14 + keys.length) return null;   // a sample from before a field was added: leave the vehicle live
       const o = {}, same = b.length === a.length && b[13] === a[13];
-      keys.forEach((key, j) => { if (14 + j >= a.length) return; const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
+      keys.forEach((key, j) => { const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
       return o;
     }
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
@@ -476,7 +478,8 @@
         else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
         else if (e[1] === 'f') { if (seek && R.pinFall) R.pinFall(e[2], age); }   // a crutch began to fall (live otherwise, as the rider nears it)
-        else if (e[1] === 's') { if (seek && R.pinStar) R.pinStar(e[2], age); }   // a star taken (played live otherwise, by the pinned rider)
+        else if (e[1] === 's') { if (seek) { if (R.pinStar) R.pinStar(e[2], age); } else lateStars.push(e); }   // a star taken: the pinned rider takes it live, and if it
+        // flew past (2× or 4×, a slow frame) the recorded pickup hides it a moment later
         else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
         if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
@@ -485,7 +488,14 @@
         else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         ei++;
       }
-      if (seek) { seek = false; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); if (!late.p) gSettle = 0; }
+      if (seek) { seek = false; lateStars.length = 0; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); if (!late.p) gSettle = 0; }
+      while (lateStars.length && head - lateStars[0][0] > 300) { const e = lateStars.shift(); if (R.pinStar) R.pinStar(e[2], (head - e[0]) / 1000, true); }
+      // clips play with the replay: held while paused, at its speed otherwise
+      for (const v of document.querySelectorAll('video')) {
+        if (!playing) { if (!v.paused) { v.pause(); heldClips.add(v); } }
+        else if (v.playbackRate !== speed) v.playbackRate = speed;
+      }
+      if (playing && heldClips.size) { for (const v of heldClips) v.play().catch(() => {}); heldClips.clear(); }
       if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);

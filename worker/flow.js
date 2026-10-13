@@ -20,6 +20,7 @@ import replayPage from './flow-replay.js';
 // event types (flow/client.js): c click, v video, h hidden, z resize, e error, l stall, g/r 3D context lost/back, b photo popup,
 // p project page, k scooter hazard, x scooter hit, t scooter tip, o couch boost
 const EVENTS = ['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r', 'b', 'p', 'k', 'x', 't', 'o', 's', 'f'];
+const VEHICLE_MIN = 25;   // rigs.scKeys and rigs.coKeys each list 25 fields
 const MAX_BODY = 64 * 1024, MAX_SEQ = 150, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 // crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
 // models such as the CUBOT X30 contain
@@ -105,7 +106,9 @@ export function checkBatch(b) {
   if (!Array.isArray(b.samples) || b.samples.length > MAX_SAMPLES || !Array.isArray(b.events) || b.events.length > MAX_EVENTS) return null;
   const samples = [];
   for (const x of b.samples) {
-    if (!Array.isArray(x) || x.length < 12 || x.length > 40 || !x.every(num)) return null;   // 12, then a project page's scroll and a driven vehicle's state (flow/client.js)
+    // 12, then a project page's scroll, then a driven vehicle: 1 (scooter) or 2 (couch) and its whole state (flow/client.js)
+    if (!Array.isArray(x) || x.length < 12 || x.length > 48 || !x.every(num)) return null;
+    if (x.length > 13 && ((x[13] !== 1 && x[13] !== 2) || x.length < 14 + VEHICLE_MIN)) return null;
     samples.push(x);
   }
   const events = [];
