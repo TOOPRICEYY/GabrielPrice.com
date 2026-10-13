@@ -140,6 +140,8 @@ function draw() {
 // ---------- the visits table ----------
 const L = (s) => data.layouts[s.layout] || data.current.sections;   // the section titles of the version the visit saw
 const far = (s) => L(s)[Math.round(s.maxS)] || 'Section ' + Math.round(s.maxS);
+// the same, as the funnel's key (title#occurrence), so two sections with one title stay apart
+const farKey = (s) => { const list = L(s), i = Math.round(s.maxS); return list[i] ? key(list, i) : 'Section ' + i; };
 const area = (x) => { const m = /(\\d+)\\D+(\\d+)/.exec(x || ''); return m ? m[1] * m[2] : null; };
 const pos = (x) => (x > 0 ? x : null);   // 0 means not measured: sorts last, like an empty cell
 const hw = (s) => [s.cores ? s.cores + ' cores' : '', s.mem ? s.mem + ' GB' : ''].filter(Boolean).join(' · ');
@@ -154,7 +156,8 @@ const COLS = [
     cell: (s) => (s.vid ? '<button type="button" class="who" data-vid="' + esc(s.vid) + '" title="Show only visits from this device">' + (s.vn > 1 ? 'Visit ' + s.vn : 'First visit') + '</button>' : ''),
     sort: (s) => (s.vid ? s.vid + String(s.vn || 0).padStart(4, '0') : null), group: (s) => s.vid, name: (l) => (l === '(none)' ? 'Not remembered' : 'Device ' + l.slice(0, 8)) },
   { id: 'len', h: 'Length', n: 1, cell: (s) => fmt(s.ms), sort: (s) => s.ms },
-  { id: 'far', h: 'Furthest section', down: 1, cell: (s) => esc(far(s)), sort: (s) => s.maxS, group: far },
+  { id: 'far', h: 'Furthest section', down: 1, cell: (s) => esc(far(s)), sort: (s) => s.maxS, group: farKey,
+    name: (g) => { const cur = data.current.sections, i = cur.findIndex((_, j) => key(cur, j) === g); return i >= 0 ? i + '. ' + cur[i] : g.slice(0, g.lastIndexOf('#')) || g; } },
   { id: 'dev', h: 'Device', cell: (s) => esc(s.dev || '?') + (s.model ? ' <span class="old">· ' + esc(s.model) + '</span>' : ''), sort: (s) => s.dev || null, group: (s) => s.dev },
   { id: 'model', h: 'Model', off: 1, cell: (s) => esc(s.model), sort: (s) => s.model || null, group: (s) => s.model },
   { id: 'os', h: 'OS', cell: (s) => esc(s.os), sort: (s) => s.os || null, group: fam },
@@ -291,14 +294,14 @@ const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, 
 const nice = (m) => { const p = Math.pow(10, Math.floor(Math.log10(Math.max(1, m)))), f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
 // a column with its top corners rounded, standing on the baseline
 const colPath = (x, y, w, h, r) => { r = Math.min(r, w / 2, h); return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z'; };
-// visits per day (per hour for Today), stacked by device type
+// visits per day (per hour for Today), stacked by device type; in UTC, like the days the range is made of
 function trend(V) {
   const el = $('trend'), W = Math.max(280, el.clientWidth), H = 190, top = 10, bot = 22, left = 30;
-  const hourly = $('days').value === '1', now = new Date(), buckets = [];
+  const hourly = $('days').value === '1', buckets = [];
   if (hourly) for (let h = 0; h < 24; h++) buckets.push({ k: String(h), l: String(h).padStart(2, '0') + ':00' });
-  else for (let i = +$('days').value - 1; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); buckets.push({ k: ymd(d), l: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }); }
+  else for (let i = +$('days').value - 1; i >= 0; i--) { const k = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10); buckets.push({ k, l: new Date(k + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) }); }
   const at = new Map(buckets.map((b, i) => [b.k, i])), counts = buckets.map(() => DEVS.map(() => 0));
-  for (const s of V) { const d = when(s), i = at.get(hourly ? String(d.getHours()) : ymd(d)); if (i != null) counts[i][DEVS.findIndex((x) => x[0] === devOf(s))]++; }
+  for (const s of V) { const i = at.get(hourly ? String(when(s).getUTCHours()) : s.day); if (i != null) counts[i][DEVS.findIndex((x) => x[0] === devOf(s))]++; }
   const max = nice(Math.max(1, ...counts.map((c) => c.reduce((a, b) => a + b, 0)))), y = (v) => top + (H - top - bot) * (1 - v / max);
   const n = buckets.length, step = (W - left) / n, bw = Math.max(2, Math.min(28, step - 2));
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="Visits per ' + (hourly ? 'hour today' : 'day') + ', by device">';
@@ -318,7 +321,7 @@ function trend(V) {
     if (i % every === 0) svg += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle" class="ax">' + esc(hourly ? b.l.slice(0, 2) : b.l) + '</text>';
   });
   el.innerHTML = svg + '<line x1="' + left + '" x2="' + W + '" y1="' + (H - bot) + '" y2="' + (H - bot) + '" class="base"/></svg>';
-  $('trendT').textContent = hourly ? 'Visits per hour today' : 'Visits per day';
+  $('trendT').innerHTML = (hourly ? 'Visits per hour today' : 'Visits per day') + ' <span class="hint">UTC</span>';
   $('trendKey').innerHTML = DEVS.filter((d) => V.some((s) => devOf(s) === d[0])).map((d) => '<span><i style="background:' + d[2] + '"></i>' + d[1] + '</span>').join('');
 }
 // day of week × hour, in this browser's time zone
@@ -360,11 +363,11 @@ function insights(V) {
   const N = V.length, cur = data.current.sections;
   trend(V); heat(V);
   // where visits ended: the furthest section, by today's section titles
-  const ends = cur.map(() => 0);
-  for (const s of V) { const t = far(s), i = cur.indexOf(t); if (i >= 0) ends[i]++; }
-  $('exits').innerHTML = !N ? '<div class="empty">No visits.</div>' : cur.map((t, i) => ({ t, i, n: ends[i] })).filter((x) => x.n).map((x) => {
+  const curKeys = cur.map((_, i) => key(cur, i)), ends = cur.map(() => 0);
+  for (const s of V) { const i = curKeys.indexOf(farKey(s)); if (i >= 0) ends[i]++; }
+  $('exits').innerHTML = !N ? '<div class="empty">No visits.</div>' : cur.map((t, i) => ({ t, i, k: curKeys[i], n: ends[i] })).filter((x) => x.n).map((x) => {
     const pct = Math.round(100 * x.n / N), tip = x.i + '. ' + x.t + ': ' + x.n + ' visits ended here (' + pct + '%)';
-    return '<div class="l" data-f="far" data-v="' + esc(x.t) + '" role="button" tabindex="0" data-tip="' + esc(tip) + '">' + esc(x.i + '. ' + x.t) + '</div><div class="track" data-tip="' + esc(tip) + '" data-f="far" data-v="' + esc(x.t) + '"><div class="fill" style="width:' + (100 * x.n / Math.max(...ends)).toFixed(1) + '%"></div></div><div class="v">' + x.n + ' <span class="old">' + pct + '%</span></div>';
+    return '<div class="l" data-f="far" data-v="' + esc(x.k) + '" role="button" tabindex="0" data-tip="' + esc(tip) + '">' + esc(x.i + '. ' + x.t) + '</div><div class="track" data-tip="' + esc(tip) + '" data-f="far" data-v="' + esc(x.k) + '"><div class="fill" style="width:' + (100 * x.n / Math.max(...ends)).toFixed(1) + '%"></div></div><div class="v">' + x.n + ' <span class="old">' + pct + '%</span></div>';
   }).join('');
   const lens = LENGTHS.map(([a, b, l]) => ({ l, n: V.filter((s) => s.ms >= a && s.ms < b).length }));
   $('lengths').innerHTML = !N ? '<div class="empty">No visits.</div>' : lens.map((x) => { const pct = Math.round(100 * x.n / N), tip = x.l + ': ' + x.n + ' visits (' + pct + '%)';
