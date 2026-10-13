@@ -611,6 +611,7 @@ async function thumbs() {
   }
 }
 new IntersectionObserver((es, io) => { if (es.some(e => e.isIntersecting)) { io.disconnect(); thumbs(); } }, { rootMargin: '800px' }).observe(grid);
-// state(): the open project, how far down its page (0..1) and its camera, for the visit capture and replay
-window.__gallery = { open: openProject, close: closeProject, PROJECTS, scroller,
+// state(): the open project, how far down its page (0..1) and its camera, for the visit capture and replay;
+// a replay also paces the clock and settles the model on the scroll position after a seek
+window.__gallery = { open: openProject, close: closeProject, PROJECTS, scroller, clock, settle: () => { tN = tT; },
   state: () => open && P ? { id: P.id, top: scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight), cam: [camera.position.toArray(), controls.target.toArray()] } : null };

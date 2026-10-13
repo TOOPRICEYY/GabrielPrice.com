@@ -369,8 +369,9 @@
     const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
     // the page's clock runs at the replay's speed and stops while it is paused, so the games' timers and hazards keep pace with the
     // recorded poses (getDelta also moves elapsedTime, the time the rigs read)
-    const clk = rig.clock;
-    if (clk) { const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); return d * k; }; }
+    const pace = (clk) => { if (!clk) return; const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); return d * k; }; };
+    pace(rig.clock); pace(window.__gallery && window.__gallery.clock);   // and a project page's, whose model eases along its scroll
+    let gSettle = 0;   // frames left to snap a project page's model to its scroll after a seek (its scroll event lands a frame later)
     const R = rig.rigs, pin = R.pin || {};
     // what is open over the page (photo popup b, project page p, scooter tip t), as the replay has put it
     const shown = { b: '', p: '', t: '' };
@@ -399,7 +400,7 @@
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    const jump = (ms) => { head = ms; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    const jump = (ms) => { head = ms; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; gSettle = 3; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
     range.oninput = () => jump(+range.value);
     // at the end it stops (and the page's clock with it); Play there starts over
     const setPlaying = (on) => { playing = on; bPlay.textContent = on ? 'Pause' : 'Play'; };
@@ -429,6 +430,7 @@
         window.__gcam = cam;
         const sc = window.__gallery.scroller, top = lerp(a[12], kc ? b[12] : a[12], kc) * Math.max(0, sc.scrollHeight - sc.clientHeight);
         if (Math.abs(sc.scrollTop - top) > .5) sc.scrollTop = top;
+        if (gSettle > 0 && window.__gallery.settle) { gSettle--; window.__gallery.settle(); }
       } else { window.__cam = cam; window.__gcam = null; }
       // the scooter and the couch, held to what the visitor's did (rigs.js PIN); older visits drive them from the keys alone
       pin.sc = a[13] === 1 && R.scKeys ? vehicle(R.scKeys, a, b, k) : null;
@@ -462,7 +464,7 @@
         const e = E[ei], age = (head - e[0]) / 1000;
         if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) late[e[1]] = String(e[2] || ''); else put(e[1], String(e[2] || '')); }
         else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
-        else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < 3.4)) && R.pinHit) R.pinHit(e.slice(2), age); }
+        else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
         else if (e[1] === 'o') { if (age < .5 && R.pinPop) R.pinPop(e[2] ? 'Full boost!' : 'Boost!'); }
         if (E[ei][1] === 'c') { if (age < 1) ping(E[ei][2] * innerWidth, E[ei][3] * innerHeight); }
         else if (E[ei][1] === 'z') resizeTo(E[ei][2], E[ei][3]);
@@ -471,7 +473,7 @@
         else if (E[ei][1] === 'r') { stall.textContent = 'Their 3D view came back'; stallFrom = E[ei][0]; stallUntil = stallFrom + 2500; }
         ei++;
       }
-      if (seek) { seek = false; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); }
+      if (seek) { seek = false; for (const key of ['p', 'b', 't']) put(key, late[key] || ''); if (!late.p) gSettle = 0; }
       if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);

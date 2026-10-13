@@ -91,6 +91,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /window\.__lightbox = \{ sel: SEL, show, close \}/, 'the photo popup can be opened by the player');
   assert.match(html, /state: \(\) => open && P \?/, 'project pages report their state (gallery.js)');
   assert.match(html, /Array\.isArray\(window\.__gcam\)/, 'project page camera override');
+  assert.match(html, /scroller, clock, settle: \(\) =>/, 'project page clock and settle for replays (gallery.js)');
 });
 
 test('a valid batch is stored under flow/<day>/<sid>/<seq> with a summary, unknown fields dropped', async () => {
