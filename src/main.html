@@ -1173,7 +1173,7 @@ const BOM_GROUPS = [
     ['railcap', 'Rail end cap (ABS)', 1, .21, .21, [STL('rail_end_cap')]],
     ['rail', '2020 V-slot rail, 200 mm', 1, 4.19, 4.19, [['Order', 'https://3dprintingcanada.com/a/p/products/2020-v-slot-extrusion-20mm-x-20mm-x-2-5m']]],
     ['wheel1', 'Solid V-wheel', 4, 2.28, 2.28, [['Order', 'https://www.alibaba.com/pla/BulkMan3D-Wholesale-Solid-Extreme-V-Wheel_1601122120706.html']]],
-    ['springs', 'Die spring', 2, 8, 8, [['Order', AMZ('red die spring medium load')]]],
+    ['springs', 'Die spring, 5/8 in OD × 3-1/2 in, heavy load (red), Ready Technology 9-1014-HE', 2, 8, 8, [['Email order', 'mailto:orders@readytechnology.com?subject=Order%209-1014-HE']]],
     ['brg1', '608 ankle bearing', 2, 1.36, 1.36, [['Order', 'https://ebay.com/itm/204366987316']]],
     [null, '6000 / 6200 mount bearing', 3, 2.74, 2.74, [['6000', AMZ('6000-2RS bearing 10x26x8 10pcs')], ['6200', 'https://acorn-ind.co.uk/p/6200-2rs-neutral']]],
     ['pinTop', 'Pins, bolts and nuts (M3–M10)', 'set', 7.64, 4.95, [['Order', AMZ('metric socket head cap screw nylock nut assortment M3 M10')]]],
@@ -1220,7 +1220,7 @@ const bomTot = { ea: [0, 0], mo: [0, 0] };   // [without, with] the knee add-on
     for (const [k, n, q, ea, mo, links] of rows) {
       for (const v of ['ea', 'mo']) { const c = v === 'ea' ? ea : mo || 0; bomTot[v][1] += c; if (!cls) bomTot[v][0] += c; }
       let num = ''; if (k) { BOM.push([k, BOM.length + 1]); num = `<span>${BOM.length}</span>`; }
-      const lk = links.map(([l, u]) => `<a href="${u}"${u.startsWith('http') ? ' target="_blank" rel="noopener"' : ' download'}>${l}</a>`).join('') || (cls ? 'CAD to come' : '');
+      const lk = links.map(([l, u]) => `<a href="${u}"${u.startsWith('http') ? ' target="_blank" rel="noopener"' : u.startsWith('mailto:') ? '' : ' download'}>${l}</a>`).join('') || (cls ? 'CAD to come' : '');
       const rc = [mo == null ? 'ea' : '', cls || ''].filter(Boolean).join(' ');
       html += `<tr${rc ? ` class="${rc}"` : ''}${k ? ` data-k="${k}"` : ''}><td class="n">${num}</td><td>${n}</td><td class="q">${typeof q === 'number' ? '×' + q : q}</td><td class="p mo">${$(mo)}</td><td class="p ea">${$(ea)}</td><td class="lk">${lk}</td></tr>`;
     }
