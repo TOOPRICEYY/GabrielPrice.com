@@ -1172,7 +1172,7 @@ function starsFrame(S, T, dt, w, Zw, manual) {
 // ----- visit replays: the player holds the scooter and the couch to the recorded state (rigs.pin) instead of
 // driving them, and spawns the recorded hazards and plays the recorded hits. On a live visit rigs.rec, when the capture sets it,
 // hears those hazards and hits as they happen. A replay never posts a score or keeps a best: it runs in Gabriel's own browser. -----
-const PIN = rigs.pin = { sc: null, co: null, hit: false };
+const PIN = rigs.pin = { sc: null, co: null, hit: false, seek: false };
 const REPLAY = /^#replay=/.test(location.hash);
 const DMG = ['head', 'torso', 'armL', 'armR', 'legL', 'legR'];
 const r2 = (v) => Math.round((+v || 0) * 100) / 100;
@@ -1187,7 +1187,9 @@ rigs.hazPut = (a, age) => {   // age: seconds since it spawned on the visit (a s
   else if (kind === 'puddle') { Object.assign(h, { r, x, dx, dz, dvy: 0, dy: 0 }); h.g.position.set(x, 0, z); h.m.scale.set(r, sy, 1); h.m.rotation.z = rz; }
   else if (kind === 'bird') { Object.assign(h, { x, y, spd }); h.z = z - spd * age; h.g.position.set(x, y, h.z); h.g.rotation.set(0, 0, 0); if (age < .3) chirp(); }
 };
-rigs.hazClear = () => { for (const h of rigs.scooter.CM.haz.list) if (h.kind !== 'chunk') { h.on = false; h.g.visible = false; } };
+// a seek: clear the run's hazards and slabs and stand the rider up; a recorded wipe-out still under way knocks the rider down again,
+// and gameFrame rebuilds the slabs from the recorded collapse edge
+rigs.hazClear = () => { const G = rigs.scooter.game; for (const h of rigs.scooter.CM.haz.list) { h.on = false; h.g.visible = false; } G.ragT = null; G.downUntil = -1e9; G.hurtT = -1e9; PIN.seek = true; };
 rigs.pinHit = (a, age) => {   // [part, amount, label, fell, ragdoll side (0: still standing)]
   const S = rigs.scooter, G = S.game; if (!G.on) return;
   PIN.hit = true; G.hurtT = -1e9;
@@ -1491,7 +1493,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
   if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
-  if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; }   // a replay: the run as recorded
+  if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; } }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
   if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
   const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;

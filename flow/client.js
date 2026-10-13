@@ -396,11 +396,14 @@
       keys.forEach((key, j) => { const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
       return o;
     }
-    bPlay.onclick = () => { playing = !playing; bPlay.textContent = playing ? 'Pause' : 'Play'; };
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
     // the visit's own window size at the playhead: the first batch's, then each resize up to it
     const resizeTo = (w, h) => { if (host) host.resize(w, h); };
-    range.oninput = () => { head = +range.value; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; if (R.hazClear) R.hazClear(); if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    const jump = (ms) => { head = ms; i = 0; ei = 0; lastP = [-1, -1]; lastPT = -1e9; seek = true; courseSync = true; if (rec.meta) resizeTo(rec.meta.w, rec.meta.h); };
+    range.oninput = () => jump(+range.value);
+    // at the end it stops (and the page's clock with it); Play there starts over
+    const setPlaying = (on) => { playing = on; bPlay.textContent = on ? 'Pause' : 'Play'; };
+    bPlay.onclick = () => { if (!playing && head >= dur) jump(0); setPlaying(!playing); };
     const centers = () => [...document.querySelectorAll('section[data-s]')].map((el) => el.offsetTop + el.offsetHeight * .5);
     let C = centers();
     const fmt = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
@@ -408,6 +411,7 @@
     function step(t) {
       const dt = t - prev; prev = t;
       if (playing) head = Math.min(dur, head + Math.max(0, dt) * speed);   // the first frame can start a touch before prev
+      if (playing && head >= dur) setPlaying(false);
       while (i < S.length - 1 && S[i + 1][0] <= head) i++;   // up to the last sample, so its state (a lifted finger) applies
       while (i > 0 && S[i][0] > head) i--;
       // a sample is kept only when something changed, so across a gap the state held still until the tick before b:
@@ -430,6 +434,7 @@
       pin.sc = a[13] === 1 && R.scKeys ? vehicle(R.scKeys, a, b, k) : null;
       pin.co = a[13] === 2 && R.coKeys ? vehicle(R.coKeys, a, b, k) : null;
       if (!pin.co) courseSync = true; else if (courseSync && R.pinCourse) { R.pinCourse(pin.co); courseSync = false; }
+      if (seek && R.hazClear) R.hazClear();   // after a seek the run is rebuilt from the recording at the new playhead
       // a seek brings back every hazard of the run under way (from its first sample: on, with the same seed); the game drops those already behind
       let runStart = seek ? Infinity : 0, behind = -Infinity;
       if (seek && a[13] === 1 && R.scKeys) {
