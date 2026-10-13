@@ -17,7 +17,23 @@ import CURRENT from './sections.gen.js';
 import dashboard from './flow-dashboard.js';
 import replayPage from './flow-replay.js';
 
-const MAX_BODY = 64 * 1024, MAX_SEQ = 60, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
+// event types (flow/client.js): c click, v video, h hidden, z resize, e error, l stall, g/r 3D context lost/back, b photo popup,
+// p project page, k scooter hazard, x scooter hit, t scooter tip, o couch boost
+const EVENTS = ['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r', 'b', 'p', 'k', 'x', 't', 'o', 's', 'f'];
+// the payload of each event a replay rebuilds the scene from (flow/client.js, src/rigs.js): one that doesn't fit is dropped,
+// so a forged recording can't put an unknown or runaway object into the owner's replay
+const N = (lo, hi) => (v) => num(v) && v >= lo && v <= hi, S = (v) => typeof v === 'string', E = (...xs) => (v) => xs.includes(v);
+const FAR = 1e8, WIDE = 1e4;
+const SHAPE = {
+  b: [S], p: [S], t: [S], o: [E(0, 1)], s: [N(0, 1e5)], f: [N(-FAR, FAR)],
+  // kind, side, x, y, z, r, spd, peak, puddle y-scale, puddle turn, dx, dz, tip
+  k: [E('crutch', 'ball', 'puddle', 'bird'), N(-1, 1), N(-WIDE, WIDE), N(-WIDE, WIDE), N(-FAR, FAR), N(0, WIDE), N(-WIDE, WIDE), N(-WIDE, WIDE),
+    N(-100, 100), N(-10, 10), N(-WIDE, WIDE), N(-WIDE, WIDE), E(0, 1)],
+  // part, amount, label, fell, ragdoll side
+  x: [E('head', 'torso', 'armL', 'armR', 'legL', 'legR'), N(0, 999), S, E(0, 1), E(-1, 0, 1)],
+};
+const VEHICLE_MIN = 25;   // rigs.coKeys lists 25 fields and rigs.scKeys 27
+const MAX_BODY = 64 * 1024, MAX_SEQ = 150, MAX_SAMPLES = 2000, MAX_EVENTS = 500;
 // crawlers and test rigs by their own tokens ("Googlebot/2.1", "bingbot", "HeadlessChrome"), not any "bot", which phone
 // models such as the CUBOT X30 contain
 const BOT = /HeadlessChrome|Lighthouse|PageSpeed|[a-z]bot[\/-]|\bbot\b|crawler|spider|slurp/i;
@@ -102,12 +118,15 @@ export function checkBatch(b) {
   if (!Array.isArray(b.samples) || b.samples.length > MAX_SAMPLES || !Array.isArray(b.events) || b.events.length > MAX_EVENTS) return null;
   const samples = [];
   for (const x of b.samples) {
-    if (!Array.isArray(x) || x.length !== 12 || !x.every(num)) return null;
+    // 12, then a project page's scroll, then a driven vehicle: 1 (scooter) or 2 (couch) and its whole state (flow/client.js)
+    if (!Array.isArray(x) || x.length < 12 || x.length > 48 || !x.every(num)) return null;
+    if (x.length > 13 && ((x[13] !== 1 && x[13] !== 2) || x.length < 14 + VEHICLE_MIN)) return null;
     samples.push(x);
   }
   const events = [];
   for (const e of b.events) {
-    if (!Array.isArray(e) || e.length < 2 || e.length > 6 || !num(e[0]) || !['c', 'v', 'h', 'z', 'e', 'l', 'g', 'r'].includes(e[1])) return null;
+    if (!Array.isArray(e) || e.length < 2 || e.length > 16 || !num(e[0]) || !EVENTS.includes(e[1])) return null;
+    const sh = SHAPE[e[1]]; if (sh && (e.length !== 2 + sh.length || !sh.every((ok, i) => ok(e[2 + i])))) continue;
     events.push(e.map((v, i) => (i < 2 ? v : num(v) ? v : str(v, 80))));
   }
   const out = { sid: b.sid, seq: b.seq, day: b.day, samples, events };

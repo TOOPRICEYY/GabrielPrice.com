@@ -15,6 +15,10 @@ The 3D view depends on a few numbers the page already computes every frame, so t
 | 5 | bitmask of held drive keys: w a s d q e space shift ↑ ↓ ← → (bits 0–11) |
 | 6–8 | camera position |
 | 9–11 | a point 100 units ahead of the camera |
+| 12 | how far down an open project page the visitor is (0 to 1), or -1 when none is open. While one is open, 6–11 are that page's camera |
+| 13… | while the scooter or the couch can be driven: 1 and `rigs.scKeys`, or 2 and `rigs.coKeys` (src/rigs.js): its pose, speed and steering, and for the scooter run its seed, distance, stars, health and damage per body part |
+
+Visits recorded before October 13, 2026 have only fields 0–11.
 
 Events are `[ms, type, …]`:
 - `c`: a click, with x and y as fractions of the viewport, the section, and the label of the button, link or figure that was clicked;
@@ -24,13 +28,23 @@ Events are `[ms, type, …]`:
 - `l`: a freeze, the ms the page drew nothing while visible (a quarter second or more). Phones keep scrolling off the main thread during one, so the replay holds still and then jumps; the player says so, and the dashboard counts them beside the frame rate;
 - `g`: the browser dropped the 3D view's WebGL context (usually out of GPU memory), with the scroll position. It is sent at once, since the tab may be killed next;
 - `r`: that context came back. Android often drops it in the background and restores it, so the dashboard flags a visit as a 3D crash only for a `g` with no `r` after it. The player shows both;
-- `e`: the sampler hit an error and stopped (the message).
+- `e`: the sampler hit an error and stopped (the message);
+- `b`: a photo or clip opened in the popup (its file), or `''` when it closed;
+- `p`: a project page opened (the project's id), or `''` when it closed;
+- `k`: a scooter hazard appeared, as `hazRec()` in src/rigs.js lists it (kind, side, position, size, speed);
+- `x`: the rider was hit (body part, health lost, the label shown, whether he fell, and the ragdoll's side when it ended the run);
+- `t`: a first-run scooter tip showed (`''` when it went);
+- `o`: the couch's boost fired;
+- `s`: a scooter star was taken (its number), so a seek just after it keeps the star away until it comes back;
+- `f`: a crutch began to fall as the rider neared it (its position), so a seek past it shows it already down.
+
+The games are recorded as state, not replayed from the keys: their hazards are random and their physics depend on the frame rate, so the same keys would play a different game. The player holds the scooter and the couch to the recorded state (`rigs.pin` in src/rigs.js), spawns the recorded hazards and plays the recorded hits, and moves the page's clock with the playhead (stopped while paused, faster at 2× and 4×, still across a seek) so hazards and lap timers keep pace. A replay never posts to the leaderboards or keeps a best score, since it runs in your own browser. Photo popups and project pages open and close as they did, and a project page follows the visitor's scroll and camera.
 
 Key presses are recorded only as the drive-key bitmask, so nothing a visitor types is captured. The first batch also carries viewport size, pixel ratio, touch, language, referring site, dark mode, the page's version and section layout, and, in Chromium browsers, the phone model and OS version (`navigator.userAgentData` client hints). The Worker adds the visitor's IP address and the country, region and city Cloudflare places it in. It also reads the device type (phone, tablet or desktop), model, OS and browser from the user agent and those hints (`device()` in `worker/flow.js`), keeps those four and drops the raw hints. Safari and Firefox never name a phone model, so an iPhone shows only as "iPhone". Chrome on Android sends a frozen "Android 10; K", so without the hints the OS shows only as "Android". Visits recorded before this was added have no OS or browser. No cookies are set (the returning-visitor id below is in localStorage). The first batch also carries the device, read once when the browser is idle (`device()` in `client.js`): screen size and orientation, CPU core count, memory (GB, as the browser rounds it), touch points, graphics chip (WebGL's renderer name), connection type, downlink and round-trip time, data saver, time zone, languages, reduced motion, and how long the 3D scene took to appear and how long until the page's load event (every file it asks for up front). Each batch adds its frame rate. The Worker adds the network provider (ISP, from Cloudflare). DEPLOY.md's privacy note summarises all of this; update both when a field is added.
 
 Returning visitors: once the scene is up and the browser is idle, the recorder reads localStorage `gp.vid` ({id, n, ok, exp}). A live id goes into every batch as `vid` with the visit count `vn`. Without one, it asks `GET /api/flow`, which answers `{ask}` from the visitor's country (`mustAsk()` in `worker/flow.js`: the EU, EEA, UK, Switzerland, or no country). Without `ask` it stores a new id for 13 months (never renewed). With `ask` it shows a small note in the bottom-left corner once the reader is past the opening; Yes stores the id with `ok`, and No or letting the note fade (20 s) stores the refusal for the same time. Batches whose id was kept with a yes carry `vc: 1`; the Worker drops `vid` from a batch that comes from an ask country without it, and never stores `vc`. The dashboard's Visitor column shows the visit number and filters to one device. The hosted page also gets a quiet Privacy link at the end of the gallery, to `/privacy` (`flow/privacy.html`, copied to `dist/` by the build), whose button sets `flow-off` and forgets `gp.vid`. Visits are deleted 90 days after the day they were recorded by a daily cron (`prune()`).
 
-Batches are sent every 30 s, and when the tab is hidden or closed, through `navigator.sendBeacon` as `text/plain` (no CORS preflight). A visit is capped at 30 minutes and 60 batches. Recording is skipped for Global Privacy Control, Do Not Track, automated browsers, `#edit`, and any browser that has opened `/admin/flow` (that page sets localStorage `flow-off`). The Worker also drops batches from headless Chrome, Lighthouse and crawlers, which covers test rigs that hide `navigator.webdriver`. A test that overrides `navigator.webdriver` to record a visit must capture `/api/flow` in the page (wrap `navigator.sendBeacon`) or run against a local server, so its visits never reach the live bucket.
+Batches are sent every 30 s, and when the tab is hidden or closed, through `navigator.sendBeacon` as `text/plain` (no CORS preflight). A batch also goes out early at 200 samples or 400 events, since a driven vehicle's state makes each sample longer and the Worker takes at most 64 KB. A visit is capped at 30 minutes and 150 batches. Recording is skipped for Global Privacy Control, Do Not Track, automated browsers, `#edit`, and any browser that has opened `/admin/flow` (that page sets localStorage `flow-off`). The Worker also drops batches from headless Chrome, Lighthouse and crawlers, which covers test rigs that hide `navigator.webdriver`. A test that overrides `navigator.webdriver` to record a visit must capture `/api/flow` in the page (wrap `navigator.sendBeacon`) or run against a local server, so its visits never reach the live bucket.
 
 ## New versions of the page
 
@@ -63,6 +77,7 @@ The dashboard's Replay link opens `/admin/flow/replay?key=<day>/<sid>` (`worker/
 The player itself runs in the page at `/#replay=<day>/<sid>`, which also works on its own at the viewer's window size. It gets the merged visit from the frame host, or on its own from `/admin/api/flow/session` (Access login needed), and drives the page:
 - it scrolls the window to match `s` and pins it with `__rig.setS`;
 - it sets the camera through `window.__cam`;
-- it feeds the pointer into `ui.ptr`, so the laser follows it, and replays the drive keys.
+- it feeds the pointer into `ui.ptr`, so the laser follows it, and lights the drive keys that were held;
+- it holds the scooter and the couch to their recorded state and plays the game events (see above).
 
-The couch and scooter physics run live, so a replay of driving is close to what the visitor did but not exact.
+Visits recorded before October 13, 2026 carry no vehicle state, so their drives run on the live physics from the recorded keys and come out close to what the visitor did but not exact.
