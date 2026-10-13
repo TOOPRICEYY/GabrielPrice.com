@@ -378,6 +378,11 @@
     };
     pace(rig.clock); pace(window.__gallery && window.__gallery.clock);   // and a project page's, whose model eases along its scroll
     const lateStars = [], heldClips = new Set();
+    // a clip held by the pause: if the page itself pauses it meanwhile (a new chapter, the project closed), it stays paused on Play
+    function hold(v) {
+      if (!v.gpPause) { const p = v.pause; v.gpPause = p; v.pause = function () { heldClips.delete(this); return p.call(this); }; }
+      v.gpPause.call(v); heldClips.add(v);
+    }
     let gSettle = 0;   // frames left to snap a project page's model to its scroll after a seek (its scroll event lands a frame later)
     const R = rig.rigs, pin = R.pin || {};
     // what is open over the page (photo popup b, project page p, scooter tip t), as the replay has put it
@@ -479,7 +484,8 @@
         const e = E[ei], age = (head - e[0]) / 1000;
         try {   // the endpoint is public: a malformed event is skipped, never fatal to the player
         if (e[1] === 'b' || e[1] === 'p' || e[1] === 't') { if (seek) { late[e[1]] = String(e[2] || ''); lateT[e[1]] = e[0]; } else put(e[1], String(e[2] || '')); }
-        else if (e[1] === 'k') { if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
+        else if (e[1] === 'k') { if (!seek && R.pinRun) R.pinRun();   // a hazard can be logged a moment before the sample that starts its run
+          if ((!seek || (e[0] >= runStart && e[6] - (e[2] === 'bird' ? e[8] * age : 0) > behind)) && R.hazPut) R.hazPut(e.slice(2), age); }
         else if (e[1] === 'x') { if ((age < .5 || (e[6] && age < (touch ? 5.5 : 3.4))) && R.pinHit) R.pinHit(e.slice(2), age); }
         else if (e[1] === 'f') { if (seek && R.pinFall) R.pinFall(e[2], age); }   // a crutch began to fall (live otherwise, as the rider nears it)
         else if (e[1] === 's') { if (seek) { if (R.pinStar) R.pinStar(e[2], age); } else lateStars.push(e); }   // a star taken: the pinned rider takes it live, and if it
@@ -502,10 +508,10 @@
       while (lateStars.length && (head - lateStars[0][0] > 300 || head >= dur)) { const e = lateStars.shift(); if (R.pinStar) R.pinStar(e[2], (head - e[0]) / 1000, true); }
       // clips play with the replay: held while paused, at its speed otherwise
       for (const v of document.querySelectorAll('video')) {
-        if (!playing) { if (!v.paused) { v.pause(); heldClips.add(v); } }
+        if (!playing) { if (!v.paused) hold(v); }
         else if (v.playbackRate !== speed) v.playbackRate = speed;
       }
-      if (playing && heldClips.size) { for (const v of heldClips) v.play().catch(() => {}); heldClips.clear(); }
+      if (playing && heldClips.size) { for (const v of heldClips) if (v.isConnected) v.play().catch(() => {}); heldClips.clear(); }
       if (head > stallUntil || head < stallFrom) stall.textContent = '';
       range.value = head; time.textContent = fmt(head) + ' / ' + fmt(dur);
       requestAnimationFrame(step);
