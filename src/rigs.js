@@ -1209,7 +1209,16 @@ rigs.scState = (S) => { const G = S.game; return [S.manual ? 1 : 0, r2(S.X), r2(
 rigs.coState = (Co) => { const C = rigs.course; return [Co.drive ? 1 : 0, ...CO_KEYS.slice(1).map((k) => r2(Co[k])),
   C.i, C.done ? 1 : 0, C.t0 >= 0 ? r2(clock.elapsedTime - C.t0) : -1, r2(C.last), r2(C.best), C.laps || 0, r2(C.acc)]; };
 // after a seek, or when the replay reaches the couch: the lap as it stood then (the gates are crossed by the pinned couch from there)
-rigs.pinCourse = (P) => Object.assign(rigs.course, { i: P.ci, done: !!P.cdone, t0: P.clap >= 0 ? clock.elapsedTime - P.clap : -1, last: P.clast, best: P.cbest, laps: P.claps, acc: P.cacc, a0: null });
+// since: seconds the visitor had been driving, so the countdown and cues pick up where they were (GO comes 2.4 s after taking over)
+rigs.pinCourse = (P, since) => {
+  const T = clock.elapsedTime, Co = rigs.couch;
+  if (P.ci != null) Object.assign(rigs.course, { i: P.ci, done: !!P.cdone, t0: P.clap >= 0 ? T - P.clap : -1, last: P.clast, best: P.cbest, laps: P.claps, acc: P.cacc, a0: null });
+  if (!P.drive || since == null) return;
+  Object.assign(Co, { goT: T + 2.4 - since, cue: since < 2.4 ? 'count' : P.hold ? 'wait' : 'ready', cn: 0, lapCue: rigs.course.flash, waitT: T });
+  if (since >= 2.4 && rigs.cueEl) rigs.cueEl.className = 'gone';
+};
+// a seek into a run under way: start it now, so the recorded hazards and hits that follow have a run to land in
+rigs.pinRun = () => { const S = rigs.scooter, G = S.game; if (!G.on) Object.assign(G, gameNew(), { on: true, t0: clock.elapsedTime, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); };
 function pinScooter(S, P) {
   Object.assign(S, { X: P.X, Z: P.Z, psi: P.psi, v: P.v, delta: P.delta, y: P.y, p: P.p, duck: P.duck, duckT: P.duck > .5 ? 1 : 0, air: !!P.air, touchRun: !!P.run, lane: P.lane, hop: false });
 }

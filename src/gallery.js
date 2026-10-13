@@ -580,7 +580,7 @@ function passage(u) {
 const clock = new THREE.Clock();
 function tick() {
   if (!open) return; requestAnimationFrame(tick);
-  const dt = Math.min(clock.getDelta(), .05);
+  const dt = Math.min(clock.getDelta(), .05 * (clock.pace || 1));
   tN += (tT - tN) * (1 - Math.pow(.0009, dt));
   applyModel(tN);
   if (!userCam) placeCam(keyAt(tN), dt);

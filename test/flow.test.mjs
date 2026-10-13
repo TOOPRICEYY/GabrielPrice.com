@@ -86,7 +86,7 @@ test('the page still exposes everything the flow recorder and replayer use', () 
   assert.match(html, /section[^>]*data-s="0"/, 'sections carry data-s');
   assert.match(html, /<canvas id="stage"/, 'the WebGL canvas the recorder reads the GPU name from');
   assert.ok(rig[1].includes('clock'), '__rig exposes clock (the replay runs it at its own speed)');
-  for (const name of ['rigs.pin = ', 'rigs.scKeys = ', 'rigs.coKeys = ', 'rigs.scState = ', 'rigs.coState = ', 'rigs.hazPut = ', 'rigs.hazClear = ', 'rigs.pinHit = ', 'rigs.pinTip = ', 'rigs.pinPop = ', "rigs.rec('k'", "rigs.rec('x'", "rigs.rec('o'"])
+  for (const name of ['rigs.pin = ', 'rigs.scKeys = ', 'rigs.coKeys = ', 'rigs.scState = ', 'rigs.coState = ', 'rigs.hazPut = ', 'rigs.hazClear = ', 'rigs.pinRun = ', 'rigs.pinHit = ', 'rigs.pinTip = ', 'rigs.pinPop = ', "rigs.rec('k'", "rigs.rec('x'", "rigs.rec('o'"])
     assert.ok(html.includes(name), `rigs.js still has ${name}`);
   assert.match(html, /window\.__lightbox = \{ sel: SEL, show, close \}/, 'the photo popup can be opened by the player');
   assert.match(html, /state: \(\) => open && P \?/, 'project pages report their state (gallery.js)');

@@ -369,7 +369,7 @@
     const touch = !!(rec.meta && rec.meta.touch), fg = !!(rec.meta && rec.meta.fg);
     // the page's clock runs at the replay's speed and stops while it is paused, so the games' timers and hazards keep pace with the
     // recorded poses (getDelta also moves elapsedTime, the time the rigs read)
-    const pace = (clk) => { if (!clk) return; const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); return d * k; }; };
+    const pace = (clk) => { if (!clk) return; const gd = clk.getDelta.bind(clk); clk.getDelta = () => { const d = gd(), k = playing ? speed : 0; clk.elapsedTime += d * (k - 1); clk.pace = Math.max(1, k); return d * k; }; };   // pace: the page's dt cap scales too
     pace(rig.clock); pace(window.__gallery && window.__gallery.clock);   // and a project page's, whose model eases along its scroll
     let gSettle = 0;   // frames left to snap a project page's model to its scroll after a seek (its scroll event lands a frame later)
     const R = rig.rigs, pin = R.pin || {};
@@ -394,7 +394,7 @@
     let courseSync = true;   // set the couch's lap progress from the recording at the next couch sample (a seek, or arriving at the couch)
     function vehicle(keys, a, b, k) {
       const o = {}, same = b.length === a.length && b[13] === a[13];
-      keys.forEach((key, j) => { const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
+      keys.forEach((key, j) => { if (14 + j >= a.length) return; const x = a[14 + j], y = same ? b[14 + j] : x; o[key] = STEP[key] ? x : lerp(x, y, k); });
       return o;
     }
     bSpeed.onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; bSpeed.textContent = speed + '×'; };
@@ -435,14 +435,18 @@
       // the scooter and the couch, held to what the visitor's did (rigs.js PIN); older visits drive them from the keys alone
       pin.sc = a[13] === 1 && R.scKeys ? vehicle(R.scKeys, a, b, k) : null;
       pin.co = a[13] === 2 && R.coKeys ? vehicle(R.coKeys, a, b, k) : null;
-      if (!pin.co) courseSync = true; else if (courseSync && R.pinCourse) { R.pinCourse(pin.co); courseSync = false; }
+      if (!pin.co) courseSync = true;
+      else if (courseSync && R.pinCourse) {   // with how long the visitor had been driving, from the first sample of this drive
+        const dr = 14 + R.coKeys.indexOf('drive'); let j = i; while (j > 0 && S[j - 1][13] === 2 && S[j - 1][dr] === 1) j--;
+        R.pinCourse(pin.co, pin.co.drive ? Math.max(0, head - S[j][0]) / 1000 : null); courseSync = false;
+      }
       if (seek && R.hazClear) R.hazClear();   // after a seek the run is rebuilt from the recording at the new playhead
       // a seek brings back every hazard of the run under way (from its first sample: on, with the same seed); the game drops those already behind
       let runStart = seek ? Infinity : 0, behind = -Infinity;
       if (seek && a[13] === 1 && R.scKeys) {
         const on = 14 + R.scKeys.indexOf('on'), sd = 14 + R.scKeys.indexOf('seed');
         let j = i; while (j > 0 && S[j - 1][13] === 1 && S[j - 1][on] === 1 && S[j - 1][sd] === a[sd]) j--;
-        if (a[on] === 1) { runStart = S[j][0]; behind = a[14 + R.scKeys.indexOf('Z')] - 320; }   // and only those not yet left behind
+        if (a[on] === 1) { runStart = S[j][0]; behind = a[14 + R.scKeys.indexOf('Z')] - 320; if (R.pinRun) R.pinRun(); }   // and only those not yet left behind
       }
       // a finger: visits recorded since fg record it only while it touches; on older ones, show it only while it moves
       if (a[3] >= 0 && (a[3] !== lastP[0] || a[4] !== lastP[1])) { lastP = [a[3], a[4]]; lastPT = a[0]; }

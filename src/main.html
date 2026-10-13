@@ -1818,7 +1818,7 @@ function frame(now) {
 function frameBody() {
   rigs.onDrive = returnToPath;   // driving the couch or the scooter hands the camera back to the chase view (rigs.js loads after this script's top)
   if (scrollY !== seenY) onScroll();
-  const dt = Math.min(clock.getDelta(), .05);
+  const dt = Math.min(clock.getDelta(), .05 * (clock.pace || 1));   // pace: a visit replay at 2× or 4×
   sNow += (sTarget - sNow) * (reduced ? 1 : 1 - Math.pow(.0009, dt));
   const s = sNow;
   sheetEl.textContent = String(Math.min(sections.length, Math.round(s) + 1)).padStart(2, '0') + ' / ' + String(sections.length).padStart(2, '0');
