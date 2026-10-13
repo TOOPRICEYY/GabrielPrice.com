@@ -1168,9 +1168,9 @@ const STL = (n) => ['STL', 'anti-thesistis/stl/' + n + '.stl'];
 const AMZ = (q) => 'https://www.amazon.com/s?k=' + encodeURIComponent(q);
 const BOM_GROUPS = [
   ['Frame', [
-    ['calf', 'Calf shell (ABS)', 1, 2.61, 2.61, [STL('calf_shell')]], ['housing', 'Actuator housing (ABS)', 1, 1.42, 1.42, [STL('actuator_housing')]],
-    ['shoe', 'Shoe cup and stirrup (ABS)', 1, 1.17, 1.17, [STL('shoe_cup'), ['STL', 'anti-thesistis/stl/stirrup.stl']]],
-    ['railcap', 'Rail end cap (ABS)', 1, .14, .14, [STL('rail_end_cap')]],
+    ['calf', 'Calf shell (ABS)', 1, 3.35, 3.35, [STL('calf_shell')]], ['housing', 'Actuator housing (ABS)', 1, 1.48, 1.48, [STL('actuator_housing')]],
+    ['shoe', 'Shoe cup (ABS)', 1, 1.01, 1.01, [STL('shoe_cup')]],
+    ['railcap', 'Rail end cap (ABS)', 1, .21, .21, [STL('rail_end_cap')]],
     ['rail', '2020 V-slot rail, 200 mm', 1, 4.19, 4.19, [['Order', 'https://3dprintingcanada.com/a/p/products/2020-v-slot-extrusion-20mm-x-20mm-x-2-5m']]],
     ['wheel1', 'Solid V-wheel', 4, 2.28, 2.28, [['Order', 'https://www.alibaba.com/pla/BulkMan3D-Wholesale-Solid-Extreme-V-Wheel_1601122120706.html']]],
     ['springs', 'Die spring', 2, 8, 8, [['Order', AMZ('red die spring medium load')]]],
@@ -1179,7 +1179,7 @@ const BOM_GROUPS = [
     ['pinTop', 'Pins, bolts and nuts (M3–M10)', 'set', 7.64, 4.95, [['Order', AMZ('metric socket head cap screw nylock nut assortment M3 M10')]]],
     [null, 'Neoprene padding, 1/2 in', '1 ft²', 3.95, 3.95, [['Order', AMZ('1/2" x 17" x 60" neoprene sponge foam rubber roll without adhesive')]]],
     [null, 'Hook-and-loop strap, 1 in', '1 ft', .41, .41, [['Order', AMZ('YMCRLUX 1" x 32ft hook and loop straps metal buckles')]]],
-    [null, 'Print supports and purge', '', .67, .53, []],
+    [null, 'Print supports and purge', '', .74, .6, []],
   ]],
   ['Drive', [
     ['motor', 'Tarot 5010 motor', 1, 30, null, [['Order', AMZ('Tarot 5010 brushless motor')]]],
@@ -1199,10 +1199,10 @@ const BOM_GROUPS = [
     [null, 'Amass EC3 connector pair', 3, 3, null, [['Order', AMZ('Amass EC3 connector 10 pairs 14 gauge silicone wire')]]],
   ]],
   ['Knee add-on', [
-    ['kneeShin', 'Shin tube, 6061 rectangular 3/4 × 1-1/2 in, 1/8 in wall, 300 mm', 1, 2.91, 2.91, [['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
-    ['kneeThigh', 'Thigh tube, same stock, 310 mm', 1, 3.01, 3.01, [['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
-    [null, 'Knee hinge blocks (ABS)', 3, 1.53, 1.53, []],
-    ['cuffs', 'Thigh cuff (ABS)', 2, 3.5, 3.5, []],
+    ['kneeShin', 'Shin tube, 6061 rectangular 3/4 × 1-1/2 in, 1/8 in wall, 300 mm', 1, 2.91, 2.91, [STL('knee_shin_tube'), ['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
+    ['kneeThigh', 'Thigh tube, same stock, 310 mm', 1, 3.01, 3.01, [STL('knee_thigh_tube'), ['Stock', AMZ('6061 aluminum rectangular tube 3/4 x 1-1/2 x 1/8 wall')]]],
+    [null, 'Knee hinge blocks (ABS)', 4, 1.49, 1.49, [['Shin', 'anti-thesistis/stl/knee_shin_outer_block.stl'], ['Shin', 'anti-thesistis/stl/knee_shin_outer_block_2.stl'], ['Shin', 'anti-thesistis/stl/knee_shin_inner_block.stl'], ['Thigh', 'anti-thesistis/stl/knee_thigh_inner_block.stl']]],
+    ['cuffs', 'Thigh cuff (ABS)', 2, 3.51, 3.51, [['Upper', 'anti-thesistis/stl/thigh_cuff.stl'], ['Lower', 'anti-thesistis/stl/thigh_cuff_lower.stl']]],
     [null, '6709-2RS knee bearing, 45 × 55 × 6 mm', 2, 5, 5, [['Order', AMZ('uxcell 6709-2RS 45x55x6 5pcs')]]],
     [null, 'Knee screws (M5 × 40 and M5 × 30) and nuts', 'set', 1.16, 1.16, [['Order', AMZ('metric socket head cap screw nylock nut assortment M3 M10')]]],
     [null, 'Hook-and-loop strap, 1 in', '2 ft', .81, .81, [['Order', AMZ('YMCRLUX 1" x 32ft hook and loop straps metal buckles')]]],
