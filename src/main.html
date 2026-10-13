@@ -165,7 +165,7 @@ p { margin: 0; max-width: 62ch; }
 .bomt:not(.det) td, .bomt:not(.det) th { padding-top: 5px; padding-bottom: 5px; }
 .bomt:not(.det) tr.sm td { color: var(--graphite-2); }
 .bomt.vmo:not(.det) tr.ea td { opacity: .4; }
-.bomt:not(.det) td.p.on { background: none; } .bomt:not(.det) th.p.on { background: var(--vellum); }
+.bomt:not(.det) td.p.on { background: none; } .bomt:not(.det) th.p.on { background: var(--vellum); } .bomt:not(.det) tfoot td.p.on { background: var(--vellum); }
 .variant .vt { opacity: .7; margin-left: 4px; }
 .bomall { display: block; width: 100%; margin-top: 6px; padding: 7px 4px; text-align: left; font-family: var(--f-mono); font-size: 11px; letter-spacing: .04em;
   color: var(--cobalt); background: none; border: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
@@ -525,6 +525,14 @@ main .card.playing { opacity: 0 !important; pointer-events: none !important; tra
   .bom .n { width: 16px; height: 16px; font-size: 9px; }
   .spec { font-size: 11px; }
   .bomwrap { max-height: 22vh; } .bomt { font-size: 10px; } .card .bomnote { font-size: 11.5px; } .bomt th { font-size: 8.5px; } .variant button, .bomctl .tg { font-size: 10px; padding: 5px 8px; }
+  /* parts card on phones: short labels so every control fits on one row (they wrap on the narrowest phones), no note or second Build it line, and the short
+     list as bare rows (no header, group titles or switched-off knee rows) so the parts themselves get the space */
+  section:has(#bom) .card { gap: 6px; } section:has(#bom) .card h2 { font-size: 20px; }
+  .bomctl { gap: 4px; } .variant button, .bomctl .tg { letter-spacing: .03em; padding: 5px 6px; white-space: nowrap; }
+  .variant .vt { margin-left: 2px; } .bomctl .lf, #bomnote, #bomall { display: none; }
+  .bomwrap { max-height: 26vh; }
+  .bomt:not(.det) thead, .bomt:not(.det) tr.g, .bomt.nokn:not(.det) tr.kn { display: none; }
+  .bomt:not(.det) td { padding-top: 2px; padding-bottom: 2px; } .bomt .n span { width: 15px; height: 15px; font-size: 8px; }
 }
 @media (max-width: 720px) and (max-height: 720px) {   /* small phones: the docked card must stay under half the screen */
   .card h2 { font-size: 21px; }
@@ -674,8 +682,8 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     <div class="card">
       <div class="eyebrow">06 <b>Exploded view</b></div>
       <h2>Parts</h2>
-      <div class="bomctl"><div class="variant" role="group" aria-label="Build"><button type="button" data-v="mo" aria-pressed="false">Mechanical only <span class="vt" id="bomvmo"></span></button><button type="button" data-v="ea" aria-pressed="false">Electric Assist <span class="vt" id="bomvea"></span></button></div>
-        <button type="button" class="tg" id="bomknee" aria-pressed="false">+ Knee add-on</button><button type="button" class="tg build" id="bomdet" aria-pressed="false" title="Full parts list: quantities, STL files and order links">Build it →</button></div>
+      <div class="bomctl"><div class="variant" role="group" aria-label="Build"><button type="button" data-v="mo" aria-pressed="false">Mech<span class="lf">anical only</span> <span class="vt" id="bomvmo"></span></button><button type="button" data-v="ea" aria-pressed="false">Electric<span class="lf"> Assist</span> <span class="vt" id="bomvea"></span></button></div>
+        <button type="button" class="tg" id="bomknee" aria-pressed="false">+ Knee<span class="lf"> add-on</span></button><button type="button" class="tg build" id="bomdet" aria-pressed="false" title="Full parts list: quantities, STL files and order links">Build it →</button></div>
       <p class="bomnote" id="bomnote"></p>
       <div class="bomwrap"><table class="bomt" id="bom"></table></div>
       <button type="button" class="bomall" id="bomall"></button>
