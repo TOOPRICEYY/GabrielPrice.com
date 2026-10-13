@@ -63,6 +63,18 @@ body {
 /* parts lists ↔ model: the lit row and its balloon (partLink) */
 #callouts g.hl circle:not(.dot), #callouts2 g.hl circle:not(.dot), #callouts3 g.hl circle:not(.dot) { fill: var(--cobalt); }
 #callouts g.hl text, #callouts2 g.hl text, #callouts3 g.hl text { fill: var(--vellum); }
+/* the thigh brace's callout (Full leg): a dot on the upper cuff, an elbowed hairline and a small sheet, drawn in by the scroll (kneeTip) */
+#kneetip { position: fixed; left: 0; top: 0; z-index: 1; pointer-events: none; visibility: hidden; will-change: transform; }
+#kneetip svg { position: absolute; left: 0; top: 0; overflow: visible; }
+#kneetip path { fill: none; stroke: var(--cobalt); stroke-width: 1; }
+#kneetip i { position: absolute; display: block; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--cobalt);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cobalt) 18%, transparent); }
+#kneetip p { position: absolute; top: 0; margin: 0; width: max-content; max-width: 196px; padding: 9px 12px 10px; box-sizing: border-box;
+  font: 13.5px/1.38 var(--f-body); color: var(--graphite); text-wrap: balance;
+  background: var(--sheet); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid var(--rule); }
+@media (max-width: 720px) { #kneetip p { max-width: 128px; font-size: 12px; padding: 7px 9px 8px; } }
+/* Full leg: a longer section, so the leg is seen bare for a moment before the thigh brace goes on (phones already have the room) */
+main > section[data-s="7"] { min-height: 240vh; }
 .bom li[data-k], .bomt tr[data-k] { cursor: pointer; }
 .bom li.hl, .bomt tr.hl td, .bomt tr.hl td.p.on { background: color-mix(in srgb, var(--cobalt) 16%, var(--vellum)); }
 .bom li.hl .n, .bomt tr.hl td.n span { background: var(--cobalt); color: var(--vellum); }
@@ -646,6 +658,7 @@ body.playing #secnav, #secnav.early { opacity: 0; visibility: hidden; }   /* .ea
 <div id="sunset" aria-hidden="true"></div>
 <div id="grid" aria-hidden="true"></div>
 <svg id="callouts" aria-hidden="true"></svg>
+<div id="kneetip"><svg width="1" height="1" aria-hidden="true"><path pathLength="1" stroke-dasharray="1" /></svg><i></i><p>Optional thigh portion for high intensity running and sports</p></div>
 <svg id="callouts2" aria-hidden="true"></svg>
 <svg id="callouts3" aria-hidden="true"></svg>
 <div id="loading">Loading model…</div>
@@ -1312,6 +1325,7 @@ const camKeys = [
   [5.2,  [-150, 78, 90],  [0, 0, 20], 1],
   [5.6,  [-150, 78, 90],  [0, 0, 20], 1],
   [6.2,  [-120, 52, 24],  [0, -2, -16], 1],
+  [6.7,  [0, 100, 480],   [0, 94, 0], 0],   // pulled back, the leg bare for a moment, then the thigh brace goes on (KNEE_IN)
   [7,    [0, 100, 480],   [0, 94, 0], 0],
 ];
 
@@ -1515,6 +1529,7 @@ function buildKicker() {
     pv.position.copy(pivotPt);
     let mat = mats[partMat[k] || 'steel'];
     if (ghostKeys.includes(k)) { mat = mat.clone(); mat.clippingPlanes = [clip]; mats['ghost_' + k] = mat; }
+    else if (KNEE_PARTS.includes(k)) mat = mats.knee_alu ??= Object.assign(mat.clone(), { clippingPlanes: [clip] });   // fades in on its own (KNEE_IN)
     const m = new THREE.Mesh(geos[k].g, mat); m.position.copy(pivotPt).negate();
     m.castShadow = true; m.receiveShadow = true; pv.add(m);
     parts[k] = { ex, pv, m, c: geos[k].c.clone(), pivot: pivotPt };
@@ -1851,6 +1866,34 @@ function frame(now) {
   if (warmQ.length) try { warmStep(); } catch (e) { warmQ.length = 0; console.warn(e); }
   try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
 }
+// the thigh brace in Full leg: [fade on from, to] and its callout's [draw in from, to, fade out from, to] (section index s)
+const KNEE_IN = [7.04, 7.22], KNEE_TIP = [7.14, 7.26, 7.4, 7.48];
+const kt = document.getElementById('kneetip'), ktPath = kt.querySelector('path'), ktDot = kt.querySelector('i'), ktP = kt.querySelector('p');
+const ktCard = document.querySelector('section[data-s="7"] > .card'), _kt = new THREE.Vector3(), KT_UP = 51.5;   // the upper cuff's middle (device y, cm)
+// the callout hangs off the upper cuff by an elbow (up and out, then level) on whichever side has room clear of the Full leg card,
+// behind the walking figure first; the scroll draws the line in, then the label fades in along it
+function kneeTip(s, kneeIn) {
+  const p = kneeIn * smooth(seg(s, KNEE_TIP[0], KNEE_TIP[1])) * (1 - smooth(seg(s, KNEE_TIP[2], KNEE_TIP[3])));
+  if (p < .003) { if (kt.style.visibility !== 'hidden') kt.style.visibility = 'hidden'; return; }
+  const P = kicker.parts.cuffs; P.m.localToWorld(_kt.set(P.c.x, KT_UP, P.c.z)); _kt.project(camera);
+  const x = (_kt.x * .5 + .5) * innerWidth, y = (-_kt.y * .5 + .5) * innerHeight;
+  const ph = innerWidth <= 720, D = ph ? 26 : 40, H = ph ? 12 : 18, w = ktP.offsetWidth, h = ktP.offsetHeight, need = D + H + 4 + w + 8;
+  const ly = y - D, c = ktCard && ktCard.getBoundingClientRect(), hit = c && c.width && ly + h / 2 > c.top && ly - h / 2 < c.bottom;
+  const roomR = Math.min(innerWidth, hit && c.left > x ? c.left : innerWidth) - x, roomL = x - (hit && c.right < x ? c.right : 0);
+  const dir = roomR >= need || roomR >= D + w + 12 ? 1 : -1;   // behind the figure whenever it fits, so it never sits over the arm
+  // the label stays on screen: where the side is short of room it slides in toward the dot and the level run shortens
+  const lx = dir > 0 ? (ph ? x + roomR - 14 - w : Math.min(x + D + H + 4, x + roomR - 8 - w)) : Math.max(x - D - H - 4 - w, x - roomL + 8);
+  const ex = dir > 0 ? Math.max(D, lx - 4 - x) : Math.min(-D, lx + w + 4 - x);
+  ktPath.setAttribute('d', `M0 0L${dir * D} ${-D}H${ex.toFixed(1)}`);
+  ktPath.style.strokeDashoffset = (1 - smooth(clamp01((p - .1) / .45))).toFixed(3);
+  const lab = smooth(clamp01((p - .45) / .55));
+  kt.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; kt.style.visibility = 'visible';
+  // (on phones the card rises up the screen: the callout fades out before the card reaches it)
+  kt.style.opacity = c && c.width && c.left < lx + w && c.right > Math.min(x, lx) ? clamp01((c.top - (ly + h / 2) - 6) / 36).toFixed(3) : '';
+  ktDot.style.transform = `scale(${smooth(clamp01(p / .2)).toFixed(3)})`;
+  Object.assign(ktP.style, { left: (lx - x).toFixed(1) + 'px', top: (ly - y - h / 2).toFixed(1) + 'px', opacity: lab.toFixed(3),
+    transform: `translateX(${(dir * 8 * (1 - lab)).toFixed(1)}px)` });
+}
 function frameBody() {
   rigs.onDrive = returnToPath;   // driving the couch or the scooter hands the camera back to the chase view (rigs.js loads after this script's top)
   if (scrollY !== seenY) onScroll();
@@ -1906,8 +1949,11 @@ function frameBody() {
     // drawn last with no depth write, so the device behind it still shows through
     seeThrough(clayMat, ghost > .002); clayMat.opacity = 1 - .7 * ghost; clayMat.depthWrite = ghost < .5;
     figureMesh.renderOrder = ghost > .002 ? 5 : 0;
+    // the knee add-on: off until its toggle in Parts; in Full leg it fades on and settles down the thigh a little after the camera pulls back
+    const kneeIn = bomKnee ? 1 : smooth(seg(s, KNEE_IN[0], KNEE_IN[1]));
     for (const [n, m] of Object.entries(mats)) {
-      const o = n.startsWith('ghost_') ? op * (1 - ghost * (n === 'ghost_calf' ? .55 : .8)) : op;
+      let o = n.startsWith('ghost_') ? op * (1 - ghost * (n === 'ghost_calf' ? .55 : .8)) : op;
+      if (n === 'knee_alu' || n === 'ghost_cuffs') o *= kneeIn;
       m.opacity = o; seeThrough(m, o < .999); m.depthWrite = o > .5;
     }
     kicker.unslim.visible = op > .002;            // hidden outright whenever it is off: zero opacity still casts shadows
@@ -1963,7 +2009,7 @@ function frameBody() {
 
     const hideDrive = bomTouched && bomVariant === 'mo';
     for (const k of ELECTRIC_PARTS) parts[k].ex.visible = !hideDrive;
-    const kneeOn = bomKnee || s > 6.5;   // the knee add-on: off until its toggle in Parts, but always on for the Full leg section
+    const kneeOn = kneeIn > .002;
     for (const k of KNEE_PARTS) parts[k].ex.visible = kneeOn;
     // explode, hold, rebound with a damped bounce
     const out = ease(seg(s, 4.7, 5.15));
@@ -1971,6 +2017,8 @@ function frameBody() {
     let e = out;
     if (back > 0) { const x = back; e = (1 - x) * Math.pow(1 - x, 1.5) + Math.sin(x * Math.PI * 3) * Math.pow(1 - x, 2) * .18 * (x > .33 ? 1 : 0); e = back >= 1 ? 0 : Math.max(e, -0.08); }
     for (const k in parts) parts[k].ex.position.copy(parts[k].off).multiplyScalar(e);
+    if (kneeIn < 1) for (const k of KNEE_PARTS) parts[k].ex.position.y += 9 * (1 - kneeIn) ** 2;   // up the leg, easing down into place
+    kneeTip(s, kneeIn);
 
     // balloons
     const show = clamp01(e * 3) * (s > 4.6 && s < 6.1 ? 1 : 0);
