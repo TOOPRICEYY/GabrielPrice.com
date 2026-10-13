@@ -1254,7 +1254,7 @@ const BOM_OTHER = { Frame: 'Bearings, fasteners, padding, straps', Drive: 'Gearb
       html += `<tr class="${oc}"><td class="n"></td><td>${BOM_OTHER[g] || 'Other hardware'}</td><td class="q"></td><td class="p mo">${$(other.eaOnly ? null : other.mo)}</td><td class="p ea">${$(other.ea)}</td><td class="lk"></td></tr>`;
     }
   }
-  html += `</tbody><tfoot><tr><td></td><td>Total</td><td></td><td class="p mo" id="bomtmo"></td><td class="p ea" id="bomtea"></td><td class="lk"></td></tr></tfoot>`;
+  html += `</tbody><tfoot><tr><td></td><td>Total</td><td class="q"></td><td class="p mo" id="bomtmo"></td><td class="p ea" id="bomtea"></td><td class="lk"></td></tr></tfoot>`;
   document.getElementById('bom').innerHTML = html;
 }
 const BOM_NOTE = { ea: 'The full build: motor, two-stage gearbox and electronics.', mo: 'No motor, gearbox or battery. The springs do the work: functional for walking, hiking and light sports.' };
