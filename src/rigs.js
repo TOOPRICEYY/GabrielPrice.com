@@ -857,6 +857,7 @@ function rigUI() {
     }
     if (rigs.scootOn && (k.length === 1 ? 'wasd '.includes(k) : k.startsWith('arrow'))) {
       if (lbEndOpen('sc') && !e.repeat) lbAgain();
+      if (!TOUCH) rigs.scooter.quit = false;   // after the ✕, a game key takes the bars again
       const S = rigs.scooter; S.last = clock.elapsedTime; S.useSlider = false; if (rigs.onDrive) rigs.onDrive();
       if (k === ' ') { if (!e.repeat) { S.hop = true; S.hopHeld = true; } } else S.keys.add(k);
       if (k === ' ' || k.startsWith('arrow')) e.preventDefault();          // steer and hop here instead of scrolling the page
