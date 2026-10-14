@@ -714,7 +714,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 <main>
   <section class="hero" data-s="0" data-ch="Intro">
     <div class="hero-wrap">
-      <div class="eyebrow" hidden>Portfolio <b>Engineer · Builder</b></div>
+      <div class="eyebrow">Project gallery</div>
       <h1>Gabriel <em>Price</em></h1>
       <p>Create to live, live to create</p>
       <div class="scrollhint">Scroll to start ↓</div>
@@ -1999,13 +1999,16 @@ const ktCard = document.querySelector('section[data-s="7"] > .card'), _kt = new 
 // behind the walking figure first; the scroll draws the line in, then the label fades in along it
 function kneeTip(s, kneeIn) {
   const p = kneeIn * smooth(seg(s, KNEE_TIP[0], KNEE_TIP[1])) * (1 - smooth(seg(s, KNEE_TIP[2], KNEE_TIP[3])));
-  if (p < .003) { if (kt.style.visibility !== 'hidden') kt.style.visibility = 'hidden'; return; }
+  if (p < .003) { kneeTip.dir = 0; if (kt.style.visibility !== 'hidden') kt.style.visibility = 'hidden'; return; }
   const P = kicker.parts.cuffs; P.m.localToWorld(_kt.set(P.c.x, KT_UP, P.c.z)); _kt.project(camera);
   const x = (_kt.x * .5 + .5) * innerWidth, y = (-_kt.y * .5 + .5) * innerHeight;
-  const ph = innerWidth <= 720, D = ph ? 26 : 40, H = ph ? 12 : 18, w = ktP.offsetWidth, h = ktP.offsetHeight, need = D + H + 4 + w + 8;
+  const ph = innerWidth <= 720, D = ph ? 26 : 40, H = ph ? 12 : 18, w = ktP.offsetWidth, h = ktP.offsetHeight;
   const ly = y - D, c = ktCard && ktCard.getBoundingClientRect(), hit = c && c.width && ly + h / 2 > c.top && ly - h / 2 < c.bottom;
   const roomR = Math.min(innerWidth, hit && c.left > x ? c.left : innerWidth) - x, roomL = x - (hit && c.right < x ? c.right : 0);
-  const dir = roomR >= need || roomR >= D + w + 12 ? 1 : -1;   // behind the figure whenever it fits, so it never sits over the arm
+  // behind the figure whenever it fits, so it never sits over the arm; the side is picked as it appears and then held (the cuff
+  // swings with the walk), changing only once the other side is clearly the better one
+  const fitR = roomR - (D + w + 12), was = kneeTip.dir;
+  const dir = kneeTip.dir = !was ? (fitR >= 0 ? 1 : -1) : was > 0 ? (fitR < -48 && roomL > roomR ? -1 : 1) : (fitR >= 48 ? 1 : -1);
   // the label stays on screen: where the side is short of room it slides in toward the dot and the level run shortens
   const lx = dir > 0 ? (ph ? x + roomR - 14 - w : Math.min(x + D + H + 4, x + roomR - 8 - w)) : Math.max(x - D - H - 4 - w, x - roomL + 8);
   const ex = dir > 0 ? Math.max(D, lx - 4 - x) : Math.min(-D, lx + w + 4 - x);
