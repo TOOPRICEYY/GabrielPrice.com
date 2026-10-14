@@ -2143,6 +2143,7 @@ function exitBtn() {
   const gx = ui.gx = document.createElement('button'); gx.id = 'scexit'; gx.hidden = true; gx.textContent = '✕'; gx.setAttribute('aria-label', 'Exit the game'); document.body.appendChild(gx);
   gx.addEventListener('click', () => {
     const k = LB.mode, end = lbEndOpen(k); if (end) { LB.end = null; LB.drawn = ''; lbDraw(); const a = document.activeElement; if (a && a.blur && LB.el.contains(a)) a.blur(); }
+    else if (LB.end && LB.end.k === 'sc') { LB.end = null; LB.drawn = ''; }   // tapped while the menu still waits on the rag doll: it stays shut
     if (k === 'lap' && end) { const Co = rigs.couch; Co.hold = false; Co.keys.clear(); Co.kLast = Co.last = -9; return; }
     const S = rigs.scooter; S.quit = true; S.touchRun = false; S.keys.clear(); S.hopHeld = false; S.last = -9;
   });
