@@ -1286,6 +1286,7 @@ const RAG = { q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vect
   limbs: [['lArm', [0, 0, 1], 1.9, 2.4, 1.2], ['rArm', [0, 0, 1], -1.9, -2.4, 1.2], ['lFore', [0, 1, 0], 1.3, 2.9, .5], ['rFore', [0, 1, 0], -1.3, 3.1, -.5],
     ['lUp', [1, 0, 0], -1.0, 2.2, -.4], ['rUp', [1, 0, 0], 1.1, 2.5, .3], ['lLeg', [1, 0, 0], 1.2, 3.3, .9], ['rLeg', [1, 0, 0], 1.4, 2.8, .5],
     ['spine1', [1, 0, 0], .5, 2.6, -.25], ['neck', [1, 0, 0], .7, 4.0, -.3], ['head', [0, 0, 1], .5, 3.4, .2]] };
+const RAG_HOLD = 2.8;   // s from a wipe-out to the end menu, so the rag doll can be watched (it sprawls by ~1 s and gets up at 3)
 const easeOutBack = (x) => { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
 function ragdoll(S, T, w) {
   const G = S.game, a = T - G.ragT;
@@ -1510,7 +1511,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
   if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
-  if (G.on && G.downUntil > 0 && lbEndOpen('sc')) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed
+  if (G.on && G.downUntil > 0 && (lbEndOpen('sc') || (G.ragT != null && LB.end && LB.end.k === 'sc'))) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed (and while it waits on the rag doll)
   if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
   if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
     bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
@@ -1666,7 +1667,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   if (show && G.mini) G.mini = miniDraw(G, T);
   // the board: beside the run on wide screens; on phones only once you are down (it would cover the walk)
   { const pl = show && w > .5; if (hud.playing !== pl) { hud.playing = pl; document.body.classList.toggle('playing', pl); } }   // phones hide the orbit hint while you play
-  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0, (G.downUntil > 0 && T < G.downUntil) || !G.on);
+  if (rigs.scootOn || LB.mode === 'sc') lbShow('sc', show ? w : 0, (G.downUntil > 0 && T < G.downUntil && !(G.ragT != null && T < G.ragT + RAG_HOLD)) || !G.on);   // after a wipe-out the menu waits RAG_HOLD s
   // the "Take the bars" card steps aside while a run is on
   { const c = ui.scCard || (ui.scCard = document.querySelector('section[data-s="12"] .card')); if (c) { const on = show && G.on && w > .5; if (c.classList.contains('playing') !== on) c.classList.toggle('playing', on); } }
 }
