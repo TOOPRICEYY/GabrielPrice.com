@@ -438,6 +438,7 @@ function openProject(id, from) {
   floor.scale.setScalar(M.R * 1.6);
   ov.querySelector('#gx-kind').textContent = P.kind; ov.querySelector('#gx-title').textContent = P.title;
   scroller.innerHTML = CH.map((c, i) => chapterHTML(P, c, i)).join('');
+  window.__askAttach?.(scroller.querySelector('.card > h2'), P.id);   // Follow project / I want one! under the first title (main.html)
   scroller.querySelectorAll('.card').forEach(c => c.addEventListener('pointerdown', e => e.stopPropagation()));   // cards select text, they don't orbit
   scroller.querySelectorAll('iframe[data-src]').forEach(f => {
     f.src = f.dataset.src;

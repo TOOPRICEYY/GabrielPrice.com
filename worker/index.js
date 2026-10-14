@@ -13,12 +13,15 @@
 //   /admin/flow, /admin/flow/replay, /admin/api/flow/*   visitor flow dashboard and replays (worker/flow.js)
 //   /api/flow               public: visitors' pages post flow batches here (worker/flow.js)
 //   /api/lb                 public: the scooter and couch leaderboards, GET the boards, POST a new best (worker/lb.js)
+//   /api/interest           public: "Follow project" and "I want one!" sign-ups (worker/interest.js)
+//   /admin/interest, /admin/api/interest   the owner's list of those sign-ups
 
 import { accessEmail } from './access.js';
 import { getEdits, putEdits, checkEdits, publishEdits, listNotes, createNote, updateNote, checkNote, getShot, GitHubError, ID_OK } from './github.js';
 import editorUi from './editor-ui.gen.js';
 import { flowIngest, flowAdmin, prune } from './flow.js';
 import { lb } from './lb.js';
+import { interestIngest, interestAdmin } from './interest.js';
 
 const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' };
 const send = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...NO_STORE, 'content-type': 'application/json; charset=utf-8' } });
@@ -49,6 +52,7 @@ async function admin(request, env, url) {
   }
   if (p === '/admin/session') return send({ ok: true, email });
   if (p === '/admin/flow' || p === '/admin/flow/' || p === '/admin/flow/replay' || p.startsWith('/admin/api/flow/')) return flowAdmin(request, env, url);
+  if (p === '/admin/interest' || p === '/admin/interest/' || p === '/admin/api/interest') return interestAdmin(request, env, url);
   if (p === '/admin/editor-ui.js') return new Response(editorUi, { headers: { ...NO_STORE, 'content-type': 'text/javascript; charset=utf-8' } });
 
   if (p === '/admin/api/edits') {
@@ -109,6 +113,9 @@ export default {
     }
     if (url.pathname === '/api/lb') {
       try { return await lb(request, env, url); } catch (e) { console.error(e); return new Response(null, { status: 500 }); }
+    }
+    if (url.pathname === '/api/interest') {
+      try { return await interestIngest(request, env, url); } catch (e) { console.error(e); return new Response(null, { status: 500 }); }
     }
     return env.ASSETS.fetch(request);
   },
