@@ -192,21 +192,36 @@ p { margin: 0; max-width: 62ch; }
 .ask { margin-top: -8px; display: flex; flex-direction: column; gap: 10px; }
 /* where the card's label line has room, the links sit at its right end and take no height (the form still opens under the title) */
 .ask.top { display: contents; }
-.ask.top .ask-row { position: absolute; gap: 12px; flex-wrap: nowrap; white-space: nowrap; }
-.ask-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; }
-.ask-row button { padding: 2px 0; font: 11px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); cursor: pointer;
-  background: none; border: 0; border-bottom: 1px dotted color-mix(in srgb, var(--cobalt) 60%, transparent); }
-.ask-row button:hover, .ask-row button:focus-visible, .ask-row button[aria-expanded="true"] { border-bottom-style: solid; border-bottom-color: currentColor; }
-.ask-row button.done:not([aria-expanded="true"]) { color: var(--graphite-2); border-bottom-color: transparent; }
-.ask-f { display: flex; flex-direction: column; gap: 6px; }
+.ask.top .ask-row { position: absolute; flex-wrap: nowrap; white-space: nowrap; }
+/* the links: small grey text joined by a dot, violet on hover or while its form is open */
+.ask-row { display: flex; flex-wrap: wrap; align-items: baseline; }
+.ask-row button { padding: 2px 0; font: 10px/1.3 var(--f-mono); letter-spacing: .02em; color: var(--graphite-2); opacity: .7; cursor: pointer; background: none; border: 0; }
+.ask-row button + button::before { content: "\00b7"; margin: 0 7px; color: var(--graphite-2); }
+.ask-row button:hover, .ask-row button:focus-visible, .ask-row button[aria-expanded="true"] { opacity: 1; color: var(--cobalt); outline: none; }
+.ask-row button:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+/* the form: a light panel with a title, a close button, email, optional comment, Send */
+/* on phones a label too long to share its line is cut back to whole parts (see place()) */
+.eyebrow.ask-cut { white-space: nowrap; overflow: hidden; }
+.ask-f { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--cobalt) 4%, transparent); }
 .ask-f[hidden] { display: none; }
-.ask-f input, .ask-f textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 var(--f-body); color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); padding: 7px 9px; border-radius: 0; resize: none; }
+@media (prefers-reduced-motion: no-preference) { .ask-f:not([hidden]) { animation: ask-in .18s ease-out; } }
+@keyframes ask-in { from { opacity: 0; transform: translateY(-4px); } }
+.ask-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ask-t { font: 600 10.5px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); }
+.ask-x { flex: none; width: 28px; height: 28px; margin: -6px -8px -6px 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--graphite-2); cursor: pointer; }
+.ask-x:hover, .ask-x:focus-visible { color: var(--graphite); background: var(--rule); outline: none; }
+.ask-f input, .ask-f textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 var(--f-body); color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); padding: 8px 10px; border-radius: 0; resize: none; }
+.ask-f ::placeholder { color: var(--graphite-2); opacity: .75; }
 .ask-f input:focus, .ask-f textarea:focus { outline: none; border-color: var(--cobalt); }
 .ask-f input[aria-invalid="true"] { border-color: var(--sun); }
+@media (pointer: coarse) { .ask-f input, .ask-f textarea { font-size: 16px; } }   /* 16px keeps iOS from zooming in on focus */
 .ask-f .ask-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.ask-f.sent > input, .ask-f.sent > textarea { display: none; }
 .ask-go { display: flex; gap: 10px; align-items: center; }
-.ask-go button { font: 600 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 12px; cursor: pointer; color: var(--vellum); background: var(--cobalt); border: 1px solid var(--cobalt); }
-.ask-go button:disabled { opacity: .5; cursor: default; }
+.ask-go button { margin-left: auto; flex: none; font: 600 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; padding: 8px 16px; cursor: pointer; color: var(--vellum); background: var(--cobalt); border: 1px solid var(--cobalt); }
+.ask-go button:hover, .ask-go button:focus-visible { filter: brightness(1.12); outline: none; }
+.ask-go button:disabled { opacity: .5; cursor: default; filter: none; }
+.ask-go button[hidden] { display: none; }
 .ask-msg { font-size: 12.5px; line-height: 1.35; color: var(--graphite-2); }
 a { color: var(--cobalt); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
@@ -987,8 +1002,8 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 // remembered in localStorage (gp.ask) so the link reads "Following" or "Asked" on the next visit.
 (() => {
   if (/^#replay=/.test(location.hash)) return;   // a visit replay shows the page as it was, without forms that send anything
-  const KIND = { follow: { btn: 'Follow project', done: 'Following', send: 'Follow', ok: "Thanks. You'll hear when there's news." },
-                 want: { btn: 'I want one!', done: 'Asked', send: 'Send', ok: "Thanks. I'll be in touch." } };
+  const KIND = { follow: { btn: 'Follow project', head: 'Follow for updates', done: 'Following', send: 'Follow', ok: "Thanks. You'll hear when there's news." },
+                 want: { btn: 'I want one!', head: 'Want one?', done: 'Asked', send: 'Send', ok: "Thanks. I'll be in touch." } };
   const sent = (() => { try { return JSON.parse(localStorage.getItem('gp.ask') || '{}') || {}; } catch (e) { return {}; } })();
   const remember = (k) => { sent[k] = 1; try { localStorage.setItem('gp.ask', JSON.stringify(sent)); } catch (e) {} };
   const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -1016,42 +1031,74 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     if (!h || (h.nextElementSibling && h.nextElementSibling.matches('.ask'))) return;
     const box = document.createElement('aside'); box.className = 'ask'; box.dataset.p = p;
     box.innerHTML = '<div class="ask-row">' + Object.keys(KIND).map(k => `<button type="button" data-k="${k}" aria-expanded="false">${KIND[k].btn}</button>`).join('') + '</div>' +
-      '<form class="ask-f" hidden novalidate><input type="email" name="email" required maxlength="254" autocomplete="email" placeholder="Your email" aria-label="Your email">' +
+      '<form class="ask-f" hidden novalidate><div class="ask-hd"><span class="ask-t"></span>' +
+      '<button type="button" class="ask-x" aria-label="Close"><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></button></div>' +
+      '<input type="email" name="email" required maxlength="254" autocomplete="email" placeholder="Your email" aria-label="Your email">' +
       '<textarea name="note" rows="2" maxlength="1000" placeholder="Comments (optional)" aria-label="Comments (optional)"></textarea>' +
       '<input class="ask-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
-      '<div class="ask-go"><button type="submit"></button><span class="ask-msg" role="status"></span></div></form>';
+      '<div class="ask-go"><span class="ask-msg" role="status"></span><button type="submit"></button></div></form>';
     h.after(box);
     // at the right end of the label line when it fits beside the label, else of the title's line when the title is one short
-    // line, else a line of its own under the title
+    // line, else a line of its own under the title. On phones the label line is preferred: a label too long is shown cut back
+    // to its longest leading run of whole " · " parts that fits (at least its number), its text left as it is
     const card = h.parentElement, row = box.querySelector('.ask-row');
     const place = () => {
       const cs = getComputedStyle(card);
       box.classList.remove('top'); row.style.top = row.style.right = '';
+      const eb = card.querySelector(':scope > .eyebrow');
+      if (eb) { eb.classList.remove('ask-cut'); eb.style.maxWidth = ''; }
       if (!card.clientWidth) return;
-      const rowW = [...row.children].reduce((w, b) => w + b.offsetWidth, 0) + 12 * (row.children.length - 1);
+      const rowW = [...row.children].reduce((w, b) => w + b.offsetWidth, 0);   // the dot between them sits inside the second's width
       const padR = parseFloat(cs.paddingRight) || 0, avail = card.clientWidth - (parseFloat(cs.paddingLeft) || 0) - padR;
       const room = (el) => { if (!el) return false; const rg = document.createRange(); rg.selectNodeContents(el); const r = rg.getBoundingClientRect();
         return r.height < parseFloat(getComputedStyle(el).fontSize) * 1.8 && r.width + rowW + 20 <= avail; };   // one line, with room to its right
-      const eb = card.querySelector(':scope > .eyebrow'), at = room(eb) ? eb : room(h) ? h : null;
+      let at = room(eb) ? eb : null;
+      if (!at && eb && matchMedia('(max-width: 720px)').matches) {
+        const cut = cutTo(eb, avail - rowW - 14);
+        if (cut) { eb.classList.add('ask-cut'); eb.style.maxWidth = cut + 'px'; at = eb; }
+      }
+      if (!at) at = room(h) ? h : null;
       if (!at) return;
       if (cs.position === 'static') card.style.position = 'relative';
       box.classList.add('top');
       // beside the label: centred on it; beside the title: on its baseline, roughly
       row.style.right = padR + 'px'; row.style.top = (at === eb ? at.offsetTop + (at.offsetHeight - row.offsetHeight) / 2 : at.offsetTop + at.offsetHeight - row.offsetHeight - 4).toFixed(1) + 'px';
     };
+    // the widest cut of the label ending at a part boundary (after its number, or before a " · ") that fits in max px
+    const cutTo = (eb, max) => {
+      const L = eb.getBoundingClientRect().left, w = document.createTreeWalker(eb, NodeFilter.SHOW_TEXT), rg = document.createRange();
+      const upTo = (n, i) => { rg.setStart(eb, 0); rg.setEnd(n, i); return rg.getBoundingClientRect().right - L; };
+      let best = 0, first = true;
+      for (let n; (n = w.nextNode());) {
+        const ends = first ? [n.data.trimEnd().length] : [];
+        first = false;
+        for (let i = n.data.indexOf(' · '); i >= 0; i = n.data.indexOf(' · ', i + 1)) ends.push(i);
+        for (const i of ends) { const x = Math.ceil(upTo(n, i)); if (x > 0 && x <= max) best = Math.max(best, x); }
+      }
+      return best;
+    };
     place(); new ResizeObserver(place).observe(card);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
-    const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg');
+    const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg'), title = f.querySelector('.ask-t');
     let kind = null, busy = false, done = 0;   // busy: a send in flight; done: bumps on each success so its delayed close knows if it's stale
     const label = () => box.querySelectorAll('.ask-row button').forEach(b => { const k = b.dataset.k, on = sent[p + ':' + k]; b.classList.toggle('done', !!on); b.textContent = on ? '✓ ' + KIND[k].done : KIND[k].btn; });
     label();
+    const close = (refocus) => {
+      const was = kind && box.querySelector(`.ask-row button[data-k="${kind}"]`);
+      f.hidden = true; kind = null; done++;
+      box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false'));
+      if (refocus && was) was.focus({ preventScroll: true });
+    };
+    f.querySelector('.ask-x').addEventListener('click', () => close(true));
+    f.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(true); } });
     box.querySelector('.ask-row').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b || busy) return;
-      const k = b.dataset.k, open = !(kind === k && !f.hidden);
-      kind = open ? k : null; f.hidden = !open;
-      box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', String(open && x === b)));
-      if (!open) return;
-      done++; go.textContent = KIND[k].send; go.disabled = false; go.hidden = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
+      const k = b.dataset.k;
+      if (kind === k && !f.hidden) return close(false);
+      kind = k; f.hidden = false;
+      box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', String(x === b)));
+      done++; title.textContent = KIND[k].head; f.classList.remove('sent');
+      go.textContent = KIND[k].send; go.disabled = false; go.hidden = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
       try { if (!em.value) em.value = localStorage.getItem('gp.email') || ''; } catch (e) {}
       if (matchMedia('(hover: hover)').matches) em.focus({ preventScroll: true });
     });
@@ -1066,9 +1113,9 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
         await post({ p, k, email, note: note.value.trim().slice(0, 1000) });
         try { localStorage.setItem('gp.email', email); } catch (e) {}
         remember(p + ':' + k); label(); note.value = '';
-        msg.textContent = KIND[k].ok; go.hidden = true;
+        msg.textContent = '✓ ' + KIND[k].ok; go.hidden = true; f.classList.add('sent');
         const n = ++done;
-        setTimeout(() => { if (n === done) { f.hidden = true; go.hidden = false; box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false')); kind = null; } }, 4000);
+        setTimeout(() => { if (n === done) close(false); }, 4000);
       } catch (err) {
         go.disabled = false; msg.innerHTML = 'Couldn’t send. Try again, or email <a href="mailto:iam@gabrielprice.com">iam@gabrielprice.com</a>.';
       } finally { busy = false; }
