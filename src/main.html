@@ -189,13 +189,15 @@ p { margin: 0; max-width: 62ch; }
 .chain span { border: 1px solid var(--rule); padding: 2px 7px; }
 .note { font-size: 13px; color: var(--graphite-2); }
 /* Follow project / I want one!: a quiet pair of links under each build's title; either opens a small form (email, optional comment) */
-.ask { margin-top: -4px; display: flex; flex-direction: column; gap: 10px; }
-.ask-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.ask-row button { padding: 5px 10px; font: 11px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); cursor: pointer;
-  background: color-mix(in srgb, var(--cobalt) 6%, transparent); border: 1px solid color-mix(in srgb, var(--cobalt) 45%, transparent); transition: background .15s, color .15s; }
-.ask-row button:hover, .ask-row button:focus-visible { background: color-mix(in srgb, var(--cobalt) 14%, transparent); border-color: var(--cobalt); }
-.ask-row button[aria-expanded="true"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--vellum); }
-.ask-row button.done:not([aria-expanded="true"]) { background: none; border-style: dashed; }
+.ask { margin-top: -8px; display: flex; flex-direction: column; gap: 10px; }
+/* where the card's label line has room, the links sit at its right end and take no height (the form still opens under the title) */
+.ask.top { display: contents; }
+.ask.top .ask-row { position: absolute; gap: 12px; flex-wrap: nowrap; white-space: nowrap; }
+.ask-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; }
+.ask-row button { padding: 2px 0; font: 11px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); cursor: pointer;
+  background: none; border: 0; border-bottom: 1px dotted color-mix(in srgb, var(--cobalt) 60%, transparent); }
+.ask-row button:hover, .ask-row button:focus-visible, .ask-row button[aria-expanded="true"] { border-bottom-style: solid; border-bottom-color: currentColor; }
+.ask-row button.done:not([aria-expanded="true"]) { color: var(--graphite-2); border-bottom-color: transparent; }
 .ask-f { display: flex; flex-direction: column; gap: 6px; }
 .ask-f[hidden] { display: none; }
 .ask-f input, .ask-f textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 var(--f-body); color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); padding: 7px 9px; border-radius: 0; resize: none; }
@@ -1019,6 +1021,26 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       '<input class="ask-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
       '<div class="ask-go"><button type="submit"></button><span class="ask-msg" role="status"></span></div></form>';
     h.after(box);
+    // at the right end of the label line when it fits beside the label, else of the title's line when the title is one short
+    // line, else a line of its own under the title
+    const card = h.parentElement, row = box.querySelector('.ask-row');
+    const place = () => {
+      const cs = getComputedStyle(card);
+      box.classList.remove('top'); row.style.top = row.style.right = '';
+      if (!card.clientWidth) return;
+      const rowW = [...row.children].reduce((w, b) => w + b.offsetWidth, 0) + 12 * (row.children.length - 1);
+      const padR = parseFloat(cs.paddingRight) || 0, avail = card.clientWidth - (parseFloat(cs.paddingLeft) || 0) - padR;
+      const room = (el) => { if (!el) return false; const rg = document.createRange(); rg.selectNodeContents(el); const r = rg.getBoundingClientRect();
+        return r.height < parseFloat(getComputedStyle(el).fontSize) * 1.8 && r.width + rowW + 20 <= avail; };   // one line, with room to its right
+      const eb = card.querySelector(':scope > .eyebrow'), at = room(eb) ? eb : room(h) ? h : null;
+      if (!at) return;
+      if (cs.position === 'static') card.style.position = 'relative';
+      box.classList.add('top');
+      // beside the label: centred on it; beside the title: on its baseline, roughly
+      row.style.right = padR + 'px'; row.style.top = (at === eb ? at.offsetTop + (at.offsetHeight - row.offsetHeight) / 2 : at.offsetTop + at.offsetHeight - row.offsetHeight - 4).toFixed(1) + 'px';
+    };
+    place(); new ResizeObserver(place).observe(card);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
     const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg');
     let kind = null, busy = false, done = 0;   // busy: a send in flight; done: bumps on each success so its delayed close knows if it's stale
     const label = () => box.querySelectorAll('.ask-row button').forEach(b => { const k = b.dataset.k, on = sent[p + ':' + k]; b.classList.toggle('done', !!on); b.textContent = on ? '✓ ' + KIND[k].done : KIND[k].btn; });
