@@ -6,7 +6,7 @@
 //   /admin/api/interest      GET every sign-up as JSON; POST { delete: [keys] } removes some
 //
 // One small JSON object per sign-up, interest/<ISO time>-<random>.json in the FLOW bucket beside flow/, layout/ and lb/.
-// prune() in flow.js only walks flow/, so sign-ups stay until they are deleted here. Emails never go to GitHub (the repo is public).
+// prune() in flow.js only walks flow/, so sign-ups stay until they are deleted here. interest-rl/ holds the per-address throttle. Emails never go to GitHub (the repo is public).
 
 import listPage from './interest-page.js';
 
@@ -25,6 +25,22 @@ export function checkSignup(b) {
   return { p: b.p, k: b.k, email, note };
 }
 
+// The Origin check only stops other sites' pages; a script can send any header. So each address may sign up PER_DAY times a
+// UTC day: one small counter per address, interest-rl/<sha-256 of the address>, overwritten each day (the address itself is
+// never stored). Counts are best effort (two posts at once can both pass), which is plenty against a loop.
+export const PER_DAY = 12;
+async function allow(env, ip, now = Date.now()) {
+  const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('gp-interest:' + ip)))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const key = 'interest-rl/' + h.slice(0, 32), day = new Date(now).toISOString().slice(0, 10);
+  let c = { day, n: 0 };
+  const o = await env.FLOW.get(key);
+  if (o) { try { const v = await o.json(); if (v && v.day === day) c.n = +v.n || 0; } catch {} }
+  if (c.n >= PER_DAY) return false;
+  c.n++;
+  await env.FLOW.put(key, JSON.stringify(c), { httpMetadata: { contentType: 'application/json' } });
+  return true;
+}
+
 export async function interestIngest(request, env, url) {
   if (request.method !== 'POST') return empty(405);
   if (request.headers.get('origin') !== url.origin) return empty(403);   // only this site's own pages
@@ -34,6 +50,7 @@ export async function interestIngest(request, env, url) {
   const s = checkSignup(b);
   if (!s) return empty(400);
   if (!env.FLOW) return empty(503);
+  if (!(await allow(env, request.headers.get('cf-connecting-ip') || ''))) return empty(429);
   const at = new Date(), key = PREFIX + at.toISOString() + '-' + Math.random().toString(36).slice(2, 10).padEnd(6, '0') + '.json';
   await env.FLOW.put(key, JSON.stringify({ ...s, at: at.getTime(), country: (request.cf && request.cf.country) || '' }), { httpMetadata: { contentType: 'application/json' } });
   return empty(204);

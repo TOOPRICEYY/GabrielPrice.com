@@ -190,11 +190,12 @@ p { margin: 0; max-width: 62ch; }
 .note { font-size: 13px; color: var(--graphite-2); }
 /* Follow project / I want one!: a quiet pair of links under each build's title; either opens a small form (email, optional comment) */
 .ask { margin-top: -4px; display: flex; flex-direction: column; gap: 10px; }
-.ask-row { display: flex; gap: 16px; align-items: baseline; }
-.ask-row button { padding: 2px 0; font: 11px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite-2);
-  background: none; border: 0; border-bottom: 1px solid transparent; cursor: pointer; }
-.ask-row button:hover, .ask-row button:focus-visible, .ask-row button[aria-expanded="true"] { color: var(--cobalt); border-bottom-color: currentColor; }
-.ask-row button.done { color: var(--cobalt); }
+.ask-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ask-row button { padding: 5px 10px; font: 11px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); cursor: pointer;
+  background: color-mix(in srgb, var(--cobalt) 6%, transparent); border: 1px solid color-mix(in srgb, var(--cobalt) 45%, transparent); transition: background .15s, color .15s; }
+.ask-row button:hover, .ask-row button:focus-visible { background: color-mix(in srgb, var(--cobalt) 14%, transparent); border-color: var(--cobalt); }
+.ask-row button[aria-expanded="true"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--vellum); }
+.ask-row button.done:not([aria-expanded="true"]) { background: none; border-style: dashed; }
 .ask-f { display: flex; flex-direction: column; gap: 6px; }
 .ask-f[hidden] { display: none; }
 .ask-f input, .ask-f textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 var(--f-body); color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); padding: 7px 9px; border-radius: 0; resize: none; }
@@ -1019,35 +1020,36 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       '<div class="ask-go"><button type="submit"></button><span class="ask-msg" role="status"></span></div></form>';
     h.after(box);
     const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg');
-    let kind = null;
+    let kind = null, busy = false, done = 0;   // busy: a send in flight; done: bumps on each success so its delayed close knows if it's stale
     const label = () => box.querySelectorAll('.ask-row button').forEach(b => { const k = b.dataset.k, on = sent[p + ':' + k]; b.classList.toggle('done', !!on); b.textContent = on ? '✓ ' + KIND[k].done : KIND[k].btn; });
     label();
     box.querySelector('.ask-row').addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if (!b) return;
+      const b = e.target.closest('button'); if (!b || busy) return;
       const k = b.dataset.k, open = !(kind === k && !f.hidden);
       kind = open ? k : null; f.hidden = !open;
       box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', String(open && x === b)));
       if (!open) return;
-      go.textContent = KIND[k].send; go.disabled = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
+      done++; go.textContent = KIND[k].send; go.disabled = false; go.hidden = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
       try { if (!em.value) em.value = localStorage.getItem('gp.email') || ''; } catch (e) {}
       if (matchMedia('(hover: hover)').matches) em.focus({ preventScroll: true });
     });
     em.addEventListener('input', () => em.removeAttribute('aria-invalid'));
     f.addEventListener('submit', async (e) => {
-      e.preventDefault(); if (!kind || go.disabled) return;
-      const email = em.value.trim();
+      e.preventDefault(); if (!kind || busy) return;
+      const k = kind, email = em.value.trim();   // the kind as sent, whatever the links do while it's in flight
       if (!EMAIL.test(email)) { em.setAttribute('aria-invalid', 'true'); msg.textContent = 'That email looks off.'; em.focus(); return; }
       if (f.elements.website.value) { f.hidden = true; return; }   // a bot filled the hidden field
-      go.disabled = true; msg.textContent = 'Sending…';
+      busy = go.disabled = true; msg.textContent = 'Sending…';
       try {
-        await post({ p, k: kind, email, note: note.value.trim().slice(0, 1000) });
+        await post({ p, k, email, note: note.value.trim().slice(0, 1000) });
         try { localStorage.setItem('gp.email', email); } catch (e) {}
-        remember(p + ':' + kind); label(); note.value = '';
-        msg.textContent = KIND[kind].ok; go.hidden = true;
-        setTimeout(() => { if (go.hidden) { f.hidden = true; go.hidden = false; box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false')); kind = null; } }, 4000);
+        remember(p + ':' + k); label(); note.value = '';
+        msg.textContent = KIND[k].ok; go.hidden = true;
+        const n = ++done;
+        setTimeout(() => { if (n === done) { f.hidden = true; go.hidden = false; box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false')); kind = null; } }, 4000);
       } catch (err) {
         go.disabled = false; msg.innerHTML = 'Couldn’t send. Try again, or email <a href="mailto:iam@gabrielprice.com">iam@gabrielprice.com</a>.';
-      }
+      } finally { busy = false; }
     });
   }
 })();

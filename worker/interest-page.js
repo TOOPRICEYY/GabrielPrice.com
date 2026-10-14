@@ -50,7 +50,8 @@ input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--acc)}#ms
   $('all').addEventListener('change', (e) => { for (const r of shown()) e.target.checked ? sel.add(r.key) : sel.delete(r.key); draw(); });
   $('fp').addEventListener('change', draw); $('fk').addEventListener('change', draw);
   $('csv').addEventListener('click', () => {
-    const q = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+    // a cell a spreadsheet would run as a formula (= + - @, or a tab or return first) gets a leading ' so it stays text
+    const q = (s) => { s = String(s == null ? '' : s); if (/^[=+\\-@\\t\\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
     const csv = ['when,build,kind,email,comment,country', ...shown().map((r) => [new Date(r.at).toISOString(), r.p, r.k, r.email, r.note, r.country].map(q).join(','))].join('\\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'signups.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
