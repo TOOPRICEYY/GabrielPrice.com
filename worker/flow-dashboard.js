@@ -4,6 +4,7 @@
 // The visits table's columns can be shown, hidden and moved, sorted by clicking a heading, and grouped; this browser remembers how.
 // Above it: visits over time, when people visit, where visits end, how long they last, where visitors come from and how the page ran.
 // Clicking a bar in any of those narrows the whole page to it (the chips at the top undo that).
+// Under the totals: the newest "Follow project" / "I want one!" sign-ups (worker/interest.js); /admin/interest has them all, with CSV and delete.
 export default `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Site flow</title>
@@ -46,6 +47,7 @@ svg .grid{stroke:var(--line);stroke-width:1}svg .base{stroke:var(--muted);stroke
 .heatkey{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);margin-top:8px}.heatkey .hc{width:14px;height:10px;border-radius:2px}
 .chips{display:contents}.chip{font-size:13px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--bar) 12%,var(--panel))}
 .tip{position:fixed;z-index:10;pointer-events:none;max-width:320px;padding:6px 9px;border-radius:8px;background:var(--ink);color:var(--panel);font-size:12px;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.18)}.old{color:var(--muted)}.warn{color:#b26a00}@media (prefers-color-scheme:dark){.warn{color:#ffc46b}}.empty{color:var(--muted);padding:12px 0}
+td.note{white-space:normal;min-width:16em;max-width:28em}
 </style></head><body><main>
 <h1>Site flow</h1><p class="sub">How visitors move through gabrielprice.com. Your own visits from this browser are not recorded.</p>
 <div class="row"><label>Range <select id="days"><option value="1">Today</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>
@@ -54,6 +56,8 @@ svg .grid{stroke:var(--line);stroke-width:1}svg .base{stroke:var(--muted);stroke
 <span id="chips" class="chips"></span>
 <span id="status" class="sub" style="margin:0"></span></div>
 <div class="tiles" id="tiles"></div>
+<div class="card full"><div class="head"><h2>Sign-ups <span class="hint" id="signN"></span></h2><a href="/admin/interest">All sign-ups, CSV, delete</a></div>
+<div class="scroll"><table><thead><tr><th>When</th><th>Build</th><th>Kind</th><th>Email</th><th>Comment</th><th>Country</th></tr></thead><tbody id="signRows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody></table></div></div>
 <div class="card full"><div class="head"><h2 id="trendT">Visits per day</h2><div class="legend" id="trendKey"></div></div><div id="trend"></div></div>
 <div class="grid"><div class="card"><h2>Reached each section (% of visits)</h2><div class="bars" id="funnel"></div></div>
 <div class="card"><h2>Average seconds spent on each section</h2><div class="bars" id="dwell"></div></div></div>
@@ -460,8 +464,23 @@ $('del').onclick = async () => {
   draw();
 };
 $('days').onchange = () => { picked.clear(); last = -1; load(); }; $('dev').onchange = $('os').onchange = () => { last = -1; if (data) draw(); };
-load();
+// sign-ups: all builds, newest first, whatever the range and filters above
+const SIGN_SHOW = 25, SIGN_KIND = { follow: 'Follow', want: 'Wants one' };
+const BUILD = { exoleg: 'ExoLeg', quadfather: 'QuadFather', catzoom: 'CatZoom' };   // the rest title-case from their slug
+const buildName = (p) => BUILD[p] || String(p || '').split('-').map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+async function loadSignups() {
+  try {
+    const r = await fetch('/admin/api/interest', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const rows = (await r.json()).rows || [];
+    $('signN').textContent = rows.length ? rows.length + ' in all' + (rows.length > SIGN_SHOW ? ', newest ' + SIGN_SHOW + ' here' : '') : '';
+    $('signRows').innerHTML = rows.length ? rows.slice(0, SIGN_SHOW).map((x) => '<tr><td>' + esc(new Date(x.at).toLocaleString()) + '</td><td>' + esc(buildName(x.p)) + '</td><td>' + esc(SIGN_KIND[x.k] || x.k) +
+      '</td><td><a href="mailto:' + esc(x.email) + '">' + esc(x.email) + '</a></td><td class="note">' + esc(x.note) + '</td><td>' + esc(x.country) + '</td></tr>').join('')
+      : '<tr><td colspan="6" class="empty">No sign-ups yet.</td></tr>';
+  } catch (e) { $('signRows').innerHTML = '<tr><td colspan="6" class="empty">Couldn’t load sign-ups.</td></tr>'; }
+}
+load(); loadSignups();
 // refresh every minute while the page is in view, so "on the site now" and today's numbers keep up
-setInterval(() => { if (!document.hidden && !busy && data) load(true).catch(() => {}); }, 60e3);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy && data) load(true).catch(() => {}); });
+setInterval(() => { if (!document.hidden && !busy && data) load(true).catch(() => {}); if (!document.hidden) loadSignups(); }, 60e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy && data) load(true).catch(() => {}); if (!document.hidden) loadSignups(); });
 </script></body></html>`;

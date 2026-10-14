@@ -202,10 +202,8 @@ p { margin: 0; max-width: 62ch; }
 /* the form: a light panel with a title, a close button, email, optional comment, Send */
 /* on phones a label too long to share its line is cut back to whole parts (see place()) */
 .eyebrow.ask-cut { white-space: nowrap; overflow: hidden; }
-.ask-f { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--cobalt) 4%, transparent); }
+.ask-f { box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--cobalt) 4%, transparent); }
 .ask-f[hidden] { display: none; }
-@media (prefers-reduced-motion: no-preference) { .ask-f:not([hidden]) { animation: ask-in .18s ease-out; } }
-@keyframes ask-in { from { opacity: 0; transform: translateY(-4px); } }
 .ask-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ask-t { font: 600 10.5px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--cobalt); }
 .ask-x { flex: none; width: 28px; height: 28px; margin: -6px -8px -6px 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--graphite-2); cursor: pointer; }
@@ -1083,9 +1081,24 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     let kind = null, busy = false, done = 0;   // busy: a send in flight; done: bumps on each success so its delayed close knows if it's stale
     const label = () => box.querySelectorAll('.ask-row button').forEach(b => { const k = b.dataset.k, on = sent[p + ':' + k]; b.classList.toggle('done', !!on); b.textContent = on ? '✓ ' + KIND[k].done : KIND[k].btn; });
     label();
+    // the form slides open (its height grows from 0, pushing the card's text down) and slides shut; a reversal mid-way
+    // carries on from the height it has reached. Instant with reduced motion
+    let anim = null, shut = true;
+    const slide = (open) => {
+      const from = anim ? f.getBoundingClientRect().height : 0;
+      if (anim) { anim.onfinish = null; anim.cancel(); anim = null; }
+      shut = !open; f.hidden = false; f.style.overflow = '';
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { f.hidden = !open; return; }
+      const h = f.offsetHeight;
+      f.style.overflow = 'hidden';
+      const flat = { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 }, part = { height: from + 'px', opacity: from / h }, full = { height: h + 'px', opacity: 1 };
+      anim = f.animate(open ? [from ? part : flat, full] : [from ? part : full, flat],
+        { duration: open ? 280 : 200, easing: open ? 'cubic-bezier(.2, .8, .2, 1)' : 'cubic-bezier(.4, 0, .6, 1)' });
+      anim.onfinish = () => { anim = null; f.style.overflow = ''; if (!open) f.hidden = true; };
+    };
     const close = (refocus) => {
       const was = kind && box.querySelector(`.ask-row button[data-k="${kind}"]`);
-      f.hidden = true; kind = null; done++;
+      slide(false); kind = null; done++;
       box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false'));
       if (refocus && was) was.focus({ preventScroll: true });
     };
@@ -1094,12 +1107,13 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
     box.querySelector('.ask-row').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b || busy) return;
       const k = b.dataset.k;
-      if (kind === k && !f.hidden) return close(false);
-      kind = k; f.hidden = false;
+      if (kind === k && !shut) return close(false);
+      const opening = shut; kind = k;
       box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', String(x === b)));
       done++; title.textContent = KIND[k].head; f.classList.remove('sent');
       go.textContent = KIND[k].send; go.disabled = false; go.hidden = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
       try { if (!em.value) em.value = localStorage.getItem('gp.email') || ''; } catch (e) {}
+      if (opening) slide(true);
       if (matchMedia('(hover: hover)').matches) em.focus({ preventScroll: true });
     });
     em.addEventListener('input', () => em.removeAttribute('aria-invalid'));
@@ -1107,7 +1121,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       e.preventDefault(); if (!kind || busy) return;
       const k = kind, email = em.value.trim();   // the kind as sent, whatever the links do while it's in flight
       if (!EMAIL.test(email)) { em.setAttribute('aria-invalid', 'true'); msg.textContent = 'That email looks off.'; em.focus(); return; }
-      if (f.elements.website.value) { f.hidden = true; return; }   // a bot filled the hidden field
+      if (f.elements.website.value) { close(false); return; }   // a bot filled the hidden field
       busy = go.disabled = true; msg.textContent = 'Sending…';
       try {
         await post({ p, k, email, note: note.value.trim().slice(0, 1000) });
