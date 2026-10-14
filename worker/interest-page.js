@@ -28,7 +28,7 @@ input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--acc)}#ms
 <script>
 (() => {
   const $ = (id) => document.getElementById(id), esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const KIND = { follow: 'Follow', want: 'I want one' }, name = (p) => p.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const KIND = { follow: 'Follow', want: 'I want one' }, BUILD = { exoleg: 'ExoLeg', quadfather: 'QuadFather', catzoom: 'CatZoom' }, name = (p) => BUILD[p] || p.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
   let rows = [], sel = new Set();
   const shown = () => rows.filter((r) => (!$('fp').value || r.p === $('fp').value) && (!$('fk').value || r.k === $('fk').value));
   function draw() {

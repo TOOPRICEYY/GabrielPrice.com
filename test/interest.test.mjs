@@ -54,6 +54,8 @@ test('the owner lists sign-ups newest first and deletes them by key', async () =
   assert.equal(page.status, 200); assert.match(await page.text(), /<title>Sign-ups<\/title>/);
   const { rows } = await (await adm('/admin/api/interest')).json();
   assert.deepEqual(rows.map((r) => r.email), ['second@b.co', 'first@b.co']);
+  const newest = await (await adm('/admin/api/interest?limit=1')).json();   // the flow dashboard's preview reads only the newest
+  assert.deepEqual([newest.rows.map((r) => r.email), newest.total], [['second@b.co'], 2]);
   const del = (body, h = { 'x-editor': '1' }) => adm('/admin/api/interest', { method: 'POST', headers: { 'content-type': 'application/json', ...h }, body: JSON.stringify(body) });
   assert.equal((await del({ delete: [rows[0].key] }, {})).status, 403, 'writes need the editor header');
   assert.equal((await del({ delete: ['flow/2026-10-14/abc/1.json'] })).status, 400, 'only sign-up keys');
