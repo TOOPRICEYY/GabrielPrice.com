@@ -123,6 +123,7 @@ section.hero { min-height: 100vh; align-items: flex-end; padding-block: 0 14vh; 
   color: var(--cobalt); display: flex; gap: 10px; align-items: baseline;
 }
 .eyebrow b { font-weight: 500; color: var(--graphite-2); }
+.eyebrow[hidden] { display: none; }
 h1, h2 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -.02em; }
 h1 { font-size: clamp(56px, 11vw, 148px); line-height: .86; font-weight: 300; font-variation-settings: "opsz" 96; }
 h1 em { font-style: normal; font-weight: 750; display: block; }
@@ -693,7 +694,7 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
 <main>
   <section class="hero" data-s="0" data-ch="Intro">
     <div class="hero-wrap">
-      <div class="eyebrow">Portfolio <b>Engineer · Builder</b></div>
+      <div class="eyebrow" hidden>Portfolio <b>Engineer · Builder</b></div>
       <h1>Gabriel <em>Price</em></h1>
       <p>Create to live, live to create</p>
       <div class="scrollhint">Scroll to start ↓</div>
