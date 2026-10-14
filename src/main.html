@@ -1016,21 +1016,28 @@ const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
 
 // ---------- free look: drag to orbit/pan; any scroll or Reset eases back to the scripted camera ----------
 const controls = new OrbitControls(camera, canvas);
-controls.enableZoom = false;          // the wheel stays the page's scroll
+controls.enableZoom = true;           // zoom is a pinch (it starts free look like an orbit does); the wheel stays the page's scroll
+controls.minDistance = 30; controls.maxDistance = 700;
+// a plain wheel over the canvas never reaches the controls (it scrolls the page); a trackpad pinch arrives as a ctrl+wheel and does
+addEventListener('wheel', (e) => { if (e.target === canvas && !e.ctrlKey) e.stopPropagation(); }, { capture: true, passive: true });
 controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE }; // one finger scrolls the page
 controls.screenSpacePanning = true;
 controls.enabled = true;
 canvas.style.touchAction = 'pan-y';
-const free = { on: false, back: 0, fromP: new THREE.Vector3(), fromT: new THREE.Vector3() };
+const free = { on: false, back: 0, y0: 0, fromP: new THREE.Vector3(), fromT: new THREE.Vector3() };
+// phones: a two-finger gesture on the stage is the 3D's, so the page doesn't pan under it (a pan would also cancel the gesture)
+for (const ev of ['touchstart', 'touchmove']) canvas.addEventListener(ev, (e) => { if (e.touches.length > 1 && e.cancelable) e.preventDefault(); }, { passive: false });
 const resetBtn = document.getElementById('resetview');
 const hintEl = document.getElementById('viewhint');
 if (matchMedia('(hover: none), (pointer: coarse)').matches) hintEl.textContent = 'Two fingers to orbit';
 controls.addEventListener('start', () => {
   if (!free.on) controls.target.copy(camTgt);
-  free.on = true; free.back = 0; resetBtn.hidden = false; hintEl.hidden = true; canvas.classList.add('dragging');
+  free.on = true; free.back = 0; free.y0 = scrollY; resetBtn.hidden = false; hintEl.hidden = true; canvas.classList.add('dragging');
 });
-controls.addEventListener('end', () => canvas.classList.remove('dragging'));
+controls.addEventListener('end', () => { canvas.classList.remove('dragging'); free.y0 = scrollY; });
+// a scroll hands the camera back only once it is a real one: not mid-gesture, and past a nudge (phones drift a little as fingers lift)
+function scrolledAway() { if (free.on && !free.back && !canvas.classList.contains('dragging') && Math.abs(scrollY - free.y0) > (innerWidth <= 720 ? 120 : 30)) returnToPath(); }
 function returnToPath() {
   if (!free.on || free.back) return;
   free.back = 1e-6; free.fromP.copy(camera.position); free.fromT.copy(controls.target);
@@ -1814,7 +1821,7 @@ function fadeSheets() {
 // the frame loop also checks scrollY, because iOS can drop the scroll event at the end of a fling or a tap-to-top, which left the
 // scene parked on a section the page had already left
 let seenY = -1;
-const onScroll = () => { seenY = scrollY; readScroll(); returnToPath(); fadeSheets(); };
+const onScroll = () => { seenY = scrollY; readScroll(); scrolledAway(); fadeSheets(); };
 addEventListener('scroll', onScroll, { passive: true });
 
 let camVO = -1;
