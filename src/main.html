@@ -1075,7 +1075,11 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       }
       return best;
     };
-    place(); new ResizeObserver(place).observe(card);
+    // re-placed when the card's width or its label/title text changes, not its height: the form opening grows the card every
+    // frame of its slide, and re-placing then would re-lay the card out each frame and break the slide up
+    let placed = '';
+    const replace = () => { const k = card.clientWidth + '|' + (card.querySelector(':scope > .eyebrow')?.textContent || '') + '|' + h.textContent; if (k !== placed) { placed = k; place(); } };
+    place(); new ResizeObserver(replace).observe(card);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
     const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg'), title = f.querySelector('.ask-t');
     let kind = null, busy = false, done = 0;   // busy: a send in flight; done: bumps on each success so its delayed close knows if it's stale
@@ -1088,8 +1092,12 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
       const from = anim ? f.getBoundingClientRect().height : 0;
       if (anim) { anim.onfinish = null; anim.cancel(); anim = null; }
       shut = !open; f.hidden = false; f.style.overflow = '';
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { f.hidden = !open; return; }
       const h = f.offsetHeight;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) {   // a short fade in place of the slide
+        anim = f.animate([{ opacity: open ? 0 : 1 }, { opacity: open ? 1 : 0 }], { duration: 150 });
+        anim.onfinish = () => { anim = null; if (!open) f.hidden = true; };
+        return;
+      }
       f.style.overflow = 'hidden';
       const flat = { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 }, part = { height: from + 'px', opacity: from / h }, full = { height: h + 'px', opacity: 1 };
       anim = f.animate(open ? [from ? part : flat, full] : [from ? part : full, flat],
@@ -2053,7 +2061,7 @@ function frame(now) {
   try { frameBody(); } catch (e) { if (!frame.err) console.error((frame.err = e)); }
 }
 // the thigh brace in Full leg: [fade on from, to] and its callout's [draw in from, to, fade out from, to] (section index s)
-const KNEE_IN = [7.04, 7.22], KNEE_TIP = [7.14, 7.26, 7.4, 7.48];
+const KNEE_IN = [7.04, 7.22], KNEE_TIP = [7.1, 7.2, 7.44, 7.5];
 const kt = document.getElementById('kneetip'), ktPath = kt.querySelector('path'), ktDot = kt.querySelector('i'), ktP = kt.querySelector('p');
 const ktCard = document.querySelector('section[data-s="7"] > .card'), _kt = new THREE.Vector3(), KT_UP = 51.5;   // the upper cuff's middle (device y, cm)
 // the callout hangs off the upper cuff by an elbow (up and out, then level) on whichever side has room clear of the Full leg card,
@@ -2064,7 +2072,9 @@ function kneeTip(s, kneeIn) {
   const P = kicker.parts.cuffs; P.m.localToWorld(_kt.set(P.c.x, KT_UP, P.c.z)); _kt.project(camera);
   const x = (_kt.x * .5 + .5) * innerWidth, y = (-_kt.y * .5 + .5) * innerHeight;
   const ph = innerWidth <= 720, D = ph ? 26 : 40, H = ph ? 12 : 18, w = ktP.offsetWidth, h = ktP.offsetHeight;
-  const ly = y - D, c = ktCard && ktCard.getBoundingClientRect(), hit = c && c.width && ly + h / 2 > c.top && ly - h / 2 < c.bottom;
+  // the card is in the way when it's level with the label (phones) or anywhere on screen (desktop: as the cuff bobs with the walk,
+  // a level-only test toggled at the card's top edge and the label jumped across and faded with every step)
+  const ly = y - D, c = ktCard && ktCard.getBoundingClientRect(), hit = c && c.width && (ph ? ly + h / 2 > c.top && ly - h / 2 < c.bottom : c.bottom > 0 && c.top < innerHeight);
   const roomR = Math.min(innerWidth, hit && c.left > x ? c.left : innerWidth) - x, roomL = x - (hit && c.right < x ? c.right : 0);
   // behind the figure whenever it fits, so it never sits over the arm; the side is picked as it appears and then held (the cuff
   // swings with the walk), changing only once the other side is clearly the better one
@@ -2078,7 +2088,7 @@ function kneeTip(s, kneeIn) {
   const lab = smooth(clamp01((p - .45) / .55));
   kt.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; kt.style.visibility = 'visible';
   // (on phones the card rises up the screen: the callout fades out before the card reaches it)
-  kt.style.opacity = c && c.width && c.left < lx + w && c.right > Math.min(x, lx) ? clamp01((c.top - (ly + h / 2) - 6) / 36).toFixed(3) : '';
+  kt.style.opacity = ph && c && c.width && c.left < lx + w && c.right > Math.min(x, lx) ? clamp01((c.top - (ly + h / 2) - 6) / 36).toFixed(3) : '';
   ktDot.style.transform = `scale(${smooth(clamp01(p / .2)).toFixed(3)})`;
   Object.assign(ktP.style, { left: (lx - x).toFixed(1) + 'px', top: (ly - y - h / 2).toFixed(1) + 'px', opacity: lab.toFixed(3),
     transform: `translateX(${(dir * 8 * (1 - lab)).toFixed(1)}px)` });
