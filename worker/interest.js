@@ -74,8 +74,10 @@ export async function interestAdmin(request, env, url) {
       if (!r.truncated) break;
       cursor = r.cursor;
     }
-    const rows = await Promise.all(keys.map(async (key) => { const o = await env.FLOW.get(key); if (!o) return null; try { return { key, ...(await o.json()) }; } catch { return null; } }));
-    return send({ rows: rows.filter(Boolean).sort((a, b) => b.at - a.at) });
+    // ?limit=N: only the newest N are read (keys start with the time they were stored), for the flow dashboard's preview
+    const limit = Math.floor(Number(url.searchParams.get('limit'))), pick = limit > 0 ? keys.sort().reverse().slice(0, limit) : keys;
+    const rows = await Promise.all(pick.map(async (key) => { const o = await env.FLOW.get(key); if (!o) return null; try { return { key, ...(await o.json()) }; } catch { return null; } }));
+    return send({ rows: rows.filter(Boolean).sort((a, b) => b.at - a.at), total: keys.length });
   }
   if (request.method === 'POST') {
     const text = await request.text();

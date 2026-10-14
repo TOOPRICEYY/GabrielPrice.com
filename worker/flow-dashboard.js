@@ -470,11 +470,11 @@ const BUILD = { exoleg: 'ExoLeg', quadfather: 'QuadFather', catzoom: 'CatZoom' }
 const buildName = (p) => BUILD[p] || String(p || '').split('-').map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
 async function loadSignups() {
   try {
-    const r = await fetch('/admin/api/interest', { credentials: 'same-origin' });
+    const r = await fetch('/admin/api/interest?limit=' + SIGN_SHOW, { credentials: 'same-origin' });
     if (!r.ok) throw new Error('http ' + r.status);
-    const rows = (await r.json()).rows || [];
-    $('signN').textContent = rows.length ? rows.length + ' in all' + (rows.length > SIGN_SHOW ? ', newest ' + SIGN_SHOW + ' here' : '') : '';
-    $('signRows').innerHTML = rows.length ? rows.slice(0, SIGN_SHOW).map((x) => '<tr><td>' + esc(new Date(x.at).toLocaleString()) + '</td><td>' + esc(buildName(x.p)) + '</td><td>' + esc(SIGN_KIND[x.k] || x.k) +
+    const j = await r.json(), rows = j.rows || [], total = j.total || rows.length;
+    $('signN').textContent = total ? total + ' in all' + (total > rows.length ? ', newest ' + rows.length + ' here' : '') : '';
+    $('signRows').innerHTML = rows.length ? rows.map((x) => '<tr><td>' + esc(new Date(x.at).toLocaleString()) + '</td><td>' + esc(buildName(x.p)) + '</td><td>' + esc(SIGN_KIND[x.k] || x.k) +
       '</td><td><a href="mailto:' + esc(x.email) + '">' + esc(x.email) + '</a></td><td class="note">' + esc(x.note) + '</td><td>' + esc(x.country) + '</td></tr>').join('')
       : '<tr><td colspan="6" class="empty">No sign-ups yet.</td></tr>';
   } catch (e) { $('signRows').innerHTML = '<tr><td colspan="6" class="empty">Couldn’t load sign-ups.</td></tr>'; }
