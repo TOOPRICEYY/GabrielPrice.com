@@ -1319,8 +1319,8 @@ const camKeys = [
   [2.4,  [150, 64, 190],  [16, 36, 0], 0],
   // close-ups sit on the figure's -x side: the inner (medial) face of the left foot
   // target z offsets push the device away from whichever side that section's card is on (+z = screen right)
-  [3.3,  [-125, 52, 58],  [0, -2, 18], 1],
-  [4.6,  [-105, 60, 14],  [0, -2, -16], 1],
+  [3.3,  [-125, 52, 58],  [0, -2, 18], 1, null, 1.2],   // (k[5]: phones punch in close on the drive train, well above the docked card)
+  [4.6,  [-105, 60, 14],  [0, -2, -16], 1, null, 1.2],
   [5.2,  [-150, 78, 90],  [0, 0, 20], 1],
   [5.6,  [-150, 78, 90],  [0, 0, 20], 1],
   [6.2,  [-120, 52, 24],  [0, -2, -16], 1],
@@ -1746,7 +1746,7 @@ function applyCam(s) {
   const [i, j, f] = sampleKeys(camKeys, s);
   keyWorld(camKeys[i], _p1, _t1); keyWorld(camKeys[j], _p2, _t2);
   camTgt.copy(_t1).lerp(_t2, f);
-  if (camKeys[i].length > 4 && camKeys[j].length > 4) {
+  if (camKeys[i][4] != null && camKeys[j][4] != null) {
     // between device scenes: orbit (lerp distance, azimuth, elevation) so the camera swings round the figure instead of cutting through it
     _p1.sub(_t1); _p2.sub(_t2);
     const r1 = _p1.length(), r2 = _p2.length(), a1 = Math.atan2(_p1.x, _p1.z), a2 = Math.atan2(_p2.x, _p2.z);
