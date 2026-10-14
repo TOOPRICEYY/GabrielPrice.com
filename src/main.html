@@ -188,6 +188,23 @@ p { margin: 0; max-width: 62ch; }
 .chain { font-family: var(--f-mono); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
 .chain span { border: 1px solid var(--rule); padding: 2px 7px; }
 .note { font-size: 13px; color: var(--graphite-2); }
+/* Follow project / I want one!: a quiet pair of links at the end of each build's last card; either opens a small form (email, optional comment) */
+.ask { margin-top: 2px; padding-top: 10px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+.ask-row { display: flex; gap: 16px; align-items: baseline; }
+.ask-row button { padding: 2px 0; font: 11px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite-2);
+  background: none; border: 0; border-bottom: 1px solid transparent; cursor: pointer; }
+.ask-row button:hover, .ask-row button:focus-visible, .ask-row button[aria-expanded="true"] { color: var(--cobalt); border-bottom-color: currentColor; }
+.ask-row button.done { color: var(--cobalt); }
+.ask-f { display: flex; flex-direction: column; gap: 6px; }
+.ask-f[hidden] { display: none; }
+.ask-f input, .ask-f textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 var(--f-body); color: var(--graphite); background: var(--vellum); border: 1px solid var(--rule); padding: 7px 9px; border-radius: 0; resize: none; }
+.ask-f input:focus, .ask-f textarea:focus { outline: none; border-color: var(--cobalt); }
+.ask-f input[aria-invalid="true"] { border-color: var(--sun); }
+.ask-f .ask-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.ask-go { display: flex; gap: 10px; align-items: center; }
+.ask-go button { font: 600 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 12px; cursor: pointer; color: var(--vellum); background: var(--cobalt); border: 1px solid var(--cobalt); }
+.ask-go button:disabled { opacity: .5; cursor: default; }
+.ask-msg { font-size: 12.5px; line-height: 1.35; color: var(--graphite-2); }
 a { color: var(--cobalt); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
 .links { display: flex; flex-wrap: wrap; gap: 10px; font-family: var(--f-mono); font-size: 13px; }
@@ -957,6 +974,80 @@ setTimeout(() => { if (!window.__rig) no3D('The 3D view is taking a while.'); },
   let seen = NaN, seenH = 0;
   (function tick() { if (scrollY !== seen || innerHeight !== seenH) { seen = scrollY; seenH = innerHeight; update(); } requestAnimationFrame(tick); })();
   new ResizeObserver(() => { last = -1; update(); }).observe(document.querySelector('main'));
+})();
+</script>
+<script>
+// "Follow project" and "I want one!" at the end of each build: the last card of every data-ch chapter gets the pair. Either opens
+// a small form (email, optional comment). On claude.ai the artifact's db keeps them, one doc per sign-up under the visitor's own
+// interest/<id>/ subtree (only the owner reads them); on the hosted site the Worker's /api/interest saves them. Sent ones are
+// remembered in localStorage (gp.ask) so the link reads "Following" or "Asked" on the next visit.
+(() => {
+  if (/^#replay=/.test(location.hash)) return;   // a visit replay shows the page as it was, without forms that send anything
+  const KIND = { follow: { btn: 'Follow project', done: 'Following', send: 'Follow', ok: "Thanks. You'll hear when there's news." },
+                 want: { btn: 'I want one!', done: 'Asked', send: 'Send', ok: "Thanks. I'll be in touch." } };
+  const sent = (() => { try { return JSON.parse(localStorage.getItem('gp.ask') || '{}') || {}; } catch (e) { return {}; } })();
+  const remember = (k) => { sent[k] = 1; try { localStorage.setItem('gp.ask', JSON.stringify(sent)); } catch (e) {} };
+  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  // where sign-ups go: the artifact's db when this page runs on claude.ai, else the Worker
+  let dbP = null;
+  const store = () => dbP || (dbP = (async () => {
+    const C = window.claude;
+    if (C && C.use) { const [db, user] = await Promise.all([C.use('db'), C.use('user')]); if (db && user) return { db, me: await user.id() }; return null; }
+    return /^https?:$/.test(location.protocol) ? { api: '/api/interest' } : null;
+  })().catch(() => null));
+  async function post(rec) {
+    const s = await store();
+    if (!s) throw new Error('none');
+    if (s.db) { await s.db.collection('interest/' + s.me + '/s').add({ ...rec, at: Date.now() }); return; }
+    const r = await fetch(s.api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rec) });
+    if (!r.ok) throw new Error('http ' + r.status);
+  }
+  const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const secs = [...document.querySelectorAll('main > section')];
+  secs.forEach((sec, i) => {
+    const ch = sec.dataset.ch; if (!ch || sec.matches('.hero, .gallery')) return;
+    let last = null;   // the chapter's last card: up to the next chapter
+    for (let j = i; j < secs.length && (j === i || !secs[j].dataset.ch); j++) { const c = secs[j].querySelector(':scope > .card'); if (c) last = c; }
+    if (!last) return;
+    const p = slug(ch), box = document.createElement('div'); box.className = 'ask'; box.dataset.p = p;
+    box.innerHTML = '<div class="ask-row">' + Object.keys(KIND).map(k => `<button type="button" data-k="${k}" aria-expanded="false">${KIND[k].btn}</button>`).join('') + '</div>' +
+      '<form class="ask-f" hidden novalidate><input type="email" name="email" required maxlength="254" autocomplete="email" placeholder="Your email" aria-label="Your email">' +
+      '<textarea name="note" rows="2" maxlength="1000" placeholder="Comments (optional)" aria-label="Comments (optional)"></textarea>' +
+      '<input class="ask-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
+      '<div class="ask-go"><button type="submit"></button><span class="ask-msg" role="status"></span></div></form>';
+    last.appendChild(box);
+    const f = box.querySelector('form'), em = f.elements.email, note = f.elements.note, go = f.querySelector('.ask-go button'), msg = f.querySelector('.ask-msg');
+    let kind = null;
+    const label = () => box.querySelectorAll('.ask-row button').forEach(b => { const k = b.dataset.k, on = sent[p + ':' + k]; b.classList.toggle('done', !!on); b.textContent = on ? '✓ ' + KIND[k].done : KIND[k].btn; });
+    label();
+    box.querySelector('.ask-row').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = b.dataset.k, open = !(kind === k && !f.hidden);
+      kind = open ? k : null; f.hidden = !open;
+      box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', String(open && x === b)));
+      if (!open) return;
+      go.textContent = KIND[k].send; go.disabled = false; msg.textContent = ''; em.removeAttribute('aria-invalid');
+      try { if (!em.value) em.value = localStorage.getItem('gp.email') || ''; } catch (e) {}
+      if (matchMedia('(hover: hover)').matches) em.focus({ preventScroll: true });
+    });
+    em.addEventListener('input', () => em.removeAttribute('aria-invalid'));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); if (!kind || go.disabled) return;
+      const email = em.value.trim();
+      if (!EMAIL.test(email)) { em.setAttribute('aria-invalid', 'true'); msg.textContent = 'That email looks off.'; em.focus(); return; }
+      if (f.elements.website.value) { f.hidden = true; return; }   // a bot filled the hidden field
+      go.disabled = true; msg.textContent = 'Sending…';
+      try {
+        await post({ p, k: kind, email, note: note.value.trim().slice(0, 1000) });
+        try { localStorage.setItem('gp.email', email); } catch (e) {}
+        remember(p + ':' + kind); label(); note.value = '';
+        msg.textContent = KIND[kind].ok; go.hidden = true;
+        setTimeout(() => { if (go.hidden) { f.hidden = true; go.hidden = false; box.querySelectorAll('.ask-row button').forEach(x => x.setAttribute('aria-expanded', 'false')); kind = null; } }, 4000);
+      } catch (err) {
+        go.disabled = false; msg.innerHTML = 'Couldn’t send. Try again, or email <a href="mailto:iam@gabrielprice.com">iam@gabrielprice.com</a>.';
+      }
+    });
+  });
 })();
 </script>
 <script>/*EDITOR*/</script>
