@@ -2166,7 +2166,8 @@ function couchHud(Co, show, live, target) {
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
   { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K && K.classList.contains('pin') !== show) keysPin(K, show); }   // the key legend stays put while you drive
   if (H.hintOn !== show) { H.hintOn = show; for (const e of H.hints || (H.hints = document.querySelectorAll('section.drive[data-s="14"] .keyhint'))) e.style.opacity = show ? 0 : ''; }   // the "take the wheel" hint has done its job once you drive
-  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) { if (ui.bready && H.nb) { ui.bready.className = ''; H.nb.st = null; } return; }
+  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) { if (ui.bready && H.nb) { ui.bready.className = ''; H.nb.st = null; }
+    if (H.fx && ui.boostfx) { ui.boostfx.style.opacity = 0; ui.boostfx.classList.remove('on'); } H.fx = false; return; }   // scrolled off mid-boost: the streaks go with the HUD
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
   // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
   const C = rigs.course, T = clock.elapsedTime, fmt = LBK.lap.fmt, run = C.t0 >= 0 ? (T - C.t0) * 1000 : 0, held = Co.hold && C.last;
@@ -2191,7 +2192,7 @@ function couchHud(Co, show, live, target) {
   if (!D.L) { try { D.L = D.fg.getTotalLength(); D.fg.style.strokeDasharray = D.L; } catch (e) { D.L = 1; } }
   D.fg.style.strokeDashoffset = (D.L * (1 - f)).toFixed(1); const k = Math.round(kmh); if (D.k !== k) { D.k = k; D.kmh.textContent = k; }
   D.classList.toggle('boost', !!Co.boostOn);
-  if (ui.boostfx) { const b = (Co.bst || 0) * (Co.boostOn ? 1 : .6); ui.boostfx.style.opacity = b.toFixed(3); ui.boostfx.classList.toggle('on', b > .02); }   // the scooter's speed streaks
+  if (ui.boostfx) { const b = (Co.bst || 0) * (Co.boostOn ? 1 : .6); ui.boostfx.style.opacity = b.toFixed(3); ui.boostfx.classList.toggle('on', b > .02); H.fx = true; }   // the scooter's speed streaks
 }
 // just-in-time tips while you drive: each one waits for you to try it, then the next
 const TIPS = [
