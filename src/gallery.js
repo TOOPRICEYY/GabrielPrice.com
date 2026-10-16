@@ -66,7 +66,7 @@ const PROJECTS = [
       cut: ['Cut through.', ''],
       specs: ['Tensile Tester', 'Base, cap and dogbone, all printed.'] } },
   { id: 'desk', title: 'Pedestal Desk', kind: 'Furniture', ph: 'desk',
-    blurb: 'A height-adjustable desk from construction lumber: a post on cross feet, and a top on a sleeve that slides along it.',
+    blurb: 'A height-adjustable desk from lumber offcuts: a post on cross feet, and a top on a sleeve that slides along it.',
     chapters: [{ key: 'hero', cam: [32, 14, 3.0], spin: .6 }, { key: 'open', cam: [78, 8, 2.9], side: 'right' }, { key: 'specs', cam: [-28, 16, 3.1], spin: .6 }],
     slide: { parts: ['Sleeve', 'Collar', 'Top', 'Bolt'], by: [0, 18, 0] },   // the top and its sleeve ride up the post in the 'open' chapter
     text: {
