@@ -121,3 +121,8 @@ Four additions, none of which change the physics or the scoring, so both leaderb
 - **Couch way-finder.** `#cofind`: while the next gate (or the roundabout) is off screen, a pink arrow on the edge of the view points to it with the distance in metres.
 - **Couch split times.** At gate 2 and at the end of the roundabout lap the panel shows the gap to the same point of your best lap this visit (`courseSplit`, `C.bSpl`), for 4 s.
 - **Scooter new best.** Passing your stored best mid-run pops "New best!" once (`G.best0`, `G.bestTold`), instead of only saying so on the end menu.
+
+## Drive games: juice (2026-11-09, same thread)
+More feedback on the moments that matter, with no change to physics or scoring. All of it is DOM, CSS and WebAudio (`FX`, `fxFlash`, `fxShake`/`fxStage`, `fxConfetti`, `tone` in rigs.js), so it adds no material, light or shader; shakes, flashes and confetti are off under reduced motion.
+- **Scooter:** a hit shakes the view and flashes the edges red (harder for a wipe-out); landing a jump thumps and jolts; "Cleared", "Dodged" and "Close one" tick; a marker pops every 50 m; the score jumps on a star; a new best throws confetti.
+- **Couch:** beeps on 3, 2, 1 and a long one on GO; each gate chimes and flashes pink, the finished roundabout lap plays three notes; a lap ends with a fanfare and confetti (more for a best); firing the boost shakes the view; a rescue fades in from white.
