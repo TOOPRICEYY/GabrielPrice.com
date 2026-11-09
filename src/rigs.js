@@ -1118,6 +1118,44 @@ function starChime(combo) {
     });
   } catch (e) { }
 }
+// ----- juice shared by both drive games: a screen flash, a shake of the view, confetti and a few tones. DOM, CSS and WebAudio only,
+// so nothing here adds a material, a light or a shader. Flashes and confetti are CSS animations (off under reduced motion). -----
+const FX = { shakeT: -1e9, shakeA: 0, fl: null, co: false };
+function fxFlash(kind) {
+  let el = FX.fl; if (!el) { el = FX.fl = document.createElement('div'); el.id = 'fxflash'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); }
+  el.className = ''; void el.offsetWidth; el.className = kind;
+}
+function fxShake(a) { if (reduced) return; const T = clock.elapsedTime, left = FX.shakeA * Math.max(0, 1 - (T - FX.shakeT) / .35); if (a >= left) { FX.shakeA = a; FX.shakeT = T; } }
+// the view's offset this frame: the current shake (it dies away over .35 s) plus whatever the caller adds (the scooter's boost rumble)
+function fxStage(extra) {
+  const st = ui.stage || (ui.stage = document.getElementById('stage')); if (!st) return;
+  const k = Math.max(0, 1 - (clock.elapsedTime - FX.shakeT) / .35), sh = FX.shakeA * k * k, a = reduced ? 0 : (extra || 0) + sh;
+  const tr = a > .05 ? `translate(${((Math.random() - .5) * a).toFixed(1)}px, ${((Math.random() - .5) * a).toFixed(1)}px)` + (sh > .05 ? ' scale(1.02)' : '') : '';   // (scaled up a touch while it shakes, so no edge shows)
+  if (st.style.transform !== tr) st.style.transform = tr;
+}
+function fxConfetti(n) {
+  if (reduced) return;
+  const el = document.createElement('div'); el.className = 'fxconf'; el.setAttribute('aria-hidden', 'true');
+  const cols = ['#ff5fd2', '#00e0ff', '#6a2cff', '#ffd23f', '#ffffff'];
+  for (let i = 0; i < (n || 36); i++) {
+    const p = document.createElement('i'), a = Math.random() * Math.PI * 2, r = 120 + Math.random() * 260;
+    p.style.cssText = `--x:${(Math.cos(a) * r).toFixed(0)}px;--y:${(Math.sin(a) * r * .7 + 160 + Math.random() * 120).toFixed(0)}px;--r:${((Math.random() - .5) * 1080).toFixed(0)}deg;--d:${(.9 + Math.random() * .7).toFixed(2)}s;background:${cols[i % cols.length]}`;
+    el.appendChild(p);
+  }
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1800);
+}
+// a run of short notes (Hz), one after another
+function tone(fs, o) {
+  o = o || {};
+  try {
+    starAudio = starAudio || new (window.AudioContext || window.webkitAudioContext)();
+    if (starAudio.state === 'suspended') starAudio.resume();
+    const A = starAudio, t = A.currentTime, gap = o.gap ?? .075, dur = o.dur ?? .16;
+    fs.forEach((f, i) => { const os = A.createOscillator(), g = A.createGain(), t0 = t + i * gap; os.type = o.type || 'triangle'; os.frequency.value = f;
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(o.vol ?? .04, t0 + .012); g.gain.exponentialRampToValueAtTime(.0005, t0 + dur);
+      os.connect(g).connect(A.destination); os.start(t0); os.stop(t0 + dur + .02); });
+  } catch (e) { }
+}
 function starPop(text, wp) {
   const v = wp.clone().project(camera); if (v.z > 1) return;
   const el = document.createElement('div'); el.className = 'starpop'; el.textContent = text;
@@ -1271,7 +1309,7 @@ function gameHurt(S, T, part, amt, label, fall) {
   const G = S.game; if (!G.on || T < G.downUntil || (T - G.hurtT < .5 && !fall) || (PIN.sc && !PIN.hit)) return;
   if (G.tut && !fall) amt = 0;                                    // learning: a hit slows you but costs no health
   G.hurtT = T; G.hp = Math.max(0, G.hp - amt); G.mini = true; G.dmg[part] = Math.min(1, G.dmg[part] + amt / 45); G.lastPart = part;
-  G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud();
+  G.vb = 0; G.boostUntil = -1e9; S.v *= .35; rigs.kick = -2.5; crashThud(); fxShake(G.hp <= 0 ? 16 : amt >= 22 ? 10 : 7); fxFlash('hit');
   starPop(label, S.g.localToWorld(R3.u.set(0, 120, 0)));
   if (G.hp <= 0) {
     // (phones stay down longer: the leaderboard shows then)
@@ -1511,19 +1549,20 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   H.g.position.z = -Zw;
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
-  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
+  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false, mile: 0 }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && (lbEndOpen('sc') || (G.ragT != null && LB.end && LB.end.k === 'sc'))) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed (and while it waits on the rag doll)
-  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
+  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false, mile: 0 }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
   if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
     bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
   if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
-  if (G.on && !pin && !G.tut && !G.bestTold && G.best0 > 0 && G.score > G.best0) { G.bestTold = true; rigs.pinPop('New best!'); starChime(6); }   // past your old best, mid-run: say so once
+  if (G.on && !pin && !G.tut && !G.bestTold && G.best0 > 0 && G.score > G.best0) { G.bestTold = true; rigs.pinPop('New best!'); starChime(6); fxConfetti(40); }   // past your old best, mid-run: say so once
+  if (G.on && !pin && !G.tut) { const m = Math.floor(G.dist / 5000); if (m > (G.mile || 0)) { G.mile = m; starPop(m * 50 + ' m', S.g.localToWorld(R3.u.set(0, 150, 0))); tone([523, 784], { vol: .03 }); } }   // every 50 m: a marker
   const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;
   G.vb *= Math.pow(.35, dt);
   // landing a jump: a speed kick
   if (S.air && !G.wasAir) G.airT0 = T;
-  if (!S.air && G.wasAir && G.on && T - G.airT0 > .12) G.vb = Math.min(GAME.landMax, G.vb + GAME.land);
+  if (!S.air && G.wasAir && G.on && T - G.airT0 > .12) { G.vb = Math.min(GAME.landMax, G.vb + GAME.land); if (!pin) { fxShake(3); rigs.kick = Math.max(rigs.kick || 0, 1.6); tone([110, 70], { type: 'sine', gap: .04, dur: .12, vol: .05 }); } }   // landing: a speed kick, a thump and a jolt
   G.wasAir = S.air;
   // ----- the walk crumbles from behind, faster and faster; caught by the edge, you fall -----
   const H0 = S.CM.haz;
@@ -1604,7 +1643,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
         if (rel > 0 && rel < 175) { h.hit = true; const part = rel < 55 ? (h.side > 0 ? 'legL' : 'legR') : rel < 125 ? (Math.random() < .5 ? 'torso' : (h.side > 0 ? 'armL' : 'armR')) : 'head';
           gameHurt(S, T, part, rel < 14 ? 15 : rel > 125 ? 30 : 22, rel < 14 ? 'Tripped' : 'Bonk'); }
       }
-      if (live && !h.hit && !h.passed && h.z < S.Z - 10) { h.passed = true; if (top >= 0) starPop('Cleared', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (live && !h.hit && !h.passed && h.z < S.Z - 10) { h.passed = true; if (top >= 0) { starPop('Cleared', S.g.localToWorld(R3.u.set(0, 120, 0))); tone([988], { dur: .08, vol: .025 }); } }
       if (h.z < S.Z - 260) { h.on = false; h.g.visible = false; }
     } else if (h.kind === 'ball') {
       const tt = age - h.wind;
@@ -1617,14 +1656,14 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
         if (live && !h.hit && dx < 24 && dz < 26 && rel > 40 && rel < 180 - 70 * (S.duck || 0)) { h.hit = true; gameHurt(S, T, rel > 140 ? 'head' : rel > 95 ? (h.side > 0 ? 'armL' : 'armR') : 'torso', rel > 140 ? 30 : 20, 'Oof'); }
         if (f > 1.6) { h.on = false; h.g.visible = false; }
       }
-      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; starPop('Dodged', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; starPop('Dodged', S.g.localToWorld(R3.u.set(0, 120, 0))); tone([988], { dur: .08, vol: .025 }); }
       if (h.z < S.Z - 300) { h.on = false; h.g.visible = false; }
     } else {
       h.z -= h.spd * dt; h.g.position.set(h.x + Math.sin(age * 3) * 4, h.y + Math.sin(age * 5) * 5, h.z);
       for (const [i, wg] of h.wings.entries()) wg.rotation.z = (i ? -1 : 1) * Math.sin(age * 22) * .7;
       const dx = Math.abs(h.x - S.X), dz = Math.abs(h.z - rz), rel = h.y - S.y;
       if (live && !h.hit && dx < 28 && dz < 24 && rel > 60 && rel < 190 - 80 * (S.duck || 0)) { h.hit = true; gameHurt(S, T, rel > 135 ? 'head' : (h.x > S.X ? 'armL' : 'armR'), rel > 135 ? 30 : 22, 'Squawk'); }
-      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; if (dx < 70) starPop('Close one', S.g.localToWorld(R3.u.set(0, 120, 0))); }
+      if (live && !h.hit && !h.passed && h.z < rz - 30) { h.passed = true; if (dx < 70) { starPop('Close one', S.g.localToWorld(R3.u.set(0, 120, 0))); tone([988, 1319], { gap: .05, dur: .08, vol: .025 }); } }
       if (h.z < S.Z - 300) { h.on = false; h.g.visible = false; }
     }
     if (!G.on) { h.on = false; h.g.visible = false; }
@@ -1634,7 +1673,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   // ----- boost juice: a wider view, a shake, streaks round the edge of the screen and a trail off the wheels -----
   if (boost > 0) rigs.kick = Math.max(rigs.kick || 0, 11 * boost + 4 * (1 - bIn) * boost);
   const stage = ui.stage || (ui.stage = document.getElementById('stage'));
-  if (stage) stage.style.transform = boost > 0 && !reduced ? `translate(${(Math.random() - .5) * 3 * boost}px, ${(Math.random() - .5) * 3 * boost}px)` : '';
+  fxStage(3 * boost);
   // close to dying: a faint bloodshot edge that beats like a pulse, stronger the lower the health
   if (ui.bloodfx) { const low = G.on ? clamp01((35 - G.hp) / 30) : 0, beat = reduced ? 1 : .8 + .2 * Math.pow(Math.max(0, Math.sin(T * (4 + 4 * low))), 6);
     ui.bloodfx.style.opacity = (low * beat * w * .6).toFixed(3); }
@@ -1662,6 +1701,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
     hud.querySelector('.mu').textContent = Math.floor(G.dist / 100) + ' m';
     hud.querySelector('.be').textContent = '· Best ' + best;
     hud.querySelector('.pi').textContent = pips;
+    if (G.on && G.stars !== hud.stars) { hud.stars = G.stars; if (G.stars) { hud.classList.remove('bump'); void hud.offsetWidth; hud.classList.add('bump'); } }   // a star: the score jumps
     ui.schurt.querySelector('.hp i').style.width = G.hp + '%';
     G.mini = true;
   }
@@ -1935,7 +1975,7 @@ function courseRescue(Co) {
   const h = G ? G.h + (back ? Math.PI : 0) : 0;
   Object.assign(Co, { x: G ? G.x + Co.SX : 0, z: G ? G.z - 6 : 0, h, phi: h, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, spPrev: 0, slip: 0, dl: 0, cy: 0, tk: 0, ori: 0, oriS: 0, boostOn: false, bst: 0, px: undefined });
   Object.assign(C, { acc: 0, a0: null, offT: 0, dT: null });
-  bigCue('Back on the road', C.t0 >= 0 ? 'the clock is still running' : '');
+  bigCue('Back on the road', C.t0 >= 0 ? 'the clock is still running' : ''); fxFlash('warp'); tone([392, 294], { type: 'sine', gap: .1, dur: .2, vol: .035 });
 }
 // a split: the lap clock at a checkpoint, and how it compares with the same point of your best lap this visit
 function courseSplit(C, k, T) {
@@ -1960,15 +2000,16 @@ function courseFrame(Co, dt, w) {
     const G = C.gates[C.i];
     const ux = p.x - G.x, uz = p.z - G.z, along = ux * Math.sin(G.h) + uz * Math.cos(G.h), lat = ux * Math.cos(G.h) - uz * Math.sin(G.h);
     if (Math.abs(along) < 90 && Math.abs(lat) < G.W + 40) {     // through it, either way
-      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; if (!C.best || C.last < C.best) C.bSpl = C.spl; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbEnd('lap', C.last * 1000, 'Lap complete'); lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; C.spl = {}; C.dl = null; }
+      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; if (!C.best || C.last < C.best) C.bSpl = C.spl; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; if (!PIN.co) { const nb = C.best === C.last; fxConfetti(nb ? 60 : 30); tone(nb ? [523, 659, 784, 1047, 1319] : [523, 659, 784], { gap: .09, dur: .22, vol: .04 }); } lbEnd('lap', C.last * 1000, 'Lap complete'); lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; C.spl = {}; C.dl = null; }
       else if (C.t0 >= 0) courseSplit(C, C.i, T);
       G.pulse = T; C.i++; C.acc = 0; C.a0 = null;
+      if (!PIN.co && C.t0 >= 0 && !Co.hold) { fxFlash('gate'); if (!C.flash || C.flash !== T) tone([659, 988], { vol: .035 }); }
     }
   } else {
     const dx = p.x - CC.ring[0], dz = p.z - CC.ring[1], r = Math.hypot(dx, dz), a = Math.atan2(dx, dz);
     if (r < CC.ringR + 260) { if (C.a0 !== null) { let d = a - C.a0; d = Math.atan2(Math.sin(d), Math.cos(d)); C.acc += d; } C.a0 = a; }
     else if (r > CC.ringR + 500) { C.acc = 0; C.a0 = null; }
-    if (Math.abs(C.acc) >= 2 * Math.PI) { if (C.t0 >= 0) courseSplit(C, n, T); C.i = 0; C.done = true; C.acc = 0; C.a0 = null; }
+    if (Math.abs(C.acc) >= 2 * Math.PI) { if (C.t0 >= 0) courseSplit(C, n, T); if (!PIN.co) { fxFlash('gate'); tone([659, 880, 1319], { vol: .035 }); } C.i = 0; C.done = true; C.acc = 0; C.a0 = null; }
   }
   // lost: off the road and driving away from the next target for CC.lost s puts the couch back at the last gate. A short cut
   // over the grass heads toward the target, so it is left alone; turning back toward it runs the count down again.
@@ -2050,7 +2091,7 @@ function couchBoost() {
   if (rigs.rec) rigs.rec('o', [Co.nitro >= 1 ? 1 : 0]);
   const el = document.createElement('div'); el.className = 'starpop big'; el.textContent = Co.nitro >= 1 ? 'Full boost!' : 'Boost!';
   el.style.left = '50%'; el.style.top = '34%'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
-  whoosh(); return true;
+  whoosh(); fxShake(6); return true;
 }
 // ----- live leaderboards (scooter: metres + 10 per star, higher wins; couch: full-course time in ms, lower wins) -----
 // On claude.ai the artifact's db holds one doc per player, lb/<their id> {tag, sc, lap}; everyone reads, each writes only their own.
@@ -2269,8 +2310,8 @@ function couchCues(Co, Tn, drive, st) {
   const el = rigs.cueEl;
   if (!drive) { if (Co.cue && el) el.className = 'gone'; Co.cue = null; Co.goT = null; return; }
   if (Co.goT == null) { Co.goT = Tn + 2.4; Co.cue = 'count'; Co.cn = 4; Co.turnT = 0; }
-  if (Tn < Co.goT) { const n = Math.ceil((Co.goT - Tn) / .8); if (n !== Co.cn) { Co.cn = n; bigCue(String(n), '', true); } return; }
-  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? '▲ to drive' : 'W to drive'); return; }
+  if (Tn < Co.goT) { const n = Math.ceil((Co.goT - Tn) / .8); if (n !== Co.cn) { Co.cn = n; bigCue(String(n), '', true); tone([440], { type: 'square', dur: .12, vol: .02 }); } return; }
+  if (Co.cue === 'count') { Co.cue = 'go'; bigCue('GO', TOUCH ? '▲ to drive' : 'W to drive'); tone([880], { type: 'square', dur: .4, vol: .02 }); return; }
   // after GO the cues follow the course: DRIFT at the roundabout, Keep going while you slide round it, Return to start once the
   // lap is done, and the lap time when you cross gate 1. A slide has to hold .25 s to count and lapse .8 s to end, so they don't flicker.
   const C = rigs.course, n = CC.gates.length, sl = Math.abs(Co.slip) / RD, raw = sl > 10 && Math.abs(Co.sp) > 90;
@@ -2417,6 +2458,7 @@ function couchFrame(s, dt, w) {
     if (innerWidth > 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
+  if (rigs.couchOn) { fxStage(0); FX.co = true; } else if (FX.co) { FX.co = false; fxStage(0); }
   { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); nitroFrame(Co, dt); const live = '', tg = courseFrame(Co, dt, wc); tipFrame(Co, dt, false, ''); couchHud(Co, wc > .5, live, tg); }
   // the wheel turns with the spin rate (it is what he steers with), within the T128's lock
   const stT = Co.dr > .5 ? Co.dl * 2.4 : Co.sw / WMAX * 1.3;            // driving, the T128 turns with the steering angle (+ = counterclockwise to him = left)
