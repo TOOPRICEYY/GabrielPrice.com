@@ -94,3 +94,12 @@ test('the hosted page loads three.js from its own domain, every file the import 
     for (const m of fs.readFileSync(new URL('dist/' + f, root), 'utf8').matchAll(/^\s*(?:import|export)\b[^'"]*?from\s*['"]([^'"]+)['"]/gm)) assert.equal(m[1], 'three', f + ' imports only three');
   }
 });
+
+test('the head holds the title and what a link preview reads', () => {
+  const head = html.slice(0, html.indexOf('</head>'));
+  assert.match(head, /<title>[^<]+<\/title>/, 'title in the head, not the body');
+  for (const p of ['og:title', 'og:description', 'og:image', 'og:url']) assert.ok(head.includes(`property="${p}"`), p);
+  const img = /property="og:image" content="https:\/\/gabrielprice\.com\/([^"]+)"/.exec(head);
+  assert.ok(img && fs.existsSync(new URL('dist/' + img[1], root)), 'the preview image is in dist');
+  assert.equal(html.split('<title>').length, 2, 'one title');
+});
