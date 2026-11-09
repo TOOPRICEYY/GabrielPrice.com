@@ -47,7 +47,7 @@ STP.plaza = [ST.cx + STP.RB + STP.LX + STP.RR - 120, STP.zB + STP.RB];
 // game feel for the couch drive: body lean, skid marks, drift smoke, camera kick
 const JU = { roll: 5 * RD, pitch: 3 * RD, skidN: 700, skidLife: 7, smokeN: 220, fov: 10 };
 const CC = { gates: (() => { const b = STP.at(STP.LA + STP.LC / 2); return [[ST.cx, 450, 0, 2 * ST.lane - 20], [b.x, b.z, b.a, 2 * ST.lane - 20]]; })(),
-  ring: STP.plaza, ringR: 380, tap: .3 };
+  ring: STP.plaza, ringR: 380, tap: .3, off: 700, lost: 2.5 };   // off: cm from the road's middle that counts as off it; lost: s of driving away out there before the couch is put back
 // couch, driven with the keys: car-like (Ackermann) with oversteer. L = front to rear module axle (cm), zr = rear axle z in the couch,
 // speeds cm/s, accelerations cm/s²; grip = how fast (1/s) the direction of travel catches up with the heading, so the steady
 // drift angle is about yaw rate / grip
@@ -944,8 +944,9 @@ function rigUI() {
   document.body.appendChild(ui.scdial);
   // couch score panel: the lap clock, best lap, the drift bar and the course target
   ui.cohud = document.createElement('div'); ui.cohud.id = 'cohud'; ui.cohud.setAttribute('aria-live', 'off');
-  ui.cohud.innerHTML = '<span class="lb">Lap</span><b class="sc">0</b><div class="row"><span class="be"></span></div><div class="nb"><i></i><span></span></div><div class="tg"></div>';
+  ui.cohud.innerHTML = '<span class="lb">Lap</span><b class="sc">0</b><div class="row"><span class="be"></span><span class="dl"></span></div><div class="nb"><i></i><span></span></div><div class="tg"></div>';
   document.body.appendChild(ui.cohud);
+  ui.cofind = document.createElement('div'); ui.cofind.id = 'cofind'; ui.cofind.setAttribute('aria-hidden', 'true'); ui.cofind.innerHTML = '<i></i><span></span>'; document.body.appendChild(ui.cofind);   // points to the couch course's next target while it is off screen (courseFrame)
   ui.bready = document.createElement('div'); ui.bready.id = 'bready'; ui.bready.setAttribute('aria-hidden', 'true'); document.body.appendChild(ui.bready);   // the screen edges glow while a boost is ready
   document.body.appendChild(ui.schud);
   // the little body: each part reddens with the damage it has taken and flashes when hit (seen from behind, like the rider)
@@ -1510,13 +1511,14 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   H.g.position.z = -Zw;
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
-  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
+  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && (lbEndOpen('sc') || (G.ragT != null && LB.end && LB.end.k === 'sc'))) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed (and while it waits on the rag doll)
-  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
+  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
   if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
     bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
   if (G.on && T >= G.downUntil) { G.dist = Math.max(G.dist, S.Z - G.z0); G.score = gameScore(G); }
+  if (G.on && !pin && !G.tut && !G.bestTold && G.best0 > 0 && G.score > G.best0) { G.bestTold = true; rigs.pinPop('New best!'); starChime(6); }   // past your old best, mid-run: say so once
   const boost = clamp01((G.boostUntil - T) / .4), bIn = clamp01((T - G.boostT0) / .15) * boost;
   G.vb *= Math.pow(.35, dt);
   // landing a jump: a speed kick
@@ -1918,6 +1920,28 @@ function CDframe(Co) {
   let lo = Infinity, hi = -Infinity; for (const md of Co.mods) { const d = md.x * fx + md.z * fz; lo = Math.min(lo, d); hi = Math.max(hi, d); }
   return { fx, fz, Rx: fx * lo, Rz: fz * lo, L: Math.max(40, hi - lo), hi };
 }
+// how far a point is from the street's centreline (the two straights and the bend between them) or from the roundabout's plaza, cm
+function courseOff(x, z) {
+  const C = ST.cx, { zB, RB, LX, RR } = STP, bx = C + RB, bz = zB + RB;
+  let d = Math.hypot(x - C, z - Math.max(ST.z0, Math.min(zB, z)));
+  d = Math.min(d, Math.hypot(x - Math.max(bx, Math.min(bx + LX, x)), z - bz));
+  if (x <= bx && z >= zB) d = Math.min(d, Math.abs(Math.hypot(x - bx, z - zB) - RB));
+  return Math.min(d, Math.max(0, Math.hypot(x - STP.plaza[0], z - STP.plaza[1]) - RR));
+}
+// lost off the road: back to the last gate passed (the start line before gate 1), stopped and pointing down the course. The lap
+// clock keeps running, so it costs time but not the lap.
+function courseRescue(Co) {
+  const C = rigs.course, n = CC.gates.length, back = C.i === 0 && C.done, G = C.i === 0 ? (back ? C.gates[n - 1] : null) : C.gates[C.i - 1];
+  const h = G ? G.h + (back ? Math.PI : 0) : 0;
+  Object.assign(Co, { x: G ? G.x + Co.SX : 0, z: G ? G.z - 6 : 0, h, phi: h, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, spPrev: 0, slip: 0, dl: 0, cy: 0, tk: 0, ori: 0, oriS: 0, boostOn: false, bst: 0, px: undefined });
+  Object.assign(C, { acc: 0, a0: null, offT: 0, dT: null });
+  bigCue('Back on the road', C.t0 >= 0 ? 'the clock is still running' : '');
+}
+// a split: the lap clock at a checkpoint, and how it compares with the same point of your best lap this visit
+function courseSplit(C, k, T) {
+  const t = T - C.t0; (C.spl || (C.spl = {}))[k] = t;   // (a replay's seek restores a lap under way without its splits)
+  if (C.bSpl && C.bSpl[k] != null) C.dl = { d: t - C.bSpl[k], T };
+}
 // the course: next gate lit with chevrons, gates passed by getting within half a gate of its middle; the ring wants a full lap round the pylon
 function courseFrame(Co, dt, w) {
   const C = rigs.course, T = clock.elapsedTime, n = CC.gates.length;
@@ -1936,15 +1960,38 @@ function courseFrame(Co, dt, w) {
     const G = C.gates[C.i];
     const ux = p.x - G.x, uz = p.z - G.z, along = ux * Math.sin(G.h) + uz * Math.cos(G.h), lat = ux * Math.cos(G.h) - uz * Math.sin(G.h);
     if (Math.abs(along) < 90 && Math.abs(lat) < G.W + 40) {     // through it, either way
-      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbEnd('lap', C.last * 1000, 'Lap complete'); lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; }
+      if (C.i === 0) { if (C.t0 >= 0 && C.done) { C.last = T - C.t0; if (!C.best || C.last < C.best) C.bSpl = C.spl; C.best = C.best ? Math.min(C.best, C.last) : C.last; C.laps++; C.flash = T; lbEnd('lap', C.last * 1000, 'Lap complete'); lbSubmit('lap', C.last * 1000); } C.t0 = T; C.done = false; C.spl = {}; C.dl = null; }
+      else if (C.t0 >= 0) courseSplit(C, C.i, T);
       G.pulse = T; C.i++; C.acc = 0; C.a0 = null;
     }
   } else {
     const dx = p.x - CC.ring[0], dz = p.z - CC.ring[1], r = Math.hypot(dx, dz), a = Math.atan2(dx, dz);
     if (r < CC.ringR + 260) { if (C.a0 !== null) { let d = a - C.a0; d = Math.atan2(Math.sin(d), Math.cos(d)); C.acc += d; } C.a0 = a; }
     else if (r > CC.ringR + 500) { C.acc = 0; C.a0 = null; }
-    if (Math.abs(C.acc) >= 2 * Math.PI) { C.i = 0; C.done = true; C.acc = 0; C.a0 = null; }
+    if (Math.abs(C.acc) >= 2 * Math.PI) { if (C.t0 >= 0) courseSplit(C, n, T); C.i = 0; C.done = true; C.acc = 0; C.a0 = null; }
   }
+  // lost: off the road and driving away from the next target for CC.lost s puts the couch back at the last gate. A short cut
+  // over the grass heads toward the target, so it is left alone; turning back toward it runs the count down again.
+  const tg = C.i === n ? CC.ring : [C.gates[C.i].x, C.gates[C.i].z], dT = Math.hypot(p.x - tg[0], p.z - tg[1]);
+  const live = !!Co.drive && !Co.hold && !PIN.co && Co.goT != null && T >= Co.goT && w > .5;
+  if (!live || courseOff(p.x, p.z) < CC.off) C.offT = 0;
+  else C.offT = Math.max(0, (C.offT || 0) + (dT > (C.dT ?? dT) ? dt : -dt));
+  C.dT = dT;
+  if (C.offT > CC.lost) courseRescue(Co);
+  // way-finder: while the next target is out of view, an arrow on the edge of the screen points to it and says how far it is
+  { const F = ui.cofind; let on = false;
+    if (F && live) {
+      const v = R3.u.set(tg[0], 60, tg[1]).project(camera), behind = v.z > 1, W2 = innerWidth / 2, H2 = innerHeight / 2;
+      if (behind || Math.abs(v.x) > .92 || Math.abs(v.y) > .92) {
+        let sx = v.x * W2, sy = -v.y * H2; if (behind) { sx = -sx; sy = -sy; }
+        const l = Math.hypot(sx, sy) || 1, m = 64, k = Math.min((W2 - m) / Math.max(1e-3, Math.abs(sx)), (H2 - m) / Math.max(1e-3, Math.abs(sy)));
+        F.style.transform = `translate(${(W2 + sx * k).toFixed(0)}px, ${(H2 + sy * k).toFixed(0)}px) translate(-50%, -50%)`;
+        F.firstChild.style.transform = `rotate(${(Math.atan2(sy / l, sx / l) * 180 / Math.PI + 90).toFixed(0)}deg)`;
+        const txt = Math.round(dT / 100) + ' m'; if (F.txt !== txt) { F.txt = txt; F.lastChild.textContent = txt; }
+        on = true;
+      }
+    }
+    if (F && F.on !== on) { F.on = on; F.style.opacity = on ? 1 : 0; } }
   C.arcG.setDrawRange(0, 6 * Math.round(96 * clamp01(Math.abs(C.acc) / (2 * Math.PI))));
   const tm = (t) => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
   const target = onRing ? 'Drift a full lap round the roundabout ' + Math.round(Math.abs(C.acc) / (2 * Math.PI) * 100) + '%' : C.i === 0 && C.done ? 'Back through gate 1 to finish' : 'Gate ' + (C.i + 1) + ' of ' + n;
@@ -2166,18 +2213,20 @@ function couchHud(Co, show, live, target) {
   if (show && ui.schud) for (const e of [ui.schud, ui.schurt, ui.bloodfx, ui.boostfx]) if (e) e.style.opacity = 0;   // a fast scroll from the scooter can leave its HUD up
   { const K = H.keys || (H.keys = document.querySelector('section.drive[data-s="14"] .keys')); if (K && K.classList.contains('pin') !== show) keysPin(K, show); }   // the key legend stays put while you drive
   if (H.hintOn !== show) { H.hintOn = show; for (const e of H.hints || (H.hints = document.querySelectorAll('section.drive[data-s="14"] .keyhint'))) e.style.opacity = show ? 0 : ''; }   // the "take the wheel" hint has done its job once you drive
-  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) { if (ui.bready && H.nb) { ui.bready.className = ''; H.nb.st = null; }
+  H.style.opacity = D.style.opacity = show ? 1 : 0; if (!show) { if (ui.cofind && ui.cofind.on) { ui.cofind.on = false; ui.cofind.style.opacity = 0; } if (ui.bready && H.nb) { ui.bready.className = ''; H.nb.st = null; }
     if (H.fx && ui.boostfx) { ui.boostfx.style.opacity = 0; ui.boostfx.classList.remove('on'); } H.fx = false; return; }   // scrolled off mid-boost: the streaks go with the HUD
   if (!TOUCH && D.vh !== innerHeight + innerWidth) { const tb = document.querySelector('.titleblock'); if (tb) { D.vh = innerHeight + innerWidth; D.style.bottom = (innerHeight - tb.getBoundingClientRect().top + 10) + 'px'; } }
   // the score is the time for the full course: the lap clock runs from gate 1 round the roundabout and back through gate 1
   const C = rigs.course, T = clock.elapsedTime, fmt = LBK.lap.fmt, run = C.t0 >= 0 ? (T - C.t0) * 1000 : 0, held = Co.hold && C.last;
   const big = held ? fmt(C.last * 1000) : run ? fmt(run) : '0:00.0', best = C.best || (LB.mine.lap / 1000);
-  const txt = big + '|' + live + '|' + target + '|' + best;
+  const dl = !held && C.dl && T - C.dl.T < 4 ? C.dl.d : null, dls = dl == null ? '' : (dl <= 0 ? '−' : '+') + Math.abs(dl).toFixed(1) + ' s';   // the split against your best lap, for 4 s after a checkpoint
+  const txt = big + '|' + live + '|' + target + '|' + best + '|' + dls;
   if (txt !== H.txt) {
     H.txt = txt;
     H.querySelector('.lb').textContent = held ? 'Lap time' : 'Lap';
     H.querySelector('.sc').textContent = big;
     H.querySelector('.be').textContent = best ? 'Best ' + fmt(best * 1000) : 'No lap yet'; H.querySelector('.tg').textContent = held ? '' : target;
+    { const e = H.querySelector('.dl'); e.textContent = dls; e.className = 'dl' + (dl == null ? '' : dl <= 0 ? ' up' : ' dn'); }
   }
   // the drift bar: fills while you slide, glows when it can fire, drains while it burns
   { const N = H.nb || (H.nb = H.querySelector('.nb')), f = Co.nitro || 0, st = Co.boostOn ? 'burn' : f >= 1 ? 'full' : f >= NITRO.min ? 'ready' : 'fill';
@@ -2233,7 +2282,7 @@ function couchCues(Co, Tn, drive, st) {
     bigCue(tm(C.last), C.best === C.last ? 'new best lap' : 'lap · best ' + tm(C.best));
     // finished: back on the start line, stopped, an empty drift bar; it waits there for a new press of W (or ▲)
     Object.assign(Co, { x: 0, z: 0, h: 0, vx: 0, vz: 0, w: 0, u: 0, v: 0, r: 0, sp: 0, slip: 0, phi: 0, dl: 0, cy: 0, tk: 0, nitro: 0, boostOn: false, bst: 0, hold: true, px: undefined });
-    Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null });
+    Object.assign(C, { i: 0, done: false, t0: -1, acc: 0, a0: null, offT: 0, dT: null });
     return;
   }
   if (Co.hold) { if (Tn < Co.waitT + 10 || lbEndOpen('lap')) Co.kLast = Tn; else { Co.hold = false; return; }   // waits 10 s on the line, then lets the autopilot back

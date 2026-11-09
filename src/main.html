@@ -485,6 +485,10 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--rule)
 @keyframes brpulse { from { opacity: .55; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { #cohud .nb.full, #cohud .nb.full i, #cohud .nb.burn i, #bready.full { animation: none; } }
 #cohud .tg { font-size: 11px; color: var(--graphite-2); text-wrap: balance; }
+#cohud .dl { font-weight: 600; } #cohud .dl.up { color: var(--cobalt); } #cohud .dl.dn { color: var(--graphite); }
+#cofind { position: fixed; z-index: 24; left: 0; top: 0; opacity: 0; pointer-events: none; transition: opacity .25s; display: grid; justify-items: center; gap: 4px;
+  font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--graphite); }
+#cofind i { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 24px solid #ff5fd2; filter: drop-shadow(0 0 6px rgba(255, 95, 210, .6)); }
 #cohud.live { border-color: var(--cobalt); box-shadow: 0 0 18px color-mix(in srgb, var(--cobalt) 45%, transparent); }
 @media (hover: none), (pointer: coarse) { #cohud { top: calc(56px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 220px); min-width: 150px; padding: 4px 12px 6px; } #cohud .sc { font-size: 38px; } }
 /* the scooter's card steps aside while a run is on (rigs.js toggles .playing) */
