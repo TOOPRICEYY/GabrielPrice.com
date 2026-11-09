@@ -114,3 +114,10 @@ Card 06 ("Parts") is a priced table of two builds side by side: **Mechanical onl
 
 ## Parts lists linked to the model (2026-10-13)
 Every parts list (the Anti-thetis table, QuadFather's and CatZoom's exploded BOMs, and each gallery project's exploded list) is linked to its model both ways. Hovering a row lights its part, and hovering a part or its balloon lights the row. A tap or click pins the pair until the next tap. `partLinker` in main.html does this. Each list registers its rows (`data-k`), the 3D groups a key stands for, and when its balloons are up. The lit part draws with an emissive copy of its material, which `frame()` keeps in step with the original's fades and clipping. A row stands for every copy of its part: planets 1–4, all four scooter wheels, and gallery parts sharing a balloon number.
+
+## Drive games: finding your way and beating yourself (2026-11-09, "Improve the website overall" thread)
+Four additions, none of which change the physics or the scoring, so both leaderboards stay comparable.
+- **Couch, lost off the road.** Holding W past the bend used to carry the couch into empty space for good, with the lap clock running and nothing to steer by. `courseOff` (rigs.js) measures the distance to the street's centreline and the roundabout; `CC.lost` seconds of driving *away* from the next target while more than `CC.off` cm off the road calls `courseRescue`, which puts the couch back at the last gate passed, stopped, with the clock still running. A short cut over the grass heads toward the target, so it is never rescued.
+- **Couch way-finder.** `#cofind`: while the next gate (or the roundabout) is off screen, a pink arrow on the edge of the view points to it with the distance in metres.
+- **Couch split times.** At gate 2 and at the end of the roundabout lap the panel shows the gap to the same point of your best lap this visit (`courseSplit`, `C.bSpl`), for 4 s.
+- **Scooter new best.** Passing your stored best mid-run pops "New best!" once (`G.best0`, `G.bestTold`), instead of only saying so on the end menu.
