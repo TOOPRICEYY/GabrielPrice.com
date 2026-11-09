@@ -1120,7 +1120,7 @@ function starChime(combo) {
 }
 // ----- juice shared by both drive games: a screen flash, a shake of the view, confetti and a few tones. DOM, CSS and WebAudio only,
 // so nothing here adds a material, a light or a shader. Flashes and confetti are CSS animations (off under reduced motion). -----
-const FX = { shakeT: -1e9, shakeA: 0, fl: null, co: false };
+const FX = { shakeT: -1e9, shakeA: 0, fl: null, co: false, sc: false };   // co / sc: the couch / the scooter is driving the view's shake
 function fxFlash(kind) {
   let el = FX.fl; if (!el) { el = FX.fl = document.createElement('div'); el.id = 'fxflash'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); }
   el.className = ''; void el.offsetWidth; el.className = kind;
@@ -1133,6 +1133,8 @@ function fxStage(extra) {
   const tr = a > .05 ? `translate(${((Math.random() - .5) * a).toFixed(1)}px, ${((Math.random() - .5) * a).toFixed(1)}px)` + (sh > .05 ? ' scale(1.02)' : '') : '';   // (scaled up a touch while it shakes, so no edge shows)
   if (st.style.transform !== tr) st.style.transform = tr;
 }
+// a game leaves the screen (scrolled away, perhaps mid-shake): the view goes back to rest
+function fxClear() { FX.shakeA = 0; fxStage(0); }
 function fxConfetti(n) {
   if (reduced) return;
   const el = document.createElement('div'); el.className = 'fxconf'; el.setAttribute('aria-hidden', 'true');
@@ -1673,7 +1675,7 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   // ----- boost juice: a wider view, a shake, streaks round the edge of the screen and a trail off the wheels -----
   if (boost > 0) rigs.kick = Math.max(rigs.kick || 0, 11 * boost + 4 * (1 - bIn) * boost);
   const stage = ui.stage || (ui.stage = document.getElementById('stage'));
-  fxStage(3 * boost);
+  fxStage(3 * boost); FX.sc = true;
   // close to dying: a faint bloodshot edge that beats like a pulse, stronger the lower the health
   if (ui.bloodfx) { const low = G.on ? clamp01((35 - G.hp) / 30) : 0, beat = reduced ? 1 : .8 + .2 * Math.pow(Math.max(0, Math.sin(T * (4 + 4 * low))), 6);
     ui.bloodfx.style.opacity = (low * beat * w * .6).toFixed(3); }
@@ -1734,7 +1736,7 @@ function crashThud() {
 function scooterFrame(s, dt, w) {
   const S = rigs.scooter; fade(S.g, w); fade(S.course, w);
   rigs.ghost = 0; rigs.scootOn = false;
-  if (w <= 0) { ui.callouts3.style.opacity = 0; tutHint(''); return; }
+  if (w <= 0) { ui.callouts3.style.opacity = 0; tutHint(''); if (FX.sc) { FX.sc = false; fxClear(); } return; }
   const T = clock.elapsedTime, RW = 10.16, L = SC.L, kneeH = +ui.scKnee.value; S.T = T;   // S.T: the rig clock, for render checks
   const e = ease(win(s, 10.55, 10.85, 11.3, 11.6));                 // exploded
   const moving = 1 - win(s, 10.4, 10.7, 11.35, 11.65);               // it rolls to a stop before it comes apart
@@ -2359,7 +2361,7 @@ function couchFrame(s, dt, w) {
   // the street, until it pulls in by the fire; the grid fades under the asphalt
   const wSt = w * (1 - smooth(seg(s, 10.1, 10.5)));
   fade(rigs.street.g, wSt); floorGrid.material.opacity = .32 * (1 - .85 * wSt);
-  if (w <= 0) { fade(rigs.course.g, 0); if (rigs.tipEl) rigs.tipEl.style.opacity = 0; couchHud(Co, false); if (Co.cue) couchCues(Co, 0, false); return; }
+  if (w <= 0) { if (FX.co) { FX.co = false; fxClear(); } fade(rigs.course.g, 0); if (rigs.tipEl) rigs.tipEl.style.opacity = 0; couchHud(Co, false); if (Co.cue) couchCues(Co, 0, false); return; }
   Co.t += dt;
   const pk = smooth(seg(s, 10.2, 10.7));             // parking: 0 = free driving, 1 = stopped in front of the hearth
   const wDrive = w * (1 - smooth(seg(s, 10.45, 10.8)));  // hands and feet on the controls until he sits back
@@ -2458,7 +2460,7 @@ function couchFrame(s, dt, w) {
     if (innerWidth > 720) { const off = 120 * (1 - (rigs.chasePre || 0)), px = cy * off, pz = -sy * off; C.p.x += px; C.p.z += pz; C.t.x += px; C.t.z += pz; }   // clear the card on the left
     if (C.w > .001) floorGrid.position.set(Math.round(P.x / 20) * 20, .05, Math.round(P.z / 20) * 20);
   }
-  if (rigs.couchOn) { fxStage(0); FX.co = true; } else if (FX.co) { FX.co = false; fxStage(0); }
+  if (rigs.couchOn) { fxStage(0); FX.co = true; } else if (FX.co) { FX.co = false; fxClear(); }
   { const wc = smooth(Co.dr) * w * (1 - pk); juiceFrame(Co, dt, wc); nitroFrame(Co, dt); const live = '', tg = courseFrame(Co, dt, wc); tipFrame(Co, dt, false, ''); couchHud(Co, wc > .5, live, tg); }
   // the wheel turns with the spin rate (it is what he steers with), within the T128's lock
   const stT = Co.dr > .5 ? Co.dl * 2.4 : Co.sw / WMAX * 1.3;            // driving, the T128 turns with the steering angle (+ = counterclockwise to him = left)
