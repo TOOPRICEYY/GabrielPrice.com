@@ -1983,7 +1983,7 @@ const qa = new THREE.Quaternion();
 
 // ---------- scroll → s ----------
 const sections = [...document.querySelectorAll('section[data-s]')];
-const sheetNo = sections.map((e, i) => sections.slice(0, i + 1).filter((x) => !x.matches('.skip')).length || 1), sheetN = sections.filter((e) => !e.matches('.skip')).length;   // sheet numbers skip removed scenes
+const sheetNo = sections.map((e, i) => sections.slice(0, i + 1).filter((x) => !x.matches('.skip, .drive')).length || 1), sheetN = sections.filter((e) => !e.matches('.skip, .drive')).length;   // sheet numbers skip removed scenes and the couch drive (it has no card), so they match the cards' own numbers
 let sTarget = 0, sNow = 0;
 function readScroll() {
   const mid = scrollY + innerHeight * .5;

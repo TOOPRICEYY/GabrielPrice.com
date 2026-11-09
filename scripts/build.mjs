@@ -74,9 +74,26 @@ const flow = fs.readFileSync(path.join(ROOT, 'flow', 'client.js'), 'utf8');
 if (/<\/script/i.test(flow)) throw new Error('build: flow/client.js contains a closing script tag');
 s += `\n<script>window.__flowBuild=${build};</script>\n<script>${flow}</script>`;
 
+// ---------- document head (hosted site only) ----------
+// src/main.html opens with its <title> and font links (the artifact host supplies its own <head>). Here they move into a real <head>,
+// next to what a link preview reads: the description, Open Graph and Twitter card tags, and photos/og.jpg (1200 x 630, the hero).
+// Without these a link pasted into LinkedIn, Slack or Messages unfurls as a bare URL.
+const lead = /^\s*<title>([^<]*)<\/title>\s*(?:<link\b[^>]*>\s*)*/.exec(s);
+if (!lead) throw new Error('build: expected src/main.html to open with its <title> and font links');
+s = s.slice(lead[0].length);
+const SITE = 'https://gabrielprice.com/', DESC = 'Gabriel Price: wearable and rideable builds, from an ankle exoskeleton to a swerve-drive couch.';
+if (!fs.existsSync(path.join(ROOT, 'photos', 'og.jpg'))) throw new Error('build: photos/og.jpg (the link preview image) is missing');
+const ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%236a2cff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='700' font-size='16' fill='%23fff'%3EGP%3C/text%3E%3C/svg%3E";
 const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
   + '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-  + '<meta name="description" content="Gabriel Price: wearable and rideable builds, from an ankle exoskeleton to a swerve-drive couch.">'
+  + lead[0].trim()
+  + `<meta name="description" content="${DESC}">`
+  + `<link rel="canonical" href="${SITE}"><link rel="icon" href="${ICON}">`
+  + `<meta property="og:type" content="website"><meta property="og:site_name" content="Gabriel Price"><meta property="og:url" content="${SITE}">`
+  + `<meta property="og:title" content="${lead[1].trim().replace(/"/g, '&quot;')}"><meta property="og:description" content="${DESC}">`
+  + `<meta property="og:image" content="${SITE}photos/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`
+  + '<meta property="og:image:alt" content="Gabriel Price, project gallery: a faceted white figure standing on a pink grid.">'
+  + '<meta name="twitter:card" content="summary_large_image">'
   + '<style>body{margin:0}</style></head><body>' + s + '</body></html>';
 
 // ---------- write ----------
