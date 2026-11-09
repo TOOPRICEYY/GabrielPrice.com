@@ -1511,9 +1511,9 @@ function gameFrame(S, T, dt, w, Zw, manual, L) {
   H.g.position.z = -Zw;
   for (const k in H.mat) if (H.mat[k]) H.mat[k].opacity = w;
   // a run starts when the reader takes over and ends when the autopilot takes back (or after a wipe-out); its score counts toward the best
-  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest() }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
+  if (manual && !G.on) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }
   if (G.on && G.downUntil > 0 && (lbEndOpen('sc') || (G.ragT != null && LB.end && LB.end.k === 'sc'))) G.downUntil = Math.max(G.downUntil, T + .1);   // down until the end menu is closed (and while it waits on the rag doll)
-  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest() }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
+  if (G.on && G.downUntil > 0 && T > G.downUntil) { Object.assign(G, gameNew(), { on: true, t0: T, z0: S.Z, zc: S.Z - GAME.fallGap, chunkZ: S.Z - GAME.fallGap, best0: gameBest(), bestTold: false }); for (const h of H.list) { h.on = false; h.g.visible = false; } }   // up again: a fresh run
   if (pin && G.on) { G.seed = pin.seed; G.z0 = S.Z - pin.dist; G.dist = pin.dist; G.stars = pin.stars; G.hp = pin.hp; G.zc = S.Z + pin.zc; G.tut = !!pin.tut; for (const k of DMG) G.dmg[k] = pin[k]; if (PIN.seek) { G.chunkZ = G.zc - 90; PIN.seek = false; }
     bestLoaded = pin.best; if (!(pin.boost > 0)) G.boostUntil = -1e9; else if (Math.abs(G.boostUntil - T - pin.boost) > .3) { G.boostUntil = T + pin.boost; G.boostT0 = G.boostUntil - GAME.boostT; } }   // a replay: the run as recorded
   if (!manual && G.on) { G.on = false; const sc = gameScore(G); if (sc > gameBest()) gameBest(sc); G.final = sc; lbSubmit('sc', sc); G.vb = 0; G.boostUntil = -1e9; }
@@ -1939,7 +1939,7 @@ function courseRescue(Co) {
 }
 // a split: the lap clock at a checkpoint, and how it compares with the same point of your best lap this visit
 function courseSplit(C, k, T) {
-  const t = T - C.t0; C.spl[k] = t;
+  const t = T - C.t0; (C.spl || (C.spl = {}))[k] = t;   // (a replay's seek restores a lap under way without its splits)
   if (C.bSpl && C.bSpl[k] != null) C.dl = { d: t - C.bSpl[k], T };
 }
 // the course: next gate lit with chevrons, gates passed by getting within half a gate of its middle; the ring wants a full lap round the pylon
